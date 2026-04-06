@@ -65,8 +65,6 @@ export async function POST(req: NextRequest) {
             category: "OUTROS",
             amount: Math.round(parcela * 100) / 100,
             date: new Date(y, m - 1, firstDate.getDate()),
-            month: m,
-            year: y,
             paidWithCash: false,
           },
         });
@@ -79,8 +77,6 @@ export async function POST(req: NextRequest) {
           category: "OUTROS",
           amount: totalAmount,
           date: new Date(date),
-          month: firstMonth,
-          year: firstYear,
           paidWithCash: paidWithCash || false,
         },
       });

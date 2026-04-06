@@ -341,8 +341,8 @@ export default function ClientesPage() {
               className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl p-6 hover:border-[#FF5A00]/50 transition-all cursor-pointer group flex items-center gap-4"
             >
               <div className="w-14 h-14 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xl font-bold text-zinc-300 group-hover:text-[#FF5A00] transition-colors shrink-0 shadow-inner overflow-hidden">
-                {(client as any).logoUrl
-                  ? <img src={(client as any).logoUrl} alt={client.name} className="w-full h-full object-cover" />
+                {client.logoUrl
+                  ? <img src={client.logoUrl} alt={client.name} className="w-full h-full object-cover" />
                   : client.name.charAt(0).toUpperCase()
                 }
               </div>

@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
-import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FilterDialog } from "@/components/ui/filter-dialog";
 import {
@@ -110,7 +109,7 @@ export default function FinanceiroPage() {
       {activeTab === "receivables" && <ReceivablesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "fixed" && <FixedExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "variable" && <VariableExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
-      {activeTab === "investments" && <InvestmentsTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
+      {activeTab === "investments" && <InvestmentsTab />}
       {activeTab === "prolabore" && <ProLaboreTab year={year} setYear={setYear} />}
       {activeTab === "cash" && <CashTab />}
     </div>
@@ -126,7 +125,13 @@ function DashboardTab() {
   const [period, setPeriod] = useState(1);
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<{
+    activeClients: number; expectedRevenue: number; receivedRevenue: number;
+    totalExpenses: number; grossProfit: number;
+    chartData: { name: string; faturamento: number; despesas: number }[];
+    clientRevenue: { clientId: string; name: string; expected: number; received: number }[];
+    expenseByCategory: { category: string; amount: number }[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchSummary = useCallback(async () => {
@@ -216,13 +221,13 @@ function DashboardTab() {
       </div>
 
       {/* Chart */}
-      {data?.chartData?.length > 0 && (
+      {(data?.chartData?.length ?? 0) > 0 && (
         <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl p-6">
           <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-6">
             <BarChart3 size={16} className="text-[#FF5A00]" /> Faturamento vs Despesas
           </h3>
           <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={data.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={data?.chartData ?? []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
               <XAxis dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 12 }} axisLine={false} tickLine={false} dy={10} />
               <YAxis tick={{ fill: "#a1a1aa", fontSize: 12 }} axisLine={false} tickLine={false} dx={-10} />
@@ -230,7 +235,8 @@ function DashboardTab() {
                 contentStyle={{ backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: "12px", fontSize: 12, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)" }}
                 itemStyle={{ fontWeight: "bold" }}
                 labelStyle={{ color: "#a1a1aa", marginBottom: "4px" }}
-                formatter={(value: any) => [R$(value), ""]}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={(value: any) => [R$(Number(value ?? 0)), ""]}
               />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: "20px" }} iconType="circle" />
               <Bar dataKey="faturamento" fill="#10b981" name="Faturamento" radius={[6, 6, 0, 0]} />
@@ -738,9 +744,7 @@ interface Investment {
   date: string; paidWithCash: boolean;
 }
 
-function InvestmentsTab({ month: _month, year: _year, setMonth: _setMonth, setYear: _setYear }: {
-  month: number; year: number; setMonth: (m: number) => void; setYear: (y: number) => void;
-}) {
+function InvestmentsTab() {
   const [items, setItems] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
