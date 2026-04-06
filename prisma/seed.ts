@@ -4,26 +4,49 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const password = await bcrypt.hash("hadar2024", 10);
+const users = [
+  {
+    name: "Felipe",
+    email: "felipe@agenciahadar.com.br",
+    password: "Lipinho2017_",
+    role: Role.ADMIN,
+  },
+  {
+    name: "Alexandre",
+    email: "alexandre@agenciahadar.com.br",
+    password: "ALEhadar2024",
+    role: Role.MEMBER,
+  },
+  {
+    name: "Luiz",
+    email: "luiz@agenciahadar.com.br",
+    password: "agCHADAR2024",
+    role: Role.MEMBER,
+  },
+];
 
-  // Users
-  const felipe = await prisma.user.upsert({
-    where: { email: "felipe@hadar.com" },
+const createdUsers: any = {};
+
+for (const user of users) {
+  const hashedPassword = await bcrypt.hash(user.password, 10);
+
+  const created = await prisma.user.upsert({
+    where: { email: user.email },
     update: {},
-    create: { name: "Felipe", email: "felipe@hadar.com", password, role: Role.ADMIN },
+    create: {
+      name: user.name,
+      email: user.email,
+      password: hashedPassword,
+      role: user.role,
+    },
   });
 
-  const alexandre = await prisma.user.upsert({
-    where: { email: "alexandre@hadar.com" },
-    update: {},
-    create: { name: "Alexandre", email: "alexandre@hadar.com", password, role: Role.ADMIN },
-  });
+  createdUsers[user.name.toLowerCase()] = created;
+}
 
-  const sofia = await prisma.user.upsert({
-    where: { email: "sofia@hadar.com" },
-    update: {},
-    create: { name: "Sofia", email: "sofia@hadar.com", password, role: Role.MEMBER },
-  });
+const felipe = createdUsers["felipe"];
+const alexandre = createdUsers["alexandre"];
+const luiz = createdUsers["luiz"];
 
   // Clients
   const clientAlpha = await prisma.client.create({
@@ -95,7 +118,7 @@ async function main() {
       ],
       extraFields: { qtd_reels: "4", qtd_carrosseis: "2", qtd_posts_avulsos: "3", qtd_criativos_trafego: "2" },
       tags: ["planejamento", "mensal"],
-      assignees: { create: [{ userId: sofia.id }, { userId: felipe.id }] },
+      assignees: { create: [{ userId: luiz.id }, { userId: felipe.id }] },
     },
   });
 
@@ -139,7 +162,7 @@ async function main() {
       dueDate: yesterday,
       estimatedTime: 2,
       clientId: clientAlpha.id,
-      createdById: sofia.id,
+      createdById: luiz.id,
       checklist: [
         { id: "r1-1", text: "Edição", checked: true },
         { id: "r1-2", text: "Subir no Drive", checked: true },
@@ -147,7 +170,7 @@ async function main() {
         { id: "r1-4", text: "Aprovação", checked: false },
         { id: "r1-5", text: "Programação", checked: false },
       ],
-      assignees: { create: [{ userId: sofia.id }] },
+      assignees: { create: [{ userId: luiz.id }] },
     },
   });
 
@@ -190,7 +213,7 @@ async function main() {
         { id: "ct-4", text: "Subir no Gerenciador de Anúncios", checked: false },
       ],
       tags: ["tráfego", "promoção"],
-      assignees: { create: [{ userId: sofia.id }, { userId: alexandre.id }] },
+      assignees: { create: [{ userId: luiz.id }, { userId: alexandre.id }] },
     },
   });
 
@@ -223,7 +246,7 @@ async function main() {
   await prisma.interaction.createMany({
     data: [
       { type: "PRAISE", content: "Cliente adorou o último reels do chef. Pediu mais conteúdos assim!", clientId: clientAlpha.id, authorId: felipe.id },
-      { type: "REQUEST", content: "Pediu para incluir mais fotos de pratos no feed.", clientId: clientAlpha.id, authorId: sofia.id },
+      { type: "REQUEST", content: "Pediu para incluir mais fotos de pratos no feed.", clientId: clientAlpha.id, authorId: luiz.id },
       { type: "NOTE", content: "Reunião realizada. Alinhamos expectativas para o próximo trimestre.", clientId: clientBeta.id, authorId: alexandre.id },
       { type: "COMPLAINT", content: "Reclamou de atraso na entrega do relatório de março.", clientId: clientBeta.id, authorId: felipe.id },
     ],
@@ -240,7 +263,7 @@ async function main() {
   });
 
   console.log("✅ Seed completed successfully!");
-  console.log(`   Users: Felipe (admin), Alexandre (admin), Sofia (membro)`);
+  console.log(`   Users: Felipe (admin), Alexandre (admin), Luiz (membro)`);
   console.log(`   Clients: ${clientAlpha.name}, ${clientBeta.name}, ${clientGamma.name}, ${clientProspect.name}`);
   console.log(`   Tasks: 6 tarefas com checklists`);
   console.log(`   Interactions: 4 registros`);

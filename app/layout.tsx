@@ -6,8 +6,8 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "HADAR Gestao",
-  description: "Sistema de gestao HADAR",
+  title: "Hadar APP",
+  description: "Sistema de gestao",
 };
 
 export default function RootLayout({
