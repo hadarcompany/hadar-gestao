@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -54,21 +54,21 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   const navItems = useMemo(() => {
-    const isAdmin = session?.user?.role === "ADMIN";
+    const isAdmin = user?.role === "ADMIN";
     if (isAdmin) return allNavItems;
 
-    const perms = (session?.user?.permissions as Record<string, string>) || DEFAULT_PERMISSIONS;
+    const perms = (user?.permissions as Record<string, string>) || DEFAULT_PERMISSIONS;
 
     return allNavItems.filter((item) => {
       if (item.permKey === "_admin") return false;
       const level = perms[item.permKey] || "none";
       return level !== "none";
     });
-  }, [session]);
+  }, [user]);
 
   return (
     <aside
@@ -126,21 +126,21 @@ export function Sidebar() {
       <div className="border-t border-white/5 p-3">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent-light text-xs font-bold shrink-0">
-            {session?.user?.name?.[0] ?? "?"}
+            {user?.name?.[0] ?? "?"}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white/80 truncate">
-                {session?.user?.name}
+                {user?.name}
               </p>
               <p className="text-xs text-white/30 truncate">
-                {session?.user?.role === "ADMIN" ? "Admin" : "Membro"}
+                {user?.role === "ADMIN" ? "Admin" : "Membro"}
               </p>
             </div>
           )}
           {!collapsed && (
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={signOut}
               className="p-1.5 rounded-md hover:bg-sidebar-hover text-white/30 hover:text-red-400 transition-colors"
               title="Sair"
             >

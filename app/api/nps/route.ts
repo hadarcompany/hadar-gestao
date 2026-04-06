@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
   const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
 
-  // Get all active clients
   const clients = await prisma.client.findMany({
     where: { status: "ACTIVE" },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 
-  // Get health scores for this month
   const scores = await prisma.clientHealthScore.findMany({
     where: { month, year },
     include: { client: { select: { id: true, name: true } } },
   });
 
-  // Map clients with their scores
   const clientScores = clients.map((client) => {
     const score = scores.find((s) => s.clientId === client.id);
     if (score) {
@@ -81,8 +77,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const {

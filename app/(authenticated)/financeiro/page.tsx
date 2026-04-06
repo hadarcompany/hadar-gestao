@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
@@ -69,7 +68,6 @@ const PERIOD_PRESETS = [
 
 // ── main component ──────────────────────────────────────────────
 export default function FinanceiroPage() {
-  useSession();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [month, setMonth] = useState(CURRENT_MONTH);
   const [year, setYear] = useState(CURRENT_YEAR);

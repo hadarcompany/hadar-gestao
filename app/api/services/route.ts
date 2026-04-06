@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");
@@ -27,8 +26,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
 
@@ -47,7 +46,6 @@ export async function POST(req: NextRequest) {
     data.deliveriesPerWeek = body.deliveriesPerWeek ? parseInt(body.deliveriesPerWeek) : null;
     data.deliveryTypes = body.deliveryTypes || [];
 
-    // Calculate next renewal
     if (body.startDate && body.contractMonths) {
       const start = new Date(body.startDate);
       start.setMonth(start.getMonth() + parseInt(body.contractMonths));
@@ -63,6 +61,7 @@ export async function POST(req: NextRequest) {
     data.dataPrimeiraParcela = body.dataPrimeiraParcela ? new Date(body.dataPrimeiraParcela) : null;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = await prisma.service.create({
     data: data as any,
     include: {
@@ -70,7 +69,6 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Auto-generate receivables
   try {
     if (body.type === "RECURRING" && data.monthlyValue && data.contractMonths) {
       const months = data.contractMonths as number;

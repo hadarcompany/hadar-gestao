@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -24,8 +24,8 @@ interface AccessData {
 }
 
 export default function AcessosPage() {
-  const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
 
   const [accesses, setAccesses] = useState<AccessData[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);

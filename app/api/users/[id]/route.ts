@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.user.role !== "ADMIN") {
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (auth.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -21,6 +20,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data,
     select: { id: true, name: true, email: true, role: true, permissions: true },
   });
+
+  // Sync role/permissions to Supabase Auth metadata
+  try {
+    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createSupabaseAdminClient();
+    const { data: authUsers } = await admin.auth.admin.listUsers();
+    const authUser = authUsers?.users.find((u) => u.email === user.email);
+    if (authUser) {
+      await admin.auth.admin.updateUserById(authUser.id, {
+        app_metadata: {
+          prisma_id: user.id,
+          role: user.role,
+          permissions: user.permissions,
+        },
+      });
+    }
+  } catch (e) {
+    console.error("Falha ao sincronizar metadata Supabase:", e);
+  }
 
   return NextResponse.json(user);
 }

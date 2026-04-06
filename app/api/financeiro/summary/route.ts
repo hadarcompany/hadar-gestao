@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const startMonth = parseInt(searchParams.get("startMonth") || String(new Date().getMonth() + 1));
@@ -13,10 +12,8 @@ export async function GET(req: NextRequest) {
   const endMonth = parseInt(searchParams.get("endMonth") || String(startMonth));
   const endYear = parseInt(searchParams.get("endYear") || String(startYear));
 
-  // Active clients count
   const activeClients = await prisma.client.count({ where: { status: "ACTIVE" } });
 
-  // Build month range
   const months: { month: number; year: number }[] = [];
   let cYear = startYear;
   let cMonth = startMonth;
@@ -26,7 +23,6 @@ export async function GET(req: NextRequest) {
     if (cMonth > 12) { cMonth = 1; cYear++; }
   }
 
-  // Receivables for the period
   const receivables = await prisma.receivable.findMany({
     where: {
       OR: months.map((m) => ({ month: m.month, year: m.year })),
@@ -34,15 +30,11 @@ export async function GET(req: NextRequest) {
     include: { client: { select: { id: true, name: true } } },
   });
 
-  // Faturamento Previsto = total de todas as contas a receber do periodo (PENDING + PAID + OVERDUE)
   const expectedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);
-
-  // Faturamento Recebido = apenas as pagas
   const receivedRevenue = receivables
     .filter((r) => r.status === "PAID")
     .reduce((sum, r) => sum + r.amount, 0);
 
-  // Client revenue table (based on receivables)
   const clientRevenue = new Map<string, { name: string; expected: number; received: number }>();
   receivables.forEach((r) => {
     const existing = clientRevenue.get(r.clientId);
@@ -58,13 +50,11 @@ export async function GET(req: NextRequest) {
     }
   });
 
-  // Despesas
   const fixedExpenses = await prisma.fixedExpense.findMany({
     where: { OR: months.map((m) => ({ month: m.month, year: m.year })) },
   });
   const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  // Expense by category
   const expenseByCategory = new Map<string, number>();
   fixedExpenses.forEach((e) => {
     expenseByCategory.set(e.category, (expenseByCategory.get(e.category) || 0) + e.amount);
@@ -92,7 +82,6 @@ export async function GET(req: NextRequest) {
   const totalExpenses = totalFixedExpenses + totalVariableExpenses + totalInvestments;
   const grossProfit = receivedRevenue - totalExpenses;
 
-  // Chart data: monthly breakdown
   const chartData = months.map((m) => {
     const mReceived = receivables
       .filter((r) => r.month === m.month && r.year === m.year && r.status === "PAID")

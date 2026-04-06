@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { CreateTaskModal } from "@/components/tasks/create-task-modal";
 import { type TaskData } from "@/lib/types";
 import { Loader2, Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Check, Edit3 } from "lucide-react";
 
 export default function CalendarioPage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
@@ -105,7 +105,7 @@ export default function CalendarioPage() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Calendário <span className="text-zinc-500 font-normal">| {session?.user?.name?.split(' ')[0] ?? ""}</span>
+            Calendário <span className="text-zinc-500 font-normal">| {user?.name?.split(' ')[0] ?? ""}</span>
           </h1>
         </div>
 

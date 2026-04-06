@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const entries = await prisma.cashEntry.findMany({
     orderBy: { date: "desc" },
   });
 
-  // Calculate balance
   let balance = 0;
   for (const entry of entries) {
     if (entry.type === "RETIRADA_DESPESA") {
@@ -22,7 +20,6 @@ export async function GET(_req: NextRequest) {
     }
   }
 
-  // Get config
   let config = await prisma.cashConfig.findUnique({ where: { id: "singleton" } });
   if (!config) {
     config = await prisma.cashConfig.create({
@@ -34,13 +31,12 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const { type, amount, description } = body;
 
-  // Handle config update
   if (body.action === "updateConfig") {
     const config = await prisma.cashConfig.upsert({
       where: { id: "singleton" },

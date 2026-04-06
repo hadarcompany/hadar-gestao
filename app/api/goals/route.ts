@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 async function calculateCurrentValue(
@@ -10,7 +9,6 @@ async function calculateCurrentValue(
   period: string,
   customValue: number | null
 ): Promise<number> {
-  // Determine month range based on period
   let startMonth = month;
   let startYear = year;
   const endMonth = month;
@@ -23,7 +21,6 @@ async function calculateCurrentValue(
 
   switch (type) {
     case "REVENUE": {
-      // Sum of paid receivables in period
       const months: { month: number; year: number }[] = [];
       let cY = startYear, cM = startMonth;
       while (cY < endYear || (cY === endYear && cM <= endMonth)) {
@@ -46,7 +43,6 @@ async function calculateCurrentValue(
     }
 
     case "RETENTION": {
-      // % of active clients with churnAvg >= 2.5
       const activeClients = await prisma.client.count({ where: { status: "ACTIVE" } });
       if (activeClients === 0) return 0;
       const scores = await prisma.clientHealthScore.findMany({
@@ -95,8 +91,8 @@ async function calculateCurrentValue(
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
@@ -109,7 +105,6 @@ export async function GET(req: NextRequest) {
     where.period = "MONTHLY";
   } else {
     where.period = "QUARTERLY";
-    // Show quarterly goals where the quarter includes this month
     where.month = { in: [month, month - 1, month - 2].filter((m) => m >= 1) };
   }
 
@@ -118,7 +113,6 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "asc" },
   });
 
-  // Calculate current values
   const goalsWithValues = await Promise.all(
     goals.map(async (goal) => {
       const currentValue = await calculateCurrentValue(goal.type, goal.month, goal.year, goal.period, goal.customValue);
@@ -128,7 +122,6 @@ export async function GET(req: NextRequest) {
       if (currentValue >= goal.targetValue) {
         status = "ACHIEVED";
       } else {
-        // Check if we're past halfway through the period with less than 40% progress
         const now = new Date();
         const currentDay = now.getDate();
         const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -152,8 +145,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const { title, type, targetValue, period, month, year, customValue } = body;

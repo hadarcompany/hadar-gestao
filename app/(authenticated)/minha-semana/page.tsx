@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { Textarea } from "@/components/ui/textarea";
 import { Trophy, ChevronLeft, ChevronRight, Send, Calendar, MessageSquare } from "lucide-react";
@@ -27,7 +27,7 @@ interface RankingEntry {
 }
 
 export default function MinhaSemanaPage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [currentWeek, setCurrentWeek] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
@@ -76,8 +76,8 @@ export default function MinhaSemanaPage() {
         setRanking(sorted);
 
         // Pre-fill form if current user already submitted
-        if (session?.user?.id) {
-          const myReview = data.find((r) => r.userId === session.user.id);
+        if (user?.id) {
+          const myReview = data.find((r) => r.userId === user!.id);
           if (myReview) {
             setHowWasWeek(myReview.howWasWeek);
             setDifficulties(myReview.difficulties);
@@ -92,7 +92,7 @@ export default function MinhaSemanaPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentWeek, session?.user?.id]);
+  }, [currentWeek, user?.id]);
 
   // Fetch ranking from tasks for current week
   const fetchRankingFromTasks = useCallback(async () => {
@@ -169,7 +169,7 @@ export default function MinhaSemanaPage() {
     setCurrentWeek(addWeeks(currentWeek, 1));
   }
 
-  const myReview = reviews.find((r) => r.userId === session?.user?.id);
+  const myReview = reviews.find((r) => r.userId === user?.id);
 
   const medalColors = ["text-amber-400", "text-zinc-300", "text-amber-700"];
 

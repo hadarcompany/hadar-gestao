@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { CreateTaskModal } from "@/components/tasks/create-task-modal";
 import { SelectField } from "@/components/ui/select-field";
@@ -10,7 +10,7 @@ import { type TaskData } from "@/lib/types";
 import { Loader2, Plus, Calendar, Edit3, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 
 export default function MeuTrabalhoPage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]); // Necessário para o modal de criar tarefa
@@ -24,10 +24,10 @@ export default function MeuTrabalhoPage() {
   const [filterDate, setFilterDate] = useState("");
 
   const fetchTasks = useCallback(async () => {
-    if (!session?.user?.id) return;
+    if (!user?.id) return;
     setLoading(true);
     const params = new URLSearchParams();
-    params.set("assigneeId", session.user.id);
+    params.set("assigneeId", user!.id);
     if (filterStatus) params.set("status", filterStatus);
     if (filterPriority) params.set("priority", filterPriority);
     if (filterClient) params.set("clientId", filterClient);
@@ -60,7 +60,7 @@ export default function MeuTrabalhoPage() {
     } finally {
       setLoading(false);
     }
-  }, [session?.user?.id, filterStatus, filterPriority, filterClient, filterDate]);
+  }, [user?.id, filterStatus, filterPriority, filterClient, filterDate]);
 
   useEffect(() => {
     fetchTasks();
@@ -103,7 +103,7 @@ export default function MeuTrabalhoPage() {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Meu Trabalho <span className="text-zinc-500 font-normal">| {session?.user?.name?.split(' ')[0] ?? ""}</span>
+            Meu Trabalho <span className="text-zinc-500 font-normal">| {user?.name?.split(' ')[0] ?? ""}</span>
           </h1>
           <p className="text-zinc-400 mt-2 text-sm font-medium">Minhas Tarefas Ativas</p>
         </div>
@@ -184,7 +184,7 @@ export default function MeuTrabalhoPage() {
                   <div className="flex items-center gap-6 md:gap-10 text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-300 border border-zinc-700">
-                        {session?.user?.name?.charAt(0).toUpperCase() || "M"}
+                        {user?.name?.charAt(0).toUpperCase() || "M"}
                       </div>
                       <span className="text-xs text-zinc-400 hidden md:block">Mim</span>
                     </div>

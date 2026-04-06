@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Calendar, Loader2, ArrowUpRight } from "lucide-react";
@@ -24,7 +24,7 @@ const periods = [
 ];
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [period, setPeriod] = useState("month");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Dashboard <span className="text-zinc-500 font-normal">| Bem-vindo, {session?.user?.name?.split(' ')[0] ?? ""}</span>
+            Dashboard <span className="text-zinc-500 font-normal">| Bem-vindo, {user?.name?.split(' ')[0] ?? ""}</span>
           </h1>
         </div>
 

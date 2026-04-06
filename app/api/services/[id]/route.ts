@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const data: Record<string, unknown> = {};
 
-  // Copy allowed fields
   const fields = [
     "name", "metaAds", "googleAds", "deliveryTypes", "freelancerType",
     "freelancerTypeCustom", "paymentMethod", "status",
@@ -26,13 +24,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
   if (body.dataPrimeiraParcela !== undefined) data.dataPrimeiraParcela = body.dataPrimeiraParcela ? new Date(body.dataPrimeiraParcela) : null;
 
-  // Recalculate renewal if needed
   if (body.startDate && body.contractMonths) {
     const start = new Date(body.startDate);
     start.setMonth(start.getMonth() + parseInt(body.contractMonths));
     data.nextRenewal = start;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = await prisma.service.update({
     where: { id: params.id },
     data: data as any,
@@ -43,8 +41,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await prisma.service.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });

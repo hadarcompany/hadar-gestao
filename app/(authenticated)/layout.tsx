@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
@@ -10,16 +10,16 @@ export default function AuthenticatedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { status } = useSession();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!isLoading && !user) {
       router.push("/login");
     }
-  }, [status, router]);
+  }, [isLoading, user, router]);
 
-  if (status === "loading") {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#0a0a0a]">
         <div className="w-8 h-8 border-2 border-accent-light border-t-transparent rounded-full animate-spin" />
@@ -27,7 +27,7 @@ export default function AuthenticatedLayout({
     );
   }
 
-  if (status === "unauthenticated") return null;
+  if (!user) return null;
 
   return (
     <div className="flex min-h-screen">

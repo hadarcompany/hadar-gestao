@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { PageHeader } from "@/components/page-header";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -78,7 +77,6 @@ const STATUS_OPTIONS_FREELANCER = [
 const DELIVERY_TYPE_OPTIONS = ["Reels", "Carrossel", "Post", "Stories", "Video", "Foto"];
 
 export default function ServicosPage() {
-  useSession();
   const [services, setServices] = useState<ServiceData[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(true);

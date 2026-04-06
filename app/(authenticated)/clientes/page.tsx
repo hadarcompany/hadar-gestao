@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { PageHeader } from "@/components/page-header";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -67,7 +66,6 @@ const interactionLabels: Record<string, string> = {
 };
 
 export default function ClientesPage() {
-  useSession();
   const [clients, setClients] = useState<ClientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);

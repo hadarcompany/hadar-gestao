@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { SelectField } from "@/components/ui/select-field";
 import { Loader2, Shield, Users, Save } from "lucide-react";
@@ -57,7 +57,7 @@ function getUserPermissions(user: UserData): Record<string, string> {
 }
 
 export default function EquipePage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,10 +66,10 @@ export default function EquipePage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (session && session.user.role !== "ADMIN") {
+    if (user && user.role !== "ADMIN") {
       router.push("/dashboard");
     }
-  }, [session, router]);
+  }, [user, router]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -110,7 +110,7 @@ export default function EquipePage() {
     }
   }
 
-  if (session?.user.role !== "ADMIN") return null;
+  if (user?.role !== "ADMIN") return null;
 
   return (
     <div>

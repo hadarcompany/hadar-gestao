@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 interface MonthlyProLabore {
@@ -17,8 +16,8 @@ interface MonthlyProLabore {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
@@ -26,13 +25,11 @@ export async function GET(req: NextRequest) {
   const results: MonthlyProLabore[] = [];
 
   for (let month = 1; month <= 12; month++) {
-    // Revenue received
     const receivables = await prisma.receivable.findMany({
       where: { month, year, status: "PAID" },
     });
     const receivedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);
 
-    // Expenses
     const fixedExpenses = await prisma.fixedExpense.findMany({
       where: { month, year },
     });
@@ -74,7 +71,6 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Current month data for the cards
   const currentMonth = new Date().getMonth() + 1;
   const current = results.find((r) => r.month === currentMonth) || results[0];
 

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { startOfWeek } from "date-fns";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const weekParam = searchParams.get("week");
@@ -26,15 +25,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const { howWasWeek, difficulties, improvements } = body;
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
 
-  // Count tasks completed this week by the user
   const mondayStart = new Date(weekStart);
   mondayStart.setHours(0, 0, 0, 0);
   const sundayEnd = new Date(weekStart);
@@ -44,7 +42,7 @@ export async function POST(req: NextRequest) {
   const tasksCompleted = await prisma.task.count({
     where: {
       status: "COMPLETED",
-      assignees: { some: { userId: session.user.id } },
+      assignees: { some: { userId: auth.id } },
       updatedAt: { gte: mondayStart, lte: sundayEnd },
     },
   });
@@ -52,13 +50,13 @@ export async function POST(req: NextRequest) {
   const review = await prisma.weeklyReview.upsert({
     where: {
       userId_weekStart: {
-        userId: session.user.id,
+        userId: auth.id,
         weekStart: mondayStart,
       },
     },
     update: { howWasWeek, difficulties, improvements, tasksCompleted },
     create: {
-      userId: session.user.id,
+      userId: auth.id,
       weekStart: mondayStart,
       howWasWeek,
       difficulties,
