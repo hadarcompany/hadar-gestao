@@ -1,0 +1,400 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+}
+
+enum InteractionType {
+  COMPLAINT
+  PRAISE
+  REQUEST
+  NOTE
+}
+
+enum ServiceType {
+  RECURRING
+  FREELANCER
+}
+
+enum FreelancerServiceType {
+  LANDING_PAGE
+  GOOGLE_MEU_NEGOCIO
+  VIDEO
+  FOTO
+  OUTRO
+}
+
+enum ServiceStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  CHURN
+}
+
+enum PaymentMethod {
+  A_VISTA
+  PARCELADO
+}
+
+enum ReceivableStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum FixedExpenseCategory {
+  IMPOSTOS
+  MARKETING
+  SOFTWARES
+  EQUIPE
+  LOCACAO
+  OUTROS
+}
+
+enum VariableExpenseCategory {
+  ALIMENTACAO
+  LOCOMOCAO
+  MATERIAL
+  OUTROS
+}
+
+enum CashEntryType {
+  APORTE
+  RESERVA_MENSAL
+  RETIRADA_DESPESA
+}
+
+enum GoalType {
+  REVENUE
+  NEW_CLIENTS
+  RETENTION
+  TASKS_ON_TIME
+  AVG_NPS
+  CUSTOM
+}
+
+enum GoalPeriod {
+  MONTHLY
+  QUARTERLY
+}
+
+enum GoalStatus {
+  ON_TRACK
+  BEHIND
+  ACHIEVED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role        Role     @default(MEMBER)
+  permissions Json?
+  image       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdTasks  Task[]         @relation("TaskCreator")
+  assignments   TaskAssignee[]
+  interactions  Interaction[]
+  weeklyReviews WeeklyReview[]
+
+  @@map("users")
+}
+
+model Client {
+  id                String       @id @default(cuid())
+  name              String
+  email             String?
+  phone             String?
+  driveLink         String?
+  contractLink      String?
+  briefing          String?
+  status            ClientStatus @default(ACTIVE)
+  contractStartDate DateTime?
+  renewalDate       DateTime?
+  brandColors       String[]     @default([])
+  brandFontPrimary  String?
+  brandFontSecondary String?
+  logoUrl           String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tasks        Task[]
+  interactions Interaction[]
+  accesses     Access[]
+  services     Service[]
+  receivables  Receivable[]
+  healthScores ClientHealthScore[]
+
+  @@map("clients")
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  title         String
+  type          String?
+  description   String?
+  status        TaskStatus   @default(PENDING)
+  priority      TaskPriority @default(MEDIUM)
+  startDate     DateTime?
+  dueDate       DateTime?
+  estimatedTime Float?
+  actualTime    Float?
+  checklist     Json?
+  extraFields   Json?
+  tags          String[]     @default([])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  clientId    String?
+  client      Client? @relation(fields: [clientId], references: [id])
+  createdById String
+  createdBy   User    @relation("TaskCreator", fields: [createdById], references: [id])
+
+  assignees TaskAssignee[]
+
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  taskId String
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([taskId, userId])
+  @@map("task_assignees")
+}
+
+model Interaction {
+  id       String          @id @default(cuid())
+  type     InteractionType
+  content  String
+  date     DateTime        @default(now())
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  @@map("interactions")
+}
+
+model Service {
+  id            String      @id @default(cuid())
+  type          ServiceType
+  name          String?
+  contractMonths Int?
+  monthlyValue  Float?
+  startDate     DateTime?
+  nextRenewal   DateTime?
+  metaAds       Boolean     @default(false)
+  googleAds     Boolean     @default(false)
+  deliveriesPerWeek Int?
+  deliveryTypes String[]    @default([])
+
+  freelancerType    FreelancerServiceType?
+  freelancerTypeCustom String?
+  totalValue        Float?
+  paymentMethod     PaymentMethod?
+  installments      Int?
+  status            ServiceStatus @default(IN_PROGRESS)
+  dataPrimeiraParcela DateTime?
+
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("services")
+}
+
+model Access {
+  id           String  @id @default(cuid())
+  platform     String
+  url          String?
+  email        String?
+  password     String?
+  observations String?
+
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("accesses")
+}
+
+model WeeklyReview {
+  id             String   @id @default(cuid())
+  weekStart      DateTime
+  howWasWeek     String
+  difficulties   String
+  improvements   String
+  tasksCompleted Int      @default(0)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekStart])
+  @@map("weekly_reviews")
+}
+
+model Receivable {
+  id       String           @id @default(cuid())
+  amount   Float
+  dueDate  DateTime
+  paidDate DateTime?
+  status   ReceivableStatus @default(PENDING)
+  month    Int
+  year     Int
+
+  clientId  String
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("receivables")
+}
+
+model FixedExpense {
+  id           String               @id @default(cuid())
+  name         String
+  category     FixedExpenseCategory
+  amount       Float
+  paidWithCash Boolean              @default(false)
+  month        Int
+  year         Int
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@map("fixed_expenses")
+}
+
+model VariableExpense {
+  id           String                  @id @default(cuid())
+  name         String
+  category     VariableExpenseCategory
+  amount       Float
+  date         DateTime
+  paidWithCash Boolean                 @default(false)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@map("variable_expenses")
+}
+
+model Investment {
+  id            String        @id @default(cuid())
+  description   String
+  amount        Float
+  paymentMethod PaymentMethod @default(A_VISTA)
+  installments  Int?
+  date          DateTime
+  paidWithCash  Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("investments")
+}
+
+model CashEntry {
+  id          String        @id @default(cuid())
+  type        CashEntryType
+  amount      Float
+  description String?
+  date        DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+
+  @@map("cash_entries")
+}
+
+model CashConfig {
+  id         String @id @default("singleton")
+  minBalance Float  @default(1000)
+  updatedAt  DateTime @updatedAt
+
+  @@map("cash_config")
+}
+
+model ClientHealthScore {
+  id    String @id @default(cuid())
+  month Int
+  year  Int
+
+  // Churn risk (0-5)
+  satisfactionDelivery Float @default(0)
+  serviceQuality       Float @default(0)
+  deadlineCompliance   Float @default(0)
+  perceivedResult      Float @default(0)
+  npsScore             Float @default(0)
+
+  // Client quality (0-5)
+  respondsTimely   Float @default(0)
+  changeVolume     Float @default(0)
+  complaints       Float @default(0)
+  outOfScope       Float @default(0)
+  financiallyWorth Float @default(0)
+
+  observations String?
+
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, month, year])
+  @@map("client_health_scores")
+}
+
+model Goal {
+  id          String     @id @default(cuid())
+  title       String
+  type        GoalType
+  targetValue Float
+  period      GoalPeriod @default(MONTHLY)
+  month       Int
+  year        Int
+  status      GoalStatus @default(ON_TRACK)
+  customValue Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("goals")
+}
