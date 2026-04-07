@@ -44,6 +44,18 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(receivable, { status: 201 });
 }
 
+export async function DELETE(req: NextRequest) {
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+
+  await prisma.receivable.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}
+
 export async function PATCH(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

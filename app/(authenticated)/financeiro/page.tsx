@@ -9,7 +9,7 @@ import { FilterDialog } from "@/components/ui/filter-dialog";
 import {
   BarChart3, Receipt, CreditCard, ShoppingBag, PiggyBank, Users2,
   Wallet, Plus, Loader2, AlertTriangle, CheckCircle2, Clock, TrendingUp,
-  TrendingDown, DollarSign, Settings,
+  TrendingDown, DollarSign, Settings, Trash2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -332,6 +332,7 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({ clientId: "", amount: "", dueDate: "" });
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
@@ -383,6 +384,11 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
     fetch_();
   }
 
+  async function handleDelete(id: string) {
+    await fetch(`/api/financeiro/receivables?id=${id}`, { method: "DELETE" });
+    fetch_();
+  }
+
   const statusBadge = (s: string) => {
     if (s === "PAID") return <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Pago</span>;
     if (s === "OVERDUE") return <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Atrasado</span>;
@@ -417,15 +423,20 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
                   <td className="px-6 py-4 text-sm text-zinc-400">{r.paidDate ? new Date(r.paidDate).toLocaleDateString("pt-BR") : "—"}</td>
                   <td className="px-6 py-4">{statusBadge(r.status)}</td>
                   <td className="px-6 py-4">
-                    {r.status !== "PAID" ? (
-                      <button onClick={() => markPaid(r.id)} className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 transition-colors">
-                        <CheckCircle2 size={14} /> Marcar Pago
+                    <div className="flex items-center gap-3">
+                      {r.status !== "PAID" ? (
+                        <button onClick={() => markPaid(r.id)} className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 transition-colors">
+                          <CheckCircle2 size={14} /> Marcar Pago
+                        </button>
+                      ) : (
+                        <button onClick={() => markPending(r.id)} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 flex items-center gap-1.5 transition-colors">
+                          <Clock size={14} /> Desfazer
+                        </button>
+                      )}
+                      <button onClick={() => setDeleteId(r.id)} className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Excluir">
+                        <Trash2 size={14} />
                       </button>
-                    ) : (
-                      <button onClick={() => markPending(r.id)} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 flex items-center gap-1.5 transition-colors">
-                        <Clock size={14} /> Desfazer
-                      </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -454,6 +465,16 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Excluir Conta a Receber"
+        message="Tem certeza que deseja excluir este lançamento?"
+        confirmLabel="Sim, excluir"
+        cancelLabel="Cancelar"
+        onConfirm={() => { const id = deleteId!; setDeleteId(null); handleDelete(id); }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }
