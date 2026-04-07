@@ -151,12 +151,13 @@ model Client {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  tasks        Task[]
-  interactions Interaction[]
-  accesses     Access[]
-  services     Service[]
-  receivables  Receivable[]
-  healthScores ClientHealthScore[]
+  tasks            Task[]
+  interactions     Interaction[]
+  accesses         Access[]
+  services         Service[]
+  receivables      Receivable[]
+  healthScores     ClientHealthScore[]
+  contentCalendars ContentCalendar[]
 
   @@map("clients")
 }
@@ -183,7 +184,8 @@ model Task {
   createdById String
   createdBy   User    @relation("TaskCreator", fields: [createdById], references: [id])
 
-  assignees TaskAssignee[]
+  assignees        TaskAssignee[]
+  calendarItems    ContentCalendarItem[]
 
   @@map("tasks")
 }
@@ -398,4 +400,35 @@ model Goal {
   updatedAt DateTime @updatedAt
 
   @@map("goals")
+}
+
+model ContentCalendar {
+  id               String   @id @default(cuid())
+  clientId         String
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  weekStart        DateTime
+  reels            Int      @default(0)
+  carroseis        Int      @default(0)
+  criativosTrafico Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  items ContentCalendarItem[]
+
+  @@map("content_calendars")
+}
+
+model ContentCalendarItem {
+  id         String          @id @default(cuid())
+  calendarId String
+  calendar   ContentCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  type       String
+  index      Int
+  published  Boolean         @default(false)
+  taskId     String?
+  task       Task?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@map("content_calendar_items")
 }

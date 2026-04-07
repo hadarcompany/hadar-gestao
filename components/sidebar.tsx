@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Users2,
+  CalendarCheck2,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { Logo } from "@/components/logo";
@@ -29,6 +30,7 @@ const allNavItems = [
   { href: "/tarefas", label: "Tarefas", icon: CheckSquare, permKey: "tarefas" },
   { href: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, permKey: "meu-trabalho" },
   { href: "/calendario", label: "Calendario", icon: Calendar, permKey: "calendario" },
+  { href: "/calendario-clientes", label: "Cal. Clientes", icon: CalendarCheck2, permKey: "calendario-clientes" },
   { href: "/clientes", label: "Clientes", icon: Users, permKey: "clientes" },
   { href: "/servicos", label: "Servicos", icon: Wrench, permKey: "servicos" },
   { href: "/nps", label: "NPS", icon: Star, permKey: "nps" },
@@ -44,6 +46,7 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
   tarefas: "edit",
   "meu-trabalho": "edit",
   calendario: "none",
+  "calendario-clientes": "edit",
   clientes: "none",
   servicos: "none",
   nps: "none",
