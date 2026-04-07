@@ -22,6 +22,7 @@ import {
   Users2,
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { Logo } from "@/components/logo";
 
 const allNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permKey: "dashboard" },
@@ -80,10 +81,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
         {!collapsed && (
-          <span className="text-xl font-bold tracking-tight">
-            <span className="text-accent-light">HADAR</span>
-            <span className="text-white/40 ml-1 text-sm font-normal">gestao</span>
-          </span>
+          <Logo width={110} height={33} className="text-amber-500" />
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}

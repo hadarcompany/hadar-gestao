@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,11 +36,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-amber-500">HADAR</span>
-            <span className="text-white/30 ml-2 text-lg font-normal">gestao</span>
-          </h1>
+        <div className="flex justify-center mb-10">
+          <Logo width={200} height={60} className="text-amber-500" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
