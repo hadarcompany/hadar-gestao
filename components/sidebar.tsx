@@ -46,7 +46,7 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
   tarefas: "edit",
   "meu-trabalho": "edit",
   calendario: "none",
-  "calendario-clientes": "edit",
+  "calendario-clientes": "none",
   clientes: "none",
   servicos: "none",
   nps: "none",
