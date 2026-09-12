@@ -6,7 +6,8 @@ import { useAuth } from "@/contexts/auth-context";
 import { TaskRow } from "@/components/tasks/task-row";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { getCurrentWeekRange } from "@/lib/dates";
+import { CommercialPanel } from "@/components/dashboard/commercial-panel";
+import { getCurrentWeekRange, formatDayMonthBR } from "@/lib/dates";
 import { type TaskData } from "@/lib/types";
 import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowUpRight } from "lucide-react";
 
@@ -91,10 +92,14 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-transparent w-full">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-5 gap-3">
-        <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-          Dashboard <span className="text-gray-400 font-normal text-sm">· {user?.name?.split(" ")[0] ?? ""}</span>
-        </h1>
+      <h1 className="text-xl font-bold text-gray-900 tracking-tight mb-5">
+        Dashboard <span className="text-gray-400 font-normal text-sm">· {user?.name?.split(" ")[0] ?? ""}</span>
+      </h1>
+
+      <CommercialPanel />
+
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 className="text-sm font-semibold text-gray-800">Operação</h2>
         <DateRangePicker from={range.from} to={range.to} isCustom={isCustom} onChange={handleRangeChange} onResetToCurrentWeek={resetToCurrentWeek} />
       </div>
 
@@ -142,7 +147,7 @@ export default function DashboardPage() {
               {data.upcomingRenewals.map((r) => (
                 <div key={r.id} className="flex items-center justify-between text-xs">
                   <span className="text-gray-600 truncate"><ClientIdentity client={r} /></span>
-                  <span className="text-gray-400 shrink-0 ml-2">{new Date(r.renewalDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
+                  <span className="text-gray-400 shrink-0 ml-2">{formatDayMonthBR(r.renewalDate)}</span>
                 </div>
               ))}
             </div>

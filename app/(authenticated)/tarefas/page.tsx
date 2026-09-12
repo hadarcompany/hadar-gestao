@@ -8,7 +8,7 @@ import { TaskRow } from "@/components/tasks/task-row";
 import { SelectField } from "@/components/ui/select-field";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from "@/lib/task-templates";
 import { type TaskData } from "@/lib/types";
-import { Plus, Filter, ArrowUpDown, Loader2, ChevronDown, ChevronRight, Briefcase, User } from "lucide-react";
+import { Plus, Filter, ArrowUpDown, Loader2, ChevronDown, ChevronRight, Briefcase, User, Search, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
 
 export default function TarefasPage() {
@@ -21,7 +21,9 @@ export default function TarefasPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const [groupBy, setGroupBy] = useState<"client" | "assignee">("client");
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  // Grupos nascem fechados: a lista serve primeiro para achar o cliente, depois as tarefas.
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [groupSearch, setGroupSearch] = useState("");
 
   const [filterStatus, setFilterStatus] = useState("");
   const [filterClient, setFilterClient] = useState("");
@@ -88,10 +90,16 @@ export default function TarefasPage() {
       }
     });
 
-    return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
-  }, [tasks, groupBy]);
+    const term = groupSearch.trim().toLowerCase();
+    return Object.values(groups)
+      .filter((g) => !term || g.name.toLowerCase().includes(term))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks, groupBy, groupSearch]);
 
-  const toggleGroup = (id: string) => setCollapsedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleGroup = (id: string) => setExpandedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  const allExpanded = groupedTasks.length > 0 && groupedTasks.every((g) => expandedGroups[g.id]);
+  const toggleAll = () =>
+    setExpandedGroups(allExpanded ? {} : Object.fromEntries(groupedTasks.map((g) => [g.id, true])));
 
   return (
     <div className="min-h-screen bg-transparent w-full pb-10">
@@ -122,6 +130,25 @@ export default function TarefasPage() {
               <User size={13} /> Responsável
             </button>
           </div>
+
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              value={groupSearch}
+              onChange={(e) => setGroupSearch(e.target.value)}
+              placeholder={groupBy === "client" ? "Buscar cliente" : "Buscar responsável"}
+              className="w-44 pl-7 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-lg text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+
+          <button
+            onClick={toggleAll}
+            title={allExpanded ? "Recolher todos" : "Expandir todos"}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
+          >
+            {allExpanded ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+            {allExpanded ? "Recolher" : "Expandir"}
+          </button>
 
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -181,7 +208,7 @@ export default function TarefasPage() {
       ) : (
         <div className="space-y-3">
           {groupedTasks.map((group) => {
-            const isCollapsed = collapsedGroups[group.id];
+            const isCollapsed = !expandedGroups[group.id];
             return (
               <div key={group.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 <button onClick={() => toggleGroup(group.id)} className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition-colors">

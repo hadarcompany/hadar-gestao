@@ -22,6 +22,7 @@ const MODULES = [
   { key: "tarefas", label: "Tarefas" },
   { key: "meu-trabalho", label: "Meu Trabalho" },
   { key: "calendario", label: "Calendário" },
+  { key: "pipeline", label: "Pipeline" },
   { key: "clientes", label: "Clientes" },
   { key: "servicos", label: "Serviços" },
   { key: "nps", label: "NPS" },

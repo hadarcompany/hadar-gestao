@@ -104,10 +104,12 @@ async function createEditorialSubTasks(
   for (const sub of subTasks) {
     const template = TASK_TEMPLATES[sub.templateKey];
     for (let i = 0; i < sub.count; i++) {
+      // Prazos são datas de calendário em meia-noite UTC; usar métodos locais
+      // deslocaria o dia conforme o fuso do servidor.
       const dueDate = new Date(baseDate);
-      dueDate.setDate(dueDate.getDate() + dayOffset);
-      while (dueDate.getDay() === 0 || dueDate.getDay() === 6) {
-        dueDate.setDate(dueDate.getDate() + 1);
+      dueDate.setUTCDate(dueDate.getUTCDate() + dayOffset);
+      while (dueDate.getUTCDay() === 0 || dueDate.getUTCDay() === 6) {
+        dueDate.setUTCDate(dueDate.getUTCDate() + 1);
       }
       dayOffset += 2;
 

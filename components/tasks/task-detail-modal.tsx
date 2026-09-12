@@ -12,6 +12,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task-templates";
+import { formatDateBR } from "@/lib/dates";
 import { type TaskData, type UserSummary, type TaskAttachmentData } from "@/lib/types";
 import { CheckSquare, Square, Clock, User, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip, Upload, Download, Loader2 } from "lucide-react";
 
@@ -329,7 +330,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
                 {task.dueDate && (
                   <div className="flex items-center gap-2 text-gray-500">
                     <Calendar size={14} className="text-accent-dark" />
-                    <span>{new Date(task.dueDate).toLocaleDateString("pt-BR")}</span>
+                    <span>{formatDateBR(task.dueDate)}</span>
                   </div>
                 )}
                 {task.estimatedTime && (

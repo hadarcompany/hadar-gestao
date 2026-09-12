@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { type TaskData, type UserSummary } from "@/lib/types";
 import { statusLabel, statusColor } from "@/lib/status-labels";
-import { getTaskBucket } from "@/lib/dates";
+import { getTaskBucket, formatDayMonthBR } from "@/lib/dates";
 import { Avatar } from "@/components/ui/avatar";
 import {
   Copy, ArrowLeftRight, Info, Calendar as CalendarIcon,
-  Loader2, Check, X as XIcon, Paperclip,
+  Loader2, Check, X as XIcon, Paperclip, CheckCircle2, Circle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
   const [editingDate, setEditingDate] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
-  const [saving, setSaving] = useState<"title" | "date" | "transfer" | "clone" | null>(null);
+  const [saving, setSaving] = useState<"title" | "date" | "transfer" | "clone" | "status" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +55,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
   const bucket = getTaskBucket(task);
   const assignee = task.assignees[0]?.user;
   const extraAssignees = task.assignees.length - 1;
+  const isDone = task.status === "COMPLETED";
 
   async function saveTitle() {
     const trimmed = titleValue.trim();
@@ -85,6 +86,18 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
     }
   }
 
+  async function toggleComplete() {
+    setSaving("status");
+    setError(null);
+    try {
+      onUpdated(await patchTask(task.id, { status: isDone ? "PENDING" : "COMPLETED" }));
+    } catch {
+      setError(isDone ? "Não foi possível reabrir a tarefa." : "Não foi possível concluir a tarefa.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   async function handleClone() {
     setSaving("clone");
     setError(null);
@@ -103,8 +116,26 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
   return (
     <div
       ref={rowRef}
-      className="group relative flex items-center gap-3 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors text-sm"
+      onClick={() => onOpenDetail(task)}
+      className="group relative flex items-center gap-3 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
     >
+      {/* concluir / reabrir */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); toggleComplete(); }}
+        disabled={saving === "status"}
+        title={isDone ? "Reabrir tarefa" : "Concluir tarefa"}
+        aria-label={isDone ? "Reabrir tarefa" : "Concluir tarefa"}
+        className={cn(
+          "shrink-0 transition-colors disabled:opacity-50",
+          isDone ? "text-emerald-600 hover:text-emerald-700" : "text-gray-300 hover:text-emerald-600"
+        )}
+      >
+        {saving === "status"
+          ? <Loader2 size={17} className="animate-spin" />
+          : isDone ? <CheckCircle2 size={17} /> : <Circle size={17} />}
+      </button>
+
       {/* status */}
       <span className={cn("shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap", statusColor(task.status))}>
         {statusLabel(task.status)}
@@ -116,6 +147,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
           <input
             ref={titleInputRef}
             value={titleValue}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => setTitleValue(e.target.value)}
             onBlur={saveTitle}
             onKeyDown={(e) => {
@@ -125,21 +157,20 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             className="w-full bg-white border border-accent/50 rounded px-1.5 py-0.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-accent/30"
           />
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditingTitle(true)}
-            title="Clique para editar o nome"
-            className="truncate text-left text-gray-800 font-medium hover:text-accent-dark transition-colors max-w-[280px]"
+          <span
+            onDoubleClick={(e) => { e.stopPropagation(); setEditingTitle(true); }}
+            title="Clique para abrir · duplo clique para renomear"
+            className={cn("truncate text-left font-medium max-w-[280px]", isDone ? "text-gray-400 line-through" : "text-gray-800")}
           >
             {saving === "title" ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
             {task.title}
-          </button>
+          </span>
         )}
         {task.description && (
           <div className="relative shrink-0">
             <button
               type="button"
-              onClick={() => setShowDescription((v) => !v)}
+              onClick={(e) => { e.stopPropagation(); setShowDescription((v) => !v); }}
               onMouseEnter={() => setShowDescription(true)}
               onMouseLeave={() => setShowDescription(false)}
               aria-expanded={showDescription}
@@ -175,7 +206,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       )}
 
       {/* assignee / transfer */}
-      <div className="relative shrink-0">
+      <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={() => setShowTransfer((v) => !v)}
@@ -198,7 +229,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       </div>
 
       {/* due date */}
-      <div className="shrink-0 w-24 text-right">
+      <div className="shrink-0 w-24 text-right" onClick={(e) => e.stopPropagation()}>
         {editingDate ? (
           <input
             ref={dateInputRef}
@@ -219,13 +250,16 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             )}
           >
             {saving === "date" ? <Loader2 size={11} className="animate-spin" /> : <CalendarIcon size={11} />}
-            {task.dueDate ? new Date(task.dueDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "Sem data"}
+            {task.dueDate ? formatDayMonthBR(task.dueDate) : "Sem data"}
           </button>
         )}
       </div>
 
       {/* actions */}
-      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <div
+        className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
           onClick={handleClone}

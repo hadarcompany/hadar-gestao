@@ -76,6 +76,20 @@ export function formatDateKeyBR(dateKey: string | null | undefined): string {
   return `${d}/${m}/${y}`;
 }
 
+/** DD/MM/AAAA de uma data de calendário. Use no lugar de `toLocaleDateString`,
+ * que desloca um dia por interpretar a meia-noite UTC no fuso local. */
+export function formatDateBR(value: string | Date | null | undefined): string {
+  return formatDateKeyBR(toDateKey(value));
+}
+
+/** DD/MM de uma data de calendário, sem deslocamento de fuso. */
+export function formatDayMonthBR(value: string | Date | null | undefined): string {
+  const key = toDateKey(value);
+  if (!key) return "—";
+  const [, m, d] = key.split("-");
+  return `${d}/${m}`;
+}
+
 export type TaskDateBucket = "OVERDUE" | "TODAY" | "UPCOMING" | "NO_DATE";
 
 /** Classifica um prazo (ignorando status) em atrasado / hoje / próximo / sem data. */

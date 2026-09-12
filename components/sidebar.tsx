@@ -15,6 +15,7 @@ import {
   DollarSign,
   CalendarDays,
   Target,
+  Filter,
   Settings,
   LogOut,
   ChevronLeft,
@@ -58,6 +59,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     id: "clientes",
     label: "Clientes",
     items: [
+      { href: "/pipeline", label: "Pipeline", icon: Filter, permKey: "pipeline" },
       { href: "/clientes", label: "Clientes", icon: Users, permKey: "clientes" },
       { href: "/servicos", label: "Serviços", icon: Wrench, permKey: "servicos" },
       { href: "/nps", label: "NPS", icon: Star, permKey: "nps" },
@@ -84,6 +86,7 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
   financeiro: "none",
   "minha-semana": "none",
   metas: "none",
+  pipeline: "none",
 };
 
 export function Sidebar() {

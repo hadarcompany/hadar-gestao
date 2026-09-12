@@ -4,7 +4,7 @@ export type PermissionLevel = "none" | "view" | "edit";
 
 export const MODULE_KEYS = [
   "dashboard", "tarefas", "meu-trabalho", "calendario", "clientes",
-  "servicos", "nps", "financeiro", "minha-semana", "metas", "acessos",
+  "servicos", "nps", "financeiro", "minha-semana", "metas", "acessos", "pipeline",
 ] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 

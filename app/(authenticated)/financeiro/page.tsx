@@ -15,6 +15,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+import { formatDateBR } from "@/lib/dates";
 
 // ── helpers ──────────────────────────────────────────────────────
 function R$(v: number) {
@@ -420,8 +421,8 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
                 <tr key={r.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800"><ClientIdentity client={r.client} /></td>
                   <td className="px-6 py-4 text-sm font-bold text-emerald-600">{R$(r.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{new Date(r.dueDate).toLocaleDateString("pt-BR")}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{r.paidDate ? new Date(r.paidDate).toLocaleDateString("pt-BR") : "—"}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{formatDateBR(r.dueDate)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{r.paidDate ? formatDateBR(r.paidDate) : "—"}</td>
                   <td className="px-6 py-4">{statusBadge(r.status)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -691,7 +692,7 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
                     <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(e.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{new Date(e.date).toLocaleDateString("pt-BR")}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{formatDateBR(e.date)}</td>
                   <td className="px-6 py-4">
                     {e.paidWithCash
                       ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
@@ -853,7 +854,7 @@ function InvestmentsTab() {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{new Date(inv.date).toLocaleDateString("pt-BR")}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{formatDateBR(inv.date)}</td>
                   <td className="px-6 py-4">
                     {inv.paidWithCash
                       ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>

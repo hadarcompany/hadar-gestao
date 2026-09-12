@@ -125,6 +125,16 @@ enum NotificationType {
   TASK_UPDATE
 }
 
+enum LeadStage {
+  NOVO
+  FOLLOW_UP
+  PROSPECCAO_ATIVA
+  REUNIAO_AGENDADA
+  PROPOSTA_ENVIADA
+  FECHADO
+  PERDIDO
+}
+
 model User {
   id          String   @id @default(cuid())
   name        String
@@ -147,6 +157,7 @@ model User {
   chatReads            ClientChatRead[]
   notifications        Notification[]
   uploadedAttachments  TaskAttachment[]
+  ownedLeads           Lead[]               @relation("LeadOwner")
 
   @@map("users")
 }
@@ -317,6 +328,36 @@ model Notification {
 
   @@index([userId, read])
   @@map("notifications")
+}
+
+/// Lead comercial no funil de vendas. `value` é o valor negociado (venda quando FECHADO,
+/// estimativa antes disso) e alimenta ticket médio e total vendido na dashboard.
+/// `stageChangedAt` marca a última mudança de etapa, para medir tempo parado no funil.
+model Lead {
+  id      String    @id @default(cuid())
+  name    String
+  company String?
+  email   String?
+  phone   String?
+  origin  String?
+  product String?
+  stage   LeadStage @default(NOVO)
+  value   Float?
+  notes   String?
+
+  lostReason String?
+
+  ownerId String?
+  owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id])
+
+  stageChangedAt DateTime  @default(now())
+  closedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([stage])
+  @@index([createdAt])
+  @@map("leads")
 }
 
 model TaskAssignee {

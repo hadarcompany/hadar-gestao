@@ -13,6 +13,7 @@ import {
   Upload, Download, ImageOff, ChevronRight, CalendarClock, MessageCircle,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { formatDateBR } from "@/lib/dates";
 import { WeeklyDemandPanel } from "@/components/clients/weekly-demand-panel";
 import { ClientChatPanel } from "@/components/clients/client-chat-panel";
 
@@ -326,7 +327,7 @@ export default function ClientesPage() {
             <div className="flex flex-wrap gap-2 mt-2">
               {renewalAlerts.map((c) => (
                 <span key={c.id} className="text-xs text-accent-dark bg-accent/20 border border-accent/30 px-3 py-1 rounded-lg font-medium">
-                  {c.name} — {new Date(c.renewalDate!).toLocaleDateString("pt-BR")}
+                  {c.name} — {formatDateBR(c.renewalDate)}
                 </span>
               ))}
             </div>
@@ -499,13 +500,13 @@ export default function ClientesPage() {
                         {selectedClient.contractStartDate && (
                           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200/50">
                             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Início</span>
-                            <span className="text-sm text-gray-800 font-medium">{new Date(selectedClient.contractStartDate).toLocaleDateString("pt-BR")}</span>
+                            <span className="text-sm text-gray-800 font-medium">{formatDateBR(selectedClient.contractStartDate)}</span>
                           </div>
                         )}
                         {selectedClient.renewalDate && (
                           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200/50">
                             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Renovação</span>
-                            <span className="text-sm text-gray-800 font-medium">{new Date(selectedClient.renewalDate).toLocaleDateString("pt-BR")}</span>
+                            <span className="text-sm text-gray-800 font-medium">{formatDateBR(selectedClient.renewalDate)}</span>
                           </div>
                         )}
                       </div>
@@ -608,7 +609,7 @@ export default function ClientesPage() {
                             </p>
                             {svc.nextRenewal && (
                               <p className="text-xs text-gray-400 font-medium mt-1">
-                                Renov. {new Date(svc.nextRenewal).toLocaleDateString("pt-BR")}
+                                Renov. {formatDateBR(svc.nextRenewal)}
                               </p>
                             )}
                           </div>

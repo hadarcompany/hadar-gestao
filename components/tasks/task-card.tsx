@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Calendar, CheckSquare } from "lucide-react";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from "@/lib/task-templates";
+import { formatDayMonthBR, isOverdue as isTaskOverdue } from "@/lib/dates";
 import { type TaskData } from "@/lib/types";
 
 interface TaskCardProps {
@@ -27,7 +28,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
     LOW: "default", MEDIUM: "warning", HIGH: "warning", URGENT: "danger",
   } as const)[task.priority] || "default";
 
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "COMPLETED" && task.status !== "CANCELLED";
+  const isOverdue = isTaskOverdue(task);
 
   return (
     <div
@@ -85,7 +86,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
         {task.dueDate && (
           <div className={`flex items-center gap-1 text-[11px] ${isOverdue ? "text-red-600" : "text-gray-400"}`}>
             <Calendar size={11} />
-            {new Date(task.dueDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+            {formatDayMonthBR(task.dueDate)}
           </div>
         )}
       </div>
