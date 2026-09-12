@@ -24,12 +24,12 @@ const CURRENT_MONTH = NOW.getMonth() + 1;
 const CURRENT_YEAR = NOW.getFullYear();
 
 const GOAL_TYPES = [
-  { value: "REVENUE", label: "Faturamento mensal", icon: <TrendingUp size={14} />, unit: "R$", color: "text-emerald-400" },
-  { value: "NEW_CLIENTS", label: "Novos clientes", icon: <Users size={14} />, unit: "", color: "text-blue-400" },
-  { value: "RETENTION", label: "Taxa de retenção", icon: <BarChart3 size={14} />, unit: "%", color: "text-purple-400" },
-  { value: "TASKS_ON_TIME", label: "Tarefas no prazo", icon: <CheckCircle size={14} />, unit: "%", color: "text-cyan-400" },
-  { value: "AVG_NPS", label: "NPS médio", icon: <Target size={14} />, unit: "", color: "text-amber-400" },
-  { value: "CUSTOM", label: "Meta personalizada", icon: <Target size={14} />, unit: "", color: "text-white/60" },
+  { value: "REVENUE", label: "Faturamento mensal", icon: <TrendingUp size={14} />, unit: "R$", color: "text-emerald-600" },
+  { value: "NEW_CLIENTS", label: "Novos clientes", icon: <Users size={14} />, unit: "", color: "text-blue-600" },
+  { value: "RETENTION", label: "Taxa de retenção", icon: <BarChart3 size={14} />, unit: "%", color: "text-purple-600" },
+  { value: "TASKS_ON_TIME", label: "Tarefas no prazo", icon: <CheckCircle size={14} />, unit: "%", color: "text-cyan-600" },
+  { value: "AVG_NPS", label: "NPS médio", icon: <Target size={14} />, unit: "", color: "text-accent" },
+  { value: "CUSTOM", label: "Meta personalizada", icon: <Target size={14} />, unit: "", color: "text-gray-600" },
 ];
 
 function getGoalType(type: string) {
@@ -53,9 +53,9 @@ function statusBadge(status: string) {
 
 function statusIcon(status: string) {
   switch (status) {
-    case "ACHIEVED": return <CheckCircle size={16} className="text-emerald-400" />;
-    case "BEHIND": return <AlertTriangle size={16} className="text-red-400" />;
-    default: return <Clock size={16} className="text-blue-400" />;
+    case "ACHIEVED": return <CheckCircle size={16} className="text-emerald-600" />;
+    case "BEHIND": return <AlertTriangle size={16} className="text-red-600" />;
+    default: return <Clock size={16} className="text-blue-600" />;
   }
 }
 
@@ -134,26 +134,26 @@ export default function MetasPage() {
     <div>
       <PageHeader title="Metas / OKRs" description="Acompanhamento de metas e objetivos.">
         <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors">
+          className="flex items-center gap-2 px-4 py-2 text-xs bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors">
           <Plus size={14} /> Nova Meta
         </button>
       </PageHeader>
 
       {/* Filters */}
       <div className="flex items-center gap-4 mb-6 flex-wrap">
-        <div className="flex gap-1 bg-white/[0.02] border border-white/5 rounded-xl p-1">
+        <div className="flex gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
           <button onClick={() => setPeriod("MONTHLY")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === "MONTHLY" ? "bg-amber-600/20 text-amber-400" : "text-white/40 hover:text-white/60"}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === "MONTHLY" ? "bg-accent/20 text-accent" : "text-gray-500 hover:text-gray-600"}`}>
             Mensal
           </button>
           <button onClick={() => setPeriod("QUARTERLY")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === "QUARTERLY" ? "bg-amber-600/20 text-amber-400" : "text-white/40 hover:text-white/60"}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === "QUARTERLY" ? "bg-accent/20 text-accent" : "text-gray-500 hover:text-gray-600"}`}>
             Trimestral
           </button>
         </div>
 
         <select value={month} onChange={(e) => setMonth(parseInt(e.target.value))}
-          className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 outline-none">
+          className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 outline-none">
           {Array.from({ length: 12 }, (_, i) => (
             <option key={i + 1} value={i + 1}>
               {new Date(2000, i).toLocaleString("pt-BR", { month: "long" })}
@@ -161,7 +161,7 @@ export default function MetasPage() {
           ))}
         </select>
         <select value={year} onChange={(e) => setYear(parseInt(e.target.value))}
-          className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/80 outline-none">
+          className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 outline-none">
           {[CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1].map((y) => (
             <option key={y} value={y}>{y}</option>
           ))}
@@ -169,9 +169,9 @@ export default function MetasPage() {
 
         {goals.length > 0 && (
           <div className="flex items-center gap-3 ml-auto text-xs">
-            <span className="text-emerald-400 font-medium">{achieved} atingidas</span>
-            <span className="text-blue-400 font-medium">{onTrack} no caminho</span>
-            <span className="text-red-400 font-medium">{behind} atrasadas</span>
+            <span className="text-emerald-600 font-medium">{achieved} atingidas</span>
+            <span className="text-blue-600 font-medium">{onTrack} no caminho</span>
+            <span className="text-red-600 font-medium">{behind} atrasadas</span>
           </div>
         )}
       </div>
@@ -179,14 +179,14 @@ export default function MetasPage() {
       {/* Goals grid */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-amber-500" />
+          <Loader2 size={24} className="animate-spin text-accent-dark" />
         </div>
       ) : goals.length === 0 ? (
         <div className="text-center py-16">
-          <Target size={40} className="text-white/10 mx-auto mb-3" />
-          <p className="text-sm text-white/30">Nenhuma meta definida para este período.</p>
+          <Target size={40} className="text-gray-400 mx-auto mb-3" />
+          <p className="text-sm text-gray-400">Nenhuma meta definida para este período.</p>
           <button onClick={() => setShowModal(true)}
-            className="mt-4 px-4 py-2 text-xs bg-amber-600/20 text-amber-400 rounded-lg hover:bg-amber-600/30 transition-colors">
+            className="mt-4 px-4 py-2 text-xs bg-accent/20 text-accent rounded-lg hover:bg-accent/30 transition-colors">
             Criar primeira meta
           </button>
         </div>
@@ -194,27 +194,27 @@ export default function MetasPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {goals.map((goal) => {
             const gt = getGoalType(goal.type);
-            const progressColor = goal.status === "ACHIEVED" ? "bg-emerald-500" : goal.status === "BEHIND" ? "bg-red-500" : "bg-amber-500";
+            const progressColor = goal.status === "ACHIEVED" ? "bg-emerald-500" : goal.status === "BEHIND" ? "bg-red-500" : "bg-accent-dark";
 
             return (
-              <div key={goal.id} className="bg-white/[0.03] border border-white/5 rounded-xl p-5 relative group">
+              <div key={goal.id} className="bg-white border border-gray-200 rounded-xl p-5 relative group">
                 {/* Delete button */}
                 <button onClick={() => handleDelete(goal.id)}
-                  className="absolute top-3 right-3 p-1.5 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                  className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all">
                   <Trash2 size={14} />
                 </button>
 
                 {/* Header */}
                 <div className="flex items-center gap-2 mb-3">
                   <span className={gt.color}>{gt.icon}</span>
-                  <h3 className="text-sm font-medium text-white/80 flex-1 truncate">{goal.title}</h3>
+                  <h3 className="text-sm font-medium text-gray-700 flex-1 truncate">{goal.title}</h3>
                 </div>
 
                 {/* Status */}
                 <div className="flex items-center gap-2 mb-4">
                   {statusIcon(goal.status)}
                   {statusBadge(goal.status)}
-                  <span className="text-[10px] text-white/20 ml-auto uppercase">
+                  <span className="text-[10px] text-gray-400 ml-auto uppercase">
                     {goal.period === "MONTHLY" ? "Mensal" : "Trimestral"}
                   </span>
                 </div>
@@ -224,23 +224,23 @@ export default function MetasPage() {
                   <span className={`text-2xl font-bold ${gt.color}`}>
                     {formatValue(goal.currentValue, goal.type)}
                   </span>
-                  <span className="text-sm text-white/30 mb-0.5">
+                  <span className="text-sm text-gray-400 mb-0.5">
                     / {formatValue(goal.targetValue, goal.type)}
                   </span>
                 </div>
 
                 {/* Progress bar */}
-                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-2">
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
                   <div
                     className={`h-full ${progressColor} rounded-full transition-all duration-500`}
                     style={{ width: `${Math.min(goal.progress, 100)}%` }}
                   />
                 </div>
-                <p className="text-[10px] text-white/30">{goal.progress.toFixed(1)}% concluído</p>
+                <p className="text-[10px] text-gray-400">{goal.progress.toFixed(1)}% concluído</p>
 
                 {/* Custom value input */}
                 {goal.type === "CUSTOM" && (
-                  <div className="mt-3 pt-3 border-t border-white/5">
+                  <div className="mt-3 pt-3 border-t border-gray-200">
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -248,9 +248,9 @@ export default function MetasPage() {
                         placeholder="Valor atual"
                         defaultValue={goal.customValue || ""}
                         onBlur={(e) => updateCustomValue(goal.id, e.target.value)}
-                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/80 outline-none focus:border-amber-500/50"
+                        className="flex-1 bg-gray-100 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 outline-none focus:border-accent-dark/50"
                       />
-                      <span className="text-[10px] text-white/20">manual</span>
+                      <span className="text-[10px] text-gray-400">manual</span>
                     </div>
                   </div>
                 )}
@@ -288,9 +288,9 @@ export default function MetasPage() {
           )}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-white/50 bg-white/5 rounded-lg">Cancelar</button>
+            <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-500 bg-gray-100 rounded-lg">Cancelar</button>
             <button onClick={handleCreate} disabled={saving || !form.targetValue}
-              className="px-5 py-2 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white rounded-lg">
+              className="px-5 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white rounded-lg">
               {saving ? "Criando..." : "Criar Meta"}
             </button>
           </div>

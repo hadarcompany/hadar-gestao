@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   const calendars = await prisma.contentCalendar.findMany({
     where,
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, logoUrl: true } },
       items: {
         include: {
           task: { select: { id: true, title: true, status: true } },
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       },
     },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, logoUrl: true } },
       items: {
         include: { task: { select: { id: true, title: true, status: true } } },
         orderBy: [{ type: "asc" }, { index: "asc" }],

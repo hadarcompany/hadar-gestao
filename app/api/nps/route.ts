@@ -12,13 +12,13 @@ export async function GET(req: NextRequest) {
 
   const clients = await prisma.client.findMany({
     where: { status: "ACTIVE" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, logoUrl: true },
     orderBy: { name: "asc" },
   });
 
   const scores = await prisma.clientHealthScore.findMany({
     where: { month, year },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
   });
 
   const clientScores = clients.map((client) => {
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
       return {
         clientId: client.id,
         clientName: client.name,
+        logoUrl: client.logoUrl,
         hasScore: true,
         scoreId: score.id,
         churn: {
@@ -65,6 +66,7 @@ export async function GET(req: NextRequest) {
     return {
       clientId: client.id,
       clientName: client.name,
+        logoUrl: client.logoUrl,
       hasScore: false,
       scoreId: null,
       churn: { satisfactionDelivery: 0, serviceQuality: 0, deadlineCompliance: 0, perceivedResult: 0, npsScore: 0, avg: 0 },

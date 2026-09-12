@@ -1,5 +1,26 @@
 import { type ChecklistItem } from "./task-templates";
 
+export interface UserSummary {
+  id: string;
+  name: string;
+  image?: string | null;
+}
+
+export interface ClientSummary {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+}
+
+export interface TaskAttachmentData {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+  uploadedBy: { id: string; name: string };
+}
+
 export interface TaskData {
   id: string;
   title: string;
@@ -9,6 +30,9 @@ export interface TaskData {
   priority: string;
   startDate: string | null;
   dueDate: string | null;
+  publishDate: string | null;
+  completedAt: string | null;
+  isExtra: boolean;
   estimatedTime: number | null;
   actualTime: number | null;
   checklist: ChecklistItem[] | null;
@@ -17,9 +41,10 @@ export interface TaskData {
   createdAt: string;
   updatedAt: string;
   clientId: string | null;
-  client: { id: string; name: string } | null;
+  client: ClientSummary | null;
   createdBy: { id: string; name: string };
-  assignees: Array<{ user: { id: string; name: string } }>;
+  assignees: Array<{ user: UserSummary }>;
+  attachments?: TaskAttachmentData[];
 }
 
 export interface ClientData {
@@ -31,12 +56,18 @@ export interface ClientData {
   contractLink: string | null;
   briefing: string | null;
   status: string;
+  classification: "MRR" | "FREELA" | null;
   contractStartDate: string | null;
   renewalDate: string | null;
+  brandColors?: string[];
+  brandFontPrimary?: string | null;
+  brandFontSecondary?: string | null;
+  logoUrl?: string | null;
   _count: { tasks: number };
   interactions: InteractionData[];
   accesses?: AccessData[];
   tasks?: TaskData[];
+  services?: Array<{ id: string; type: string; name: string | null }>;
 }
 
 export interface InteractionData {

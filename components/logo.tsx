@@ -4,7 +4,7 @@ interface LogoProps {
   height?: number;
 }
 
-export function Logo({ className = "text-amber-500", width = 140, height = 42 }: LogoProps) {
+export function Logo({ className = "text-accent-dark", width = 140, height = 42 }: LogoProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

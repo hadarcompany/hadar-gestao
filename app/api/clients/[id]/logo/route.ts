@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -25,7 +26,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ logoUrl: client.logoUrl });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

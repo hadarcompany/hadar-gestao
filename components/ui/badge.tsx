@@ -7,12 +7,12 @@ interface BadgeProps {
 }
 
 const variants = {
-  default: "bg-white/10 text-white/60",
-  success: "bg-emerald-500/20 text-emerald-400",
-  warning: "bg-amber-500/20 text-amber-400",
-  danger: "bg-red-500/20 text-red-400",
-  info: "bg-blue-500/20 text-blue-400",
-  purple: "bg-purple-500/20 text-purple-400",
+  default: "bg-gray-100 text-gray-600",
+  success: "bg-emerald-500/20 text-emerald-600",
+  warning: "bg-accent-dark/20 text-accent",
+  danger: "bg-red-500/20 text-red-600",
+  info: "bg-blue-500/20 text-blue-600",
+  purple: "bg-purple-500/20 text-purple-600",
 };
 
 export function Badge({ children, className, variant = "default" }: BadgeProps) {

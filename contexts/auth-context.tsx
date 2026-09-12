@@ -67,6 +67,7 @@ function parseUser(supabaseUser: any): AuthUser {
     email: supabaseUser.email ?? "",
     name: (supabaseUser.user_metadata?.name as string) ?? supabaseUser.email ?? "",
     role: (meta.role as string) ?? "MEMBER",
+    image: (supabaseUser.user_metadata?.image as string) ?? null,
     permissions: (meta.permissions as Record<string, string>) ?? null,
   };
 }

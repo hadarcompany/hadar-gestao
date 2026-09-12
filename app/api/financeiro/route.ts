@@ -8,7 +8,7 @@ export async function GET() {
 
   const recurringServices = await prisma.service.findMany({
     where: { type: "RECURRING" },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -16,7 +16,7 @@ export async function GET() {
 
   const freelancerServices = await prisma.service.findMany({
     where: { type: "FREELANCER" },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
     orderBy: { createdAt: "desc" },
   });
 

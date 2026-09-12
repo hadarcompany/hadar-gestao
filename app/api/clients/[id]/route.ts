@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -22,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       accesses: true,
       services: {
         orderBy: { createdAt: "desc" },
-        include: { client: { select: { id: true, name: true } } },
+        include: { client: { select: { id: true, name: true, logoUrl: true } } },
       },
     },
   });
@@ -31,7 +32,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(client);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -47,7 +49,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(client);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

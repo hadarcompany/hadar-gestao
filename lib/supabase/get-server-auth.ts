@@ -17,6 +17,7 @@ export async function getServerAuth(): Promise<AuthUser | null> {
     email: user.email!,
     name: (user.user_metadata?.name as string) ?? user.email!,
     role: (meta.role as string) ?? "MEMBER",
+    image: (user.user_metadata?.image as string) ?? null,
     permissions: (meta.permissions as Record<string, string>) ?? null,
   };
 }

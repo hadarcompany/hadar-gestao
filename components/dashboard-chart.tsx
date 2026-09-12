@@ -10,29 +10,30 @@ export default function DashboardChart({ data }: DashboardChartProps) {
   return (
     <ResponsiveContainer width="100%" height={250}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
         <XAxis
           dataKey="week"
-          tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }}
-          axisLine={{ stroke: "rgba(255,255,255,0.05)" }}
+          tick={{ fill: "rgba(0,0,0,0.4)", fontSize: 12 }}
+          axisLine={{ stroke: "rgba(0,0,0,0.08)" }}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }}
-          axisLine={{ stroke: "rgba(255,255,255,0.05)" }}
+          tick={{ fill: "rgba(0,0,0,0.4)", fontSize: 12 }}
+          axisLine={{ stroke: "rgba(0,0,0,0.08)" }}
           tickLine={false}
           allowDecimals={false}
         />
         <Tooltip
           contentStyle={{
-            backgroundColor: "#1a1a1a",
-            border: "1px solid rgba(255,255,255,0.1)",
+            backgroundColor: "#ffffff",
+            border: "1px solid rgba(0,0,0,0.08)",
             borderRadius: "8px",
-            color: "#fff",
+            color: "#1c1c1e",
             fontSize: 12,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         />
-        <Bar dataKey="concluidas" fill="#d97706" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="concluidas" fill="#F85021" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

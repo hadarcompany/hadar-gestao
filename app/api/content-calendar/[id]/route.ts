@@ -28,8 +28,9 @@ async function syncItems(calendarId: string, type: string, newCount: number) {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: routeParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -53,7 +54,7 @@ export async function PATCH(
   const updated = await prisma.contentCalendar.findUnique({
     where: { id },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, logoUrl: true } },
       items: {
         include: { task: { select: { id: true, title: true, status: true } } },
         orderBy: [{ type: "asc" }, { index: "asc" }],
@@ -66,8 +67,9 @@ export async function PATCH(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: routeParams }: { params: Promise<{ id: string }> }
 ) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

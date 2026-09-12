@@ -26,9 +26,11 @@ interface CreateTaskModalProps {
   onCreated: () => void;
   users: User[];
   clients: Client[];
+  initialClientId?: string;
+  initialPublishDate?: string;
 }
 
-export function CreateTaskModal({ open, onClose, onCreated, users, clients }: CreateTaskModalProps) {
+export function CreateTaskModal({ open, onClose, onCreated, users, clients, initialClientId, initialPublishDate }: CreateTaskModalProps) {
   const [loading, setLoading] = useState(false);
   const [taskType, setTaskType] = useState<string>("");
   const [title, setTitle] = useState("");
@@ -38,6 +40,8 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
   const [priority, setPriority] = useState("MEDIUM");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [publishDate, setPublishDate] = useState("");
+  const [isExtra, setIsExtra] = useState(false);
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [estimatedTime, setEstimatedTime] = useState("");
@@ -48,12 +52,13 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
   // Reset on open
   useEffect(() => {
     if (open) {
-      setTaskType(""); setTitle(""); setClientId(""); setAssigneeIds([]);
+      setTaskType(""); setTitle(""); setClientId(initialClientId || ""); setAssigneeIds([]);
       setStatus("PENDING"); setPriority("MEDIUM"); setStartDate(""); setDueDate("");
+      setPublishDate(initialPublishDate || ""); setIsExtra(false);
       setDescription(""); setTags([]); setEstimatedTime(""); setChecklist([]);
       setExtraFields({}); setNewChecklistItem("");
     }
-  }, [open]);
+  }, [open, initialClientId, initialPublishDate]);
 
   // Load template when type changes
   useEffect(() => {
@@ -94,6 +99,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
         body: JSON.stringify({
           title, type: taskType || null, description, status, priority,
           startDate: startDate || null, dueDate: dueDate || null,
+          publishDate: publishDate || null, isExtra,
           estimatedTime: estimatedTime || null,
           checklist, extraFields: Object.keys(extraFields).length > 0 ? extraFields : null,
           tags, clientId: clientId || null, assigneeIds,
@@ -152,6 +158,19 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Data de Publicação (calendário de conteúdo)"
+            type="date"
+            value={publishDate}
+            onChange={(e) => setPublishDate(e.target.value)}
+          />
+          <label className="flex items-center gap-2 mt-6 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={isExtra} onChange={(e) => setIsExtra(e.target.checked)} className="rounded accent-current text-accent" />
+            Marcar como demanda extra (acima do combinado)
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Textarea label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalhes da tarefa..." />
           <div className="space-y-4">
             <Input label="Tempo Estimado (horas)" type="number" step="0.5" value={estimatedTime} onChange={(e) => setEstimatedTime(e.target.value)} placeholder="Ex: 2.5" />
@@ -161,8 +180,8 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
 
         {/* Extra Fields for specific types */}
         {currentTemplate?.extraFields && (
-          <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
-            <h3 className="text-xs text-white/40 uppercase tracking-wider font-medium mb-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-3">
               Campos Extras — {currentTemplate.label}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -182,7 +201,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
             {/* Slide ideas for carrossel */}
             {currentTemplate.extraFields.some((f) => f.type === "slides") && slideCount > 0 && (
               <div className="mt-4 space-y-2">
-                <label className="block text-xs text-white/40 uppercase tracking-wider font-medium">
+                <label className="block text-xs text-gray-500 uppercase tracking-wider font-medium">
                   Ideia por Slide
                 </label>
                 {Array.from({ length: slideCount }).map((_, i) => (
@@ -200,16 +219,16 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
 
         {/* Checklist */}
         {(checklist.length > 0 || taskType === "tarefa_generica") && (
-          <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
-            <h3 className="text-xs text-white/40 uppercase tracking-wider font-medium mb-3">Checklist</h3>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-3">Checklist</h3>
             <div className="space-y-1.5">
               {checklist.map((item) => (
                 <div key={item.id} className="flex items-center gap-2 group py-1">
-                  <GripVertical size={14} className="text-white/10 shrink-0" />
-                  <span className="text-sm text-white/70 flex-1">{item.text}</span>
+                  <GripVertical size={14} className="text-gray-400 shrink-0" />
+                  <span className="text-sm text-gray-600 flex-1">{item.text}</span>
                   <button
                     onClick={() => removeChecklistItem(item.id)}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-white/20 hover:text-red-400 transition-all"
+                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-gray-400 hover:text-red-600 transition-all"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -222,11 +241,11 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
                 onChange={(e) => setNewChecklistItem(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChecklistItem(); } }}
                 placeholder="Adicionar item..."
-                className="flex-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50"
+                className="flex-1 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-accent-dark/50"
               />
               <button
                 onClick={addChecklistItem}
-                className="px-3 py-1.5 bg-amber-600/20 text-amber-400 rounded-lg text-sm hover:bg-amber-600/30 transition-colors"
+                className="px-3 py-1.5 bg-accent/20 text-accent rounded-lg text-sm hover:bg-accent/30 transition-colors"
               >
                 <Plus size={16} />
               </button>
@@ -235,17 +254,17 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients }: Cr
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-2 border-t border-white/5">
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-white/50 hover:text-white/70 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-gray-500 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading || !title.trim()}
-            className="px-6 py-2 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
           >
             {loading ? "Criando..." : "Criar Tarefa"}
           </button>

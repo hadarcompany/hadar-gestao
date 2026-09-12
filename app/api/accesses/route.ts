@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const accesses = await prisma.access.findMany({
     where,
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
     orderBy: { platform: "asc" },
   });
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       observations: body.observations || null,
       clientId: body.clientId,
     },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
   });
 
   return NextResponse.json(access, { status: 201 });

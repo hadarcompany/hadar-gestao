@@ -23,9 +23,9 @@ const config: Config = {
           white: "#FFFFFF",
         },
         sidebar: {
-          DEFAULT: "#0f0f0f",
-          hover: "#1a1a1a",
-          active: "#252525",
+          DEFAULT: "#ffffff",
+          hover: "#f5f5f4",
+          active: "#fdece5",
         },
       },
     },

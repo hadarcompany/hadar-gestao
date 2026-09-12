@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   const reviews = await prisma.weeklyReview.findMany({
     where,
-    include: { user: { select: { id: true, name: true } } },
+    include: { user: { select: { id: true, name: true, image: true } } },
     orderBy: { weekStart: "desc" },
   });
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       improvements,
       tasksCompleted,
     },
-    include: { user: { select: { id: true, name: true } } },
+    include: { user: { select: { id: true, name: true, image: true } } },
   });
 
   return NextResponse.json(review, { status: 201 });

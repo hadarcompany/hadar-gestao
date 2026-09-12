@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { SelectField } from "@/components/ui/select-field";
+import { Avatar } from "@/components/ui/avatar";
 import { Loader2, Shield, Users, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -12,6 +13,7 @@ interface UserData {
   name: string;
   email: string;
   role: string;
+  image: string | null;
   permissions: Record<string, string> | null;
 }
 
@@ -19,15 +21,13 @@ const MODULES = [
   { key: "dashboard", label: "Dashboard" },
   { key: "tarefas", label: "Tarefas" },
   { key: "meu-trabalho", label: "Meu Trabalho" },
-  { key: "calendario", label: "Calendario" },
-  { key: "calendario-clientes", label: "Cal. Clientes" },
+  { key: "calendario", label: "Calendário" },
   { key: "clientes", label: "Clientes" },
-  { key: "servicos", label: "Servicos" },
+  { key: "servicos", label: "Serviços" },
   { key: "nps", label: "NPS" },
   { key: "financeiro", label: "Financeiro" },
   { key: "minha-semana", label: "Minha Semana" },
   { key: "metas", label: "Metas" },
-  { key: "acessos", label: "Acessos" },
 ];
 
 const PERMISSION_OPTIONS = [
@@ -41,14 +41,12 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
   tarefas: "edit",
   "meu-trabalho": "edit",
   calendario: "none",
-  "calendario-clientes": "none",
   clientes: "none",
   servicos: "none",
   nps: "none",
   financeiro: "none",
   "minha-semana": "none",
   metas: "none",
-  acessos: "none",
 };
 
 function getUserPermissions(user: UserData): Record<string, string> {
@@ -117,14 +115,14 @@ export default function EquipePage() {
   return (
     <div>
       <PageHeader title="Equipe" description="Gerenciamento de membros e permissoes.">
-        <div className="flex items-center gap-2 text-xs text-white/40">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
           <Shield size={14} /> Apenas administradores
         </div>
       </PageHeader>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-amber-500" />
+          <Loader2 size={24} className="animate-spin text-accent-dark" />
         </div>
       ) : (
         <div className="space-y-6">
@@ -133,27 +131,25 @@ export default function EquipePage() {
             const perms = editPerms[user.id] || {};
 
             return (
-              <div key={user.id} className="bg-white/[0.03] border border-white/5 rounded-xl overflow-hidden">
+              <div key={user.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 {/* User header */}
-                <div className="flex items-center justify-between p-5 border-b border-white/5">
+                <div className="flex items-center justify-between p-5 border-b border-gray-200">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-sm">
-                      {user.name[0]}
-                    </div>
+                    <Avatar name={user.name} image={user.image} size={40} className="text-sm" />
                     <div>
-                      <h3 className="text-sm font-medium text-white/80">{user.name}</h3>
-                      <p className="text-xs text-white/30">{user.email}</p>
+                      <h3 className="text-sm font-medium text-gray-700">{user.name}</h3>
+                      <p className="text-xs text-gray-400">{user.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`text-xs px-2.5 py-1 rounded-full ${
-                      isAdmin ? "bg-amber-500/20 text-amber-400" : "bg-white/5 text-white/40"
+                      isAdmin ? "bg-accent-dark/20 text-accent" : "bg-gray-100 text-gray-500"
                     }`}>
                       {isAdmin ? "Admin" : "Membro"}
                     </span>
                     {!isAdmin && (
                       <button onClick={() => savePermissions(user.id)} disabled={saving === user.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent hover:bg-accent-dark disabled:opacity-50 text-white rounded-lg transition-colors">
                         {saving === user.id ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                         Salvar
                       </button>
@@ -164,18 +160,18 @@ export default function EquipePage() {
                 {/* Permissions grid */}
                 <div className="p-5">
                   {isAdmin ? (
-                    <p className="text-xs text-white/30 text-center py-2">
+                    <p className="text-xs text-gray-400 text-center py-2">
                       Administradores tem acesso total a todos os modulos.
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                       {MODULES.map((mod) => (
-                        <div key={mod.key} className="flex items-center gap-3 bg-white/[0.02] border border-white/5 rounded-lg p-3">
-                          <span className="text-xs text-white/60 font-medium flex-1">{mod.label}</span>
+                        <div key={mod.key} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <span className="text-xs text-gray-600 font-medium flex-1">{mod.label}</span>
                           <select
                             value={perms[mod.key] || "none"}
                             onChange={(e) => updatePerm(user.id, mod.key, e.target.value)}
-                            className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/80 outline-none focus:border-amber-500/50"
+                            className="bg-gray-100 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 outline-none focus:border-accent-dark/50"
                           >
                             {PERMISSION_OPTIONS.map((opt) => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>

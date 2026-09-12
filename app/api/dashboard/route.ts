@@ -1,52 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { dateKeyToUTCDate, dateKeyToUTCEndOfDay, getCurrentWeekRange, getTodayKey, toDateKey } from "@/lib/dates";
+import { TASK_INCLUDE } from "@/lib/task-transfer";
 
+/**
+ * period = intervalo [from, to] em chaves YYYY-MM-DD. Se ausente, usa a semana
+ * atual (segunda a domingo). "Previstas" usa dueDate; "concluídas no período"
+ * usa completedAt (não updatedAt, que muda em qualquer edição do registro).
+ */
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const period = searchParams.get("period") || "month";
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
 
-  const now = new Date();
-  let startDate: Date;
+  const defaultRange = getCurrentWeekRange();
+  const fromKey = fromParam || defaultRange.start;
+  const toKey = toParam || defaultRange.end;
 
-  switch (period) {
-    case "week":
-      startDate = new Date(now); startDate.setDate(now.getDate() - 7); break;
-    case "quarter":
-      startDate = new Date(now); startDate.setMonth(now.getMonth() - 3); break;
-    case "year":
-      startDate = new Date(now); startDate.setFullYear(now.getFullYear() - 1); break;
-    default:
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1); break;
-  }
+  const rangeStart = dateKeyToUTCDate(fromKey);
+  const rangeEnd = dateKeyToUTCEndOfDay(toKey);
+  const todayStart = dateKeyToUTCDate(getTodayKey());
 
-  const [pending, inProgress, overdue, completedThisPeriod, allTasks, upcomingRenewals] = await Promise.all([
+  const [pending, inProgress, overdue, completedInRange, upcomingRenewals] = await Promise.all([
     prisma.task.count({ where: { status: "PENDING" } }),
     prisma.task.count({ where: { status: "IN_PROGRESS" } }),
     prisma.task.count({
-      where: {
-        dueDate: { lt: now },
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-      },
+      where: { dueDate: { lt: todayStart }, status: { notIn: ["COMPLETED", "CANCELLED"] } },
     }),
     prisma.task.count({
-      where: { status: "COMPLETED", updatedAt: { gte: startDate } },
-    }),
-    prisma.task.findMany({
-      where: { status: "COMPLETED", updatedAt: { gte: startDate } },
-      select: { updatedAt: true },
+      where: { status: "COMPLETED", completedAt: { gte: rangeStart, lte: rangeEnd } },
     }),
     prisma.client.findMany({
-      where: {
-        renewalDate: {
-          gte: now,
-          lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        },
-      },
-      select: { id: true, name: true, renewalDate: true },
+      where: { renewalDate: { gte: todayStart, lte: new Date(todayStart.getTime() + 30 * 24 * 60 * 60 * 1000) } },
+      select: { id: true, name: true, logoUrl: true, renewalDate: true },
       orderBy: { renewalDate: "asc" },
     }),
   ]);
@@ -54,36 +44,17 @@ export async function GET(req: NextRequest) {
   const nextDeliveries = await prisma.task.findMany({
     where: {
       status: { notIn: ["COMPLETED", "CANCELLED"] },
-      dueDate: { gte: now },
+      dueDate: { gte: rangeStart, lte: rangeEnd },
     },
-    include: {
-      client: { select: { name: true } },
-      assignees: { include: { user: { select: { name: true } } } },
-    },
+    include: TASK_INCLUDE,
     orderBy: { dueDate: "asc" },
-    take: 5,
+    take: 12,
   });
-
-  const weeklyData: Record<string, number> = {};
-  allTasks.forEach((t) => {
-    const d = new Date(t.updatedAt);
-    const weekStart = new Date(d);
-    weekStart.setDate(d.getDate() - d.getDay());
-    const key = weekStart.toISOString().split("T")[0];
-    weeklyData[key] = (weeklyData[key] || 0) + 1;
-  });
-
-  const chartData = Object.entries(weeklyData)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([week, count]) => ({
-      week: new Date(week).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
-      concluidas: count,
-    }));
 
   return NextResponse.json({
-    stats: { pending, inProgress, overdue, completedThisPeriod },
-    chartData,
-    nextDeliveries,
+    range: { from: fromKey, to: toKey },
+    stats: { pending, inProgress, overdue, completedInRange },
+    nextDeliveries: nextDeliveries.map((t) => ({ ...t, dueDateKey: toDateKey(t.dueDate) })),
     upcomingRenewals,
   });
 }

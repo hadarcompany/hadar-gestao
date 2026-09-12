@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string; itemId: string } }
+  { params: routeParams }: { params: Promise<{ id: string; itemId: string }> }
 ) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

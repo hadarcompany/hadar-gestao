@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (auth.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -11,13 +12,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const access = await prisma.access.update({
     where: { id: params.id },
     data: body,
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
   });
 
   return NextResponse.json(access);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (auth.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     where: {
       OR: months.map((m) => ({ month: m.month, year: m.year })),
     },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
   });
 
   const expectedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     .filter((r) => r.status === "PAID")
     .reduce((sum, r) => sum + r.amount, 0);
 
-  const clientRevenue = new Map<string, { name: string; expected: number; received: number }>();
+  const clientRevenue = new Map<string, { name: string; logoUrl: string | null; expected: number; received: number }>();
   receivables.forEach((r) => {
     const existing = clientRevenue.get(r.clientId);
     if (existing) {
@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
     } else {
       clientRevenue.set(r.clientId, {
         name: r.client.name,
+        logoUrl: r.client.logoUrl,
         expected: r.amount,
         received: r.status === "PAID" ? r.amount : 0,
       });

@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/contexts/auth-context";
+import { ClientIdentity } from "@/components/clients/client-identity";
 import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -8,26 +10,35 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Avatar } from "@/components/ui/avatar";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task-templates";
-import { type TaskData } from "@/lib/types";
-import { CheckSquare, Square, Clock, User, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check } from "lucide-react";
+import { type TaskData, type UserSummary, type TaskAttachmentData } from "@/lib/types";
+import { CheckSquare, Square, Clock, User, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip, Upload, Download, Loader2 } from "lucide-react";
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface TaskDetailModalProps {
   open: boolean;
   onClose: () => void;
   task: TaskData | null;
   onUpdated: () => void;
-  users?: { id: string; name: string }[];
+  onAttachmentsChanged?: () => void;
+  users?: UserSummary[];
   clients?: { id: string; name: string }[];
 }
 
-export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], clients = [] }: TaskDetailModalProps) {
+export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsChanged, users = [], clients = [] }: TaskDetailModalProps) {
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [status, setStatus] = useState("");
   const [actualTime, setActualTime] = useState("");
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [transferMode, setTransferMode] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Edit mode fields
@@ -38,6 +49,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
   const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
   const [editStartDate, setEditStartDate] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
+  const [editPublishDate, setEditPublishDate] = useState("");
+  const [editIsExtra, setEditIsExtra] = useState(false);
   const [editEstimatedTime, setEditEstimatedTime] = useState("");
 
   // Transfer mode fields
@@ -45,8 +58,16 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
   const [transferNote, setTransferNote] = useState("");
   const [transferSaving, setTransferSaving] = useState(false);
 
+  const { user } = useAuth();
+  const [deletingAttachment, setDeletingAttachment] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<TaskAttachmentData[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
   useEffect(() => {
     if (task) {
+      setAttachments(task.attachments ?? []);
       setChecklist(Array.isArray(task.checklist) ? task.checklist : []);
       setStatus(task.status);
       setActualTime(task.actualTime ? String(task.actualTime) : "");
@@ -60,12 +81,27 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
       setEditAssigneeIds(task.assignees.map((a) => a.user.id));
       setEditStartDate(task.startDate ? task.startDate.slice(0, 10) : "");
       setEditDueDate(task.dueDate ? task.dueDate.slice(0, 10) : "");
+      setEditPublishDate(task.publishDate ? task.publishDate.slice(0, 10) : "");
+      setEditIsExtra(task.isExtra);
       setEditEstimatedTime(task.estimatedTime ? String(task.estimatedTime) : "");
       // Transfer fields start with current assignees
       setTransferAssigneeIds(task.assignees.map((a) => a.user.id));
       setTransferNote("");
     }
   }, [task]);
+
+  useEffect(() => {
+    if (!open || !task?.id) return;
+    const controller = new AbortController();
+    setLoadingAttachments(true);
+    setAttachmentError(null);
+    fetch(`/api/tasks/${task.id}/attachments`, { signal: controller.signal })
+      .then(async (res) => { if (!res.ok) throw new Error("Não foi possível carregar os anexos"); return res.json(); })
+      .then(setAttachments)
+      .catch((error) => { if (!controller.signal.aborted) setAttachmentError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoadingAttachments(false); });
+    return () => controller.abort();
+  }, [open, task?.id]);
 
   if (!task) return null;
 
@@ -86,20 +122,72 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
     }
   }
 
+  async function handleUploadAttachment(file: File) {
+    if (!task) return;
+    setAttachmentError(null);
+    if (file.size === 0 || file.size > 8 * 1024 * 1024) {
+      setAttachmentError("Selecione um arquivo não vazio de até 8 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/tasks/${task.id}/attachments`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Não foi possível enviar o arquivo");
+      }
+      const created: TaskAttachmentData = await res.json();
+      setAttachments((prev) => [...prev, created]);
+      onAttachmentsChanged?.();
+    } catch (e) {
+      setAttachmentError((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: string) {
+    if (!task) return;
+    setDeletingAttachment(attachmentId);
+    setAttachmentError(null);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/attachments/${attachmentId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Não foi possível remover o arquivo");
+      }
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      onAttachmentsChanged?.();
+    } catch (e) {
+      setAttachmentError((e as Error).message);
+    } finally {
+      setDeletingAttachment(null);
+    }
+  }
+
   async function handleTransfer() {
     if (!task) return;
     setTransferSaving(true);
+    setTransferError(null);
     try {
-      await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/tasks/${task.id}/transfer`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          assigneeIds: transferAssigneeIds,
-          transferNote: transferNote || null,
+          toUserIds: transferAssigneeIds,
+          note: transferNote || null,
         }),
       });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Não foi possível transferir a tarefa");
+      }
       setTransferMode(false);
       onUpdated();
+    } catch (e) {
+      setTransferError((e as Error).message || "Não foi possível transferir a tarefa");
     } finally {
       setTransferSaving(false);
     }
@@ -123,6 +211,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
         payload.assigneeIds = editAssigneeIds;
         payload.startDate = editStartDate || null;
         payload.dueDate = editDueDate || null;
+        payload.publishDate = editPublishDate || null;
+        payload.isExtra = editIsExtra;
         payload.estimatedTime = editEstimatedTime || null;
       }
 
@@ -145,29 +235,27 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title={editMode ? "Editar Tarefa" : transferMode ? "Transferir Tarefa" : task.title} size="xl">
+      <Modal open={open} onClose={() => { if (!uploading && deletingAttachment === null) onClose(); }} title={editMode ? "Editar Tarefa" : transferMode ? "Transferir Tarefa" : task.title} size="xl">
         <div className="space-y-6">
 
           {/* TRANSFER MODE */}
           {transferMode ? (
             <div className="space-y-5">
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-300">
-                <p className="font-medium mb-1">Transferindo: <span className="text-white">{task.title}</span></p>
-                <p className="text-amber-400/70">Selecione o(s) novo(s) responsável(is) pela tarefa.</p>
+              <div className="bg-accent-dark/10 border border-accent-dark/20 rounded-xl p-4 text-sm text-accent">
+                <p className="font-medium mb-1">Transferindo: <span className="text-gray-900">{task.title}</span></p>
+                <p className="text-accent/70">Selecione o(s) novo(s) responsável(is) pela tarefa.</p>
               </div>
 
               <div className="space-y-1.5">
-                <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Responsáveis atuais</p>
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Responsáveis atuais</p>
                 <div className="flex flex-wrap gap-2">
                   {task.assignees.length > 0 ? task.assignees.map((a) => (
-                    <span key={a.user.id} className="flex items-center gap-1.5 text-xs bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg border border-zinc-700">
-                      <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[10px] text-amber-400 font-bold">
-                        {a.user.name[0]}
-                      </span>
+                    <span key={a.user.id} className="flex items-center gap-1.5 text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg border border-gray-300">
+                      <Avatar name={a.user.name} image={a.user.image} size={20} className="text-[10px]" />
                       {a.user.name}
                     </span>
                   )) : (
-                    <span className="text-xs text-zinc-600">Nenhum responsável atribuído</span>
+                    <span className="text-xs text-gray-400">Nenhum responsável atribuído</span>
                   )}
                 </div>
               </div>
@@ -187,10 +275,14 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
                 placeholder="Ex: Tarefa transferida para revisão final..."
               />
 
-              <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+              {transferError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{transferError}</p>
+              )}
+
+              <div className="flex items-center gap-3 pt-2 border-t border-gray-200">
                 <button
                   onClick={() => setTransferMode(false)}
-                  className="px-4 py-2 text-sm text-white/50 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
                   Cancelar
                 </button>
@@ -198,7 +290,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
                 <button
                   onClick={handleTransfer}
                   disabled={transferSaving || transferAssigneeIds.length === 0}
-                  className="flex items-center gap-2 px-6 py-2 text-sm bg-[#FF5A00] hover:bg-[#E04D00] disabled:opacity-50 text-white font-bold rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-50 text-white font-bold rounded-lg transition-colors"
                 >
                   <Check size={14} />
                   {transferSaving ? "Transferindo..." : "Confirmar Transferência"}
@@ -214,14 +306,14 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
                 {task.type && <Badge>{task.type.replace(/_/g, " ")}</Badge>}
                 <div className="ml-auto flex items-center gap-2">
                   <button
-                    onClick={() => setTransferMode(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors"
+                    onClick={() => { setTransferError(null); setTransferMode(true); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors"
                   >
                     <ArrowLeftRight size={12} /> Transferir
                   </button>
                   <button
                     onClick={() => setEditMode(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent bg-accent-dark/10 hover:bg-accent-dark/20 rounded-lg transition-colors"
                   >
                     <Pencil size={12} /> Editar
                   </button>
@@ -230,28 +322,27 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 {task.client && (
-                  <div className="flex items-center gap-2 text-white/50">
-                    <User size={14} className="text-amber-500" />
-                    <span>{task.client.name}</span>
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <ClientIdentity client={task.client} size={24} />
                   </div>
                 )}
                 {task.dueDate && (
-                  <div className="flex items-center gap-2 text-white/50">
-                    <Calendar size={14} className="text-amber-500" />
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Calendar size={14} className="text-accent-dark" />
                     <span>{new Date(task.dueDate).toLocaleDateString("pt-BR")}</span>
                   </div>
                 )}
                 {task.estimatedTime && (
-                  <div className="flex items-center gap-2 text-white/50">
-                    <Clock size={14} className="text-amber-500" />
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Clock size={14} className="text-accent-dark" />
                     <span>{task.estimatedTime}h estimado</span>
                   </div>
                 )}
                 {task.assignees.length > 0 && (
-                  <div className="flex items-center gap-1 text-white/50">
+                  <div className="flex items-center gap-1 text-gray-500">
                     {task.assignees.map((a, i) => (
-                      <span key={i} className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-[10px] text-amber-400 font-bold" title={a.user.name}>
-                        {a.user.name[0]}
+                      <span key={i} title={a.user.name}>
+                        <Avatar name={a.user.name} image={a.user.image} size={24} className="text-[10px]" />
                       </span>
                     ))}
                   </div>
@@ -260,17 +351,17 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
 
               {task.tags?.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Tag size={14} className="text-white/20" />
+                  <Tag size={14} className="text-gray-400" />
                   {task.tags.map((tag) => (
-                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/40">{tag}</span>
+                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{tag}</span>
                   ))}
                 </div>
               )}
 
               {task.description && (
-                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
-                  <h3 className="text-xs text-white/30 uppercase tracking-wider mb-2">Descrição</h3>
-                  <p className="text-sm text-white/60 whitespace-pre-wrap">{task.description}</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Descrição</h3>
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{task.description}</p>
                 </div>
               )}
             </>
@@ -307,6 +398,15 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
                   onChange={(e) => setEditDueDate(e.target.value)} />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <Input label="Data de Publicação (calendário de conteúdo)" type="date" value={editPublishDate}
+                  onChange={(e) => setEditPublishDate(e.target.value)} />
+                <label className="flex items-center gap-2 mb-2.5 text-sm text-gray-600 cursor-pointer">
+                  <input type="checkbox" checked={editIsExtra} onChange={(e) => setEditIsExtra(e.target.checked)} className="rounded accent-current text-accent" />
+                  Demanda extra (acima do combinado)
+                </label>
+              </div>
+
               <Textarea label="Descrição" value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)} placeholder="Detalhes da tarefa..." />
             </>
@@ -324,25 +424,25 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
 
           {/* Checklist (not in transfer mode) */}
           {!transferMode && checklist.length > 0 && (
-            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs text-white/30 uppercase tracking-wider">Checklist</h3>
-                <span className="text-xs text-white/30">{checkDone}/{checkTotal}</span>
+                <h3 className="text-xs text-gray-400 uppercase tracking-wider">Checklist</h3>
+                <span className="text-xs text-gray-400">{checkDone}/{checkTotal}</span>
               </div>
-              <div className="w-full h-1.5 bg-white/5 rounded-full mb-4 overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full transition-all duration-300"
+              <div className="w-full h-1.5 bg-gray-100 rounded-full mb-4 overflow-hidden">
+                <div className="h-full bg-accent-dark rounded-full transition-all duration-300"
                   style={{ width: checkTotal > 0 ? `${(checkDone / checkTotal) * 100}%` : "0%" }} />
               </div>
               <div className="space-y-1">
                 {checklist.map((item) => (
                   <button key={item.id} onClick={() => toggleCheckItem(item.id)}
-                    className="flex items-center gap-3 w-full text-left py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors">
+                    className="flex items-center gap-3 w-full text-left py-1.5 px-2 rounded-lg hover:bg-gray-50 transition-colors">
                     {item.checked ? (
-                      <CheckSquare size={16} className="text-amber-500 shrink-0" />
+                      <CheckSquare size={16} className="text-accent-dark shrink-0" />
                     ) : (
-                      <Square size={16} className="text-white/20 shrink-0" />
+                      <Square size={16} className="text-gray-400 shrink-0" />
                     )}
-                    <span className={`text-sm ${item.checked ? "text-white/30 line-through" : "text-white/70"}`}>
+                    <span className={`text-sm ${item.checked ? "text-gray-400 line-through" : "text-gray-600"}`}>
                       {item.text}
                     </span>
                   </button>
@@ -351,25 +451,91 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, users = [], cl
             </div>
           )}
 
+          {/* Anexos (not in transfer mode) */}
+          {!transferMode && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Paperclip size={12} /> Anexos {attachments.length > 0 && `(${attachments.length})`}
+                </h3>
+                <label className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent-dark cursor-pointer transition-colors">
+                  {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                  Anexar arquivo
+                  <input
+                    type="file"
+                    className="hidden"
+                    disabled={uploading || loadingAttachments || deletingAttachment !== null}
+                    onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleUploadAttachment(f); }}
+                  />
+                </label>
+              </div>
+
+              <p className="text-xs text-gray-400 mb-2">Até 8 MB por arquivo. Os anexos são salvos automaticamente.</p>
+              {attachmentError && <p className="text-xs text-red-600 mb-2">{attachmentError}</p>}
+
+              {loadingAttachments ? <p className="text-xs text-gray-400">Carregando anexos...</p> : attachments.length === 0 ? (
+                <p className="text-xs text-gray-400">Nenhum arquivo anexado ainda.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {attachments.map((att) => (
+                    <div key={att.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                      <Paperclip size={13} className="text-gray-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={`/api/tasks/${task.id}/attachments/${att.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-gray-700 hover:text-accent-dark truncate block"
+                          title={att.fileName}
+                        >
+                          {att.fileName}
+                        </a>
+                        <p className="text-[11px] text-gray-400">
+                          {formatFileSize(att.size)} · {att.uploadedBy.name} · {new Date(att.createdAt).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      <a
+                        href={`/api/tasks/${task.id}/attachments/${att.id}`}
+                        download={att.fileName}
+                        title="Baixar"
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-accent-dark transition-colors shrink-0"
+                      >
+                        <Download size={14} />
+                      </a>
+                      {(user?.role === "ADMIN" || user?.id === att.uploadedBy.id) && <button
+                        disabled={deletingAttachment !== null || uploading || loadingAttachments}
+                        onClick={() => handleDeleteAttachment(att.id)}
+                        title="Remover"
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </button>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Actions (not in transfer mode) */}
           {!transferMode && (
-            <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+            <div className="flex items-center gap-3 pt-2 border-t border-gray-200">
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="p-2 rounded-lg hover:bg-red-500/10 text-white/20 hover:text-red-400 transition-colors"
+                className="p-2 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-600 transition-colors"
                 title="Excluir tarefa"
               >
                 <Trash2 size={16} />
               </button>
               {editMode && (
                 <button onClick={() => setEditMode(false)}
-                  className="px-4 py-2 text-sm text-white/50 bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+                  className="px-4 py-2 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                   Cancelar Edição
                 </button>
               )}
               <div className="flex-1" />
-              <button onClick={save} disabled={saving}
-                className="px-6 py-2 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors">
+              <button onClick={save} disabled={saving || uploading || deletingAttachment !== null}
+                className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-50 text-white font-medium rounded-lg transition-colors">
                 {saving ? "Salvando..." : "Salvar Alterações"}
               </button>
             </div>

@@ -219,16 +219,16 @@ export function generateChecklist(items: string[]): ChecklistItem[] {
 }
 
 export const STATUS_OPTIONS = [
-  { value: "PENDING", label: "A Fazer", color: "bg-zinc-500/20 text-zinc-400" },
-  { value: "IN_PROGRESS", label: "Em Progresso", color: "bg-blue-500/20 text-blue-400" },
-  { value: "IN_REVIEW", label: "Aguardando Aprovação", color: "bg-purple-500/20 text-purple-400" },
-  { value: "COMPLETED", label: "Concluída", color: "bg-emerald-500/20 text-emerald-400" },
-  { value: "CANCELLED", label: "Cancelada", color: "bg-red-500/20 text-red-400" },
+  { value: "PENDING", label: "A Fazer", color: "bg-gray-400/20 text-gray-500" },
+  { value: "IN_PROGRESS", label: "Em Progresso", color: "bg-blue-500/20 text-blue-600" },
+  { value: "IN_REVIEW", label: "Aguardando Aprovação", color: "bg-purple-500/20 text-purple-600" },
+  { value: "COMPLETED", label: "Concluída", color: "bg-emerald-500/20 text-emerald-600" },
+  { value: "CANCELLED", label: "Cancelada", color: "bg-red-500/20 text-red-600" },
 ];
 
 export const PRIORITY_OPTIONS = [
-  { value: "LOW", label: "Baixa", color: "text-zinc-400" },
-  { value: "MEDIUM", label: "Média", color: "text-amber-400" },
+  { value: "LOW", label: "Baixa", color: "text-gray-500" },
+  { value: "MEDIUM", label: "Média", color: "text-accent" },
   { value: "HIGH", label: "Alta", color: "text-orange-500" },
   { value: "URGENT", label: "Urgente", color: "text-red-500" },
 ];

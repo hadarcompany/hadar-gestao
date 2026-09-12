@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar } from "@/components/ui/avatar";
 import { Trophy, ChevronLeft, ChevronRight, Send, Calendar, MessageSquare } from "lucide-react";
 import { startOfWeek, format, subWeeks, addWeeks, isFriday, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -16,7 +17,7 @@ interface WeeklyReview {
   improvements: string;
   tasksCompleted: number;
   userId: string;
-  user: { id: string; name: string };
+  user: { id: string; name: string; image?: string | null };
   createdAt: string;
 }
 
@@ -171,7 +172,7 @@ export default function MinhaSemanaPage() {
 
   const myReview = reviews.find((r) => r.userId === user?.id);
 
-  const medalColors = ["text-amber-400", "text-zinc-300", "text-amber-700"];
+  const medalColors = ["text-accent", "text-gray-600", "text-accent-dark"];
 
   return (
     <div>
@@ -180,21 +181,21 @@ export default function MinhaSemanaPage() {
       {/* Week navigation */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <button onClick={prevWeek} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-            <ChevronLeft size={18} className="text-white/60" />
+          <button onClick={prevWeek} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <ChevronLeft size={18} className="text-gray-600" />
           </button>
           <div className="flex items-center gap-2 min-w-[220px] justify-center">
-            <Calendar size={16} className="text-amber-500" />
-            <span className="text-sm font-medium text-white/80">{weekLabel}</span>
+            <Calendar size={16} className="text-accent-dark" />
+            <span className="text-sm font-medium text-gray-700">{weekLabel}</span>
           </div>
-          <button onClick={nextWeek} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-            <ChevronRight size={18} className="text-white/60" />
+          <button onClick={nextWeek} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <ChevronRight size={18} className="text-gray-600" />
           </button>
         </div>
         {!isCurrentWeek && (
           <button
             onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="px-3 py-1.5 text-xs bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 rounded-lg transition-colors"
+            className="px-3 py-1.5 text-xs bg-accent/20 text-accent hover:bg-accent/30 rounded-lg transition-colors"
           >
             Semana Atual
           </button>
@@ -206,14 +207,14 @@ export default function MinhaSemanaPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Submit form - only on current week, from Friday on */}
           {isCurrentWeek && (
-            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-6">
+            <div className="bg-white border border-gray-200 rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
-                <MessageSquare size={18} className="text-amber-500" />
-                <h3 className="text-sm font-semibold text-white/80">
+                <MessageSquare size={18} className="text-accent-dark" />
+                <h3 className="text-sm font-semibold text-gray-700">
                   {myReview ? "Atualizar sua Reflexão Semanal" : "Reflexão Semanal"}
                 </h3>
                 {!canSubmit && (
-                  <span className="text-[10px] px-2 py-0.5 bg-white/5 rounded-full text-white/30 ml-auto">
+                  <span className="text-[10px] px-2 py-0.5 bg-gray-100 rounded-full text-gray-400 ml-auto">
                     Disponível a partir de sexta-feira
                   </span>
                 )}
@@ -221,7 +222,7 @@ export default function MinhaSemanaPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs text-white/40 mb-1.5">
+                  <label className="block text-xs text-gray-500 mb-1.5">
                     Como foi sua semana?
                   </label>
                   <Textarea
@@ -233,7 +234,7 @@ export default function MinhaSemanaPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1.5">Dificuldades?</label>
+                  <label className="block text-xs text-gray-500 mb-1.5">Dificuldades?</label>
                   <Textarea
                     value={difficulties}
                     onChange={(e) => setDifficulties(e.target.value)}
@@ -243,7 +244,7 @@ export default function MinhaSemanaPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1.5">
+                  <label className="block text-xs text-gray-500 mb-1.5">
                     Pontos de melhoria
                   </label>
                   <Textarea
@@ -259,13 +260,13 @@ export default function MinhaSemanaPage() {
                   <button
                     onClick={handleSubmit}
                     disabled={!canSubmit || submitting || !howWasWeek.trim()}
-                    className="flex items-center gap-2 px-5 py-2.5 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-5 py-2.5 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                   >
                     <Send size={14} />
                     {submitting ? "Enviando..." : myReview ? "Atualizar" : "Enviar"}
                   </button>
                   {success && (
-                    <span className="text-xs text-emerald-400">Enviado com sucesso!</span>
+                    <span className="text-xs text-emerald-600">Enviado com sucesso!</span>
                   )}
                 </div>
               </div>
@@ -273,14 +274,14 @@ export default function MinhaSemanaPage() {
           )}
 
           {/* All reviews for the week */}
-          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-white/80 mb-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">
               Reflexões da Semana {!isCurrentWeek && `(${weekLabel})`}
             </h3>
             {loading ? (
-              <p className="text-sm text-white/20">Carregando...</p>
+              <p className="text-sm text-gray-400">Carregando...</p>
             ) : reviews.length === 0 ? (
-              <p className="text-sm text-white/30">
+              <p className="text-sm text-gray-400">
                 Nenhuma reflexão enviada nesta semana ainda.
               </p>
             ) : (
@@ -288,41 +289,39 @@ export default function MinhaSemanaPage() {
                 {reviews.map((review) => (
                   <div
                     key={review.id}
-                    className="bg-white/[0.02] border border-white/5 rounded-xl p-4"
+                    className="bg-gray-50 border border-gray-200 rounded-xl p-4"
                   >
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center text-xs text-amber-400 font-bold">
-                        {review.user.name[0]}
-                      </span>
-                      <span className="text-sm font-medium text-white/70">{review.user.name}</span>
-                      <span className="text-[10px] text-white/20 ml-auto">
+                      <Avatar name={review.user.name} image={review.user.image} size={28} className="text-xs" />
+                      <span className="text-sm font-medium text-gray-600">{review.user.name}</span>
+                      <span className="text-[10px] text-gray-400 ml-auto">
                         {format(new Date(review.createdAt), "dd/MM HH:mm")}
                       </span>
                     </div>
 
                     <div className="space-y-3 text-sm">
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-white/20 mb-0.5">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">
                           Como foi a semana
                         </p>
-                        <p className="text-white/60 whitespace-pre-wrap">{review.howWasWeek}</p>
+                        <p className="text-gray-600 whitespace-pre-wrap">{review.howWasWeek}</p>
                       </div>
                       {review.difficulties && (
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-white/20 mb-0.5">
+                          <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">
                             Dificuldades
                           </p>
-                          <p className="text-white/60 whitespace-pre-wrap">
+                          <p className="text-gray-600 whitespace-pre-wrap">
                             {review.difficulties}
                           </p>
                         </div>
                       )}
                       {review.improvements && (
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-white/20 mb-0.5">
+                          <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">
                             Pontos de melhoria
                           </p>
-                          <p className="text-white/60 whitespace-pre-wrap">
+                          <p className="text-gray-600 whitespace-pre-wrap">
                             {review.improvements}
                           </p>
                         </div>
@@ -337,26 +336,26 @@ export default function MinhaSemanaPage() {
 
         {/* Ranking sidebar */}
         <div>
-          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-6 sticky top-6">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 sticky top-6">
             <div className="flex items-center gap-2 mb-5">
-              <Trophy size={18} className="text-amber-500" />
-              <h3 className="text-sm font-semibold text-white/80">Ranking da Semana</h3>
+              <Trophy size={18} className="text-accent-dark" />
+              <h3 className="text-sm font-semibold text-gray-700">Ranking da Semana</h3>
             </div>
 
             {ranking.length === 0 ? (
-              <p className="text-sm text-white/30">Sem dados nesta semana.</p>
+              <p className="text-sm text-gray-400">Sem dados nesta semana.</p>
             ) : (
               <div className="space-y-2">
                 {ranking.map((entry, idx) => (
                   <div
                     key={entry.userId}
                     className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                      idx === 0 ? "bg-amber-500/10 border border-amber-500/20" : "bg-white/[0.02]"
+                      idx === 0 ? "bg-accent-dark/10 border border-accent-dark/20" : "bg-gray-50"
                     }`}
                   >
                     <span
                       className={`text-lg font-bold w-7 text-center ${
-                        medalColors[idx] || "text-white/20"
+                        medalColors[idx] || "text-gray-400"
                       }`}
                     >
                       {idx + 1}°
@@ -364,7 +363,7 @@ export default function MinhaSemanaPage() {
                     <div className="flex-1 min-w-0">
                       <p
                         className={`text-sm font-medium truncate ${
-                          idx === 0 ? "text-amber-400" : "text-white/60"
+                          idx === 0 ? "text-accent" : "text-gray-600"
                         }`}
                       >
                         {entry.userName}
@@ -373,20 +372,20 @@ export default function MinhaSemanaPage() {
                     <div className="text-right">
                       <span
                         className={`text-lg font-bold ${
-                          idx === 0 ? "text-amber-400" : "text-white/40"
+                          idx === 0 ? "text-accent" : "text-gray-500"
                         }`}
                       >
                         {entry.completed}
                       </span>
-                      <p className="text-[10px] text-white/20">tarefas</p>
+                      <p className="text-[10px] text-gray-400">tarefas</p>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="mt-4 pt-4 border-t border-white/5">
-              <p className="text-[10px] text-white/20 text-center">
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-[10px] text-gray-400 text-center">
                 Baseado nas tarefas concluídas na semana
               </p>
             </div>

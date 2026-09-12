@@ -1,3 +1,4 @@
+import { TASK_INCLUDE } from "@/lib/task-transfer";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -22,11 +23,7 @@ export async function GET(req: NextRequest) {
 
   const tasks = await prisma.task.findMany({
     where,
-    include: {
-      client: { select: { id: true, name: true } },
-      createdBy: { select: { id: true, name: true } },
-      assignees: { include: { user: { select: { id: true, name: true } } } },
-    },
+    include: TASK_INCLUDE,
     orderBy: { [sort]: order },
   });
 
@@ -40,7 +37,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     title, type, description, status, priority,
-    startDate, dueDate, estimatedTime, checklist,
+    startDate, dueDate, publishDate, isExtra, estimatedTime, checklist,
     extraFields, tags, clientId, assigneeIds,
   } = body;
 
@@ -53,6 +50,8 @@ export async function POST(req: NextRequest) {
       priority: priority || "MEDIUM",
       startDate: startDate ? new Date(startDate) : null,
       dueDate: dueDate ? new Date(dueDate) : null,
+      publishDate: publishDate ? new Date(publishDate) : null,
+      isExtra: !!isExtra,
       estimatedTime: estimatedTime ? parseFloat(estimatedTime) : null,
       checklist: checklist || null,
       extraFields: extraFields || null,
@@ -63,11 +62,7 @@ export async function POST(req: NextRequest) {
         create: (assigneeIds || []).map((userId: string) => ({ userId })),
       },
     },
-    include: {
-      client: { select: { id: true, name: true } },
-      createdBy: { select: { id: true, name: true } },
-      assignees: { include: { user: { select: { id: true, name: true } } } },
-    },
+    include: TASK_INCLUDE,
   });
 
   return NextResponse.json(task, { status: 201 });

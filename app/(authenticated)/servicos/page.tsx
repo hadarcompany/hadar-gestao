@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientIdentity } from "@/components/clients/client-identity";
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Modal } from "@/components/ui/modal";
@@ -31,7 +32,7 @@ interface ServiceData {
   status: string;
   dataPrimeiraParcela: string | null;
   clientId: string;
-  client: { id: string; name: string };
+  client: { id: string; name: string; logoUrl?: string | null };
   createdAt: string;
 }
 
@@ -56,10 +57,10 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  IN_PROGRESS: "bg-blue-500/20 text-blue-400",
-  COMPLETED: "bg-emerald-500/20 text-emerald-400",
-  CANCELLED: "bg-red-500/20 text-red-400",
-  CHURN: "bg-orange-500/20 text-orange-400",
+  IN_PROGRESS: "bg-blue-500/20 text-blue-600",
+  COMPLETED: "bg-emerald-500/20 text-emerald-600",
+  CANCELLED: "bg-red-500/20 text-red-600",
+  CHURN: "bg-orange-500/20 text-orange-600",
 };
 
 const STATUS_OPTIONS_RECURRING = [
@@ -280,14 +281,14 @@ export default function ServicosPage() {
               <Input label="Inicio do Contrato" type="date" value={fStartDate} onChange={(e) => setFStartDate(e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs text-white/40 uppercase tracking-wider font-medium mb-2">Trafego Pago</label>
+              <label className="block text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Trafego Pago</label>
               <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-white/60 hover:text-white/80" onClick={() => setFMetaAds(!fMetaAds)}>
-                  {fMetaAds ? <CheckSquare size={16} className="text-amber-500" /> : <Square size={16} className="text-white/20" />}
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600 hover:text-gray-700" onClick={() => setFMetaAds(!fMetaAds)}>
+                  {fMetaAds ? <CheckSquare size={16} className="text-accent-dark" /> : <Square size={16} className="text-gray-400" />}
                   Meta Ads
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-white/60 hover:text-white/80" onClick={() => setFGoogleAds(!fGoogleAds)}>
-                  {fGoogleAds ? <CheckSquare size={16} className="text-amber-500" /> : <Square size={16} className="text-white/20" />}
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600 hover:text-gray-700" onClick={() => setFGoogleAds(!fGoogleAds)}>
+                  {fGoogleAds ? <CheckSquare size={16} className="text-accent-dark" /> : <Square size={16} className="text-gray-400" />}
                   Google Ads
                 </label>
               </div>
@@ -295,12 +296,12 @@ export default function ServicosPage() {
             <div className="grid grid-cols-2 gap-4">
               <Input label="Entregas por semana" type="number" value={fDeliveriesPerWeek} onChange={(e) => setFDeliveriesPerWeek(e.target.value)} placeholder="3" />
               <div>
-                <label className="block text-xs text-white/40 uppercase tracking-wider font-medium mb-2">Tipos de Entrega</label>
+                <label className="block text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Tipos de Entrega</label>
                 <div className="flex flex-wrap gap-2">
                   {DELIVERY_TYPE_OPTIONS.map((dt) => (
                     <button key={dt} type="button" onClick={() => toggleDeliveryType(dt)}
                       className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                        fDeliveryTypes.includes(dt) ? "bg-amber-500/20 border-amber-500/30 text-amber-400" : "bg-white/5 border-white/10 text-white/30 hover:text-white/50"
+                        fDeliveryTypes.includes(dt) ? "bg-accent-dark/20 border-accent-dark/30 text-accent" : "bg-gray-100 border-gray-200 text-gray-400 hover:text-gray-500"
                       }`}>
                       {dt}
                     </button>
@@ -347,47 +348,47 @@ export default function ServicosPage() {
     <div>
       <PageHeader title="Servicos" description="Gerenciamento de servicos recorrentes e avulsos.">
         <button onClick={() => { resetForm(); setShowCreate(true); }}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors">
+          className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors">
           <Plus size={16} /> Novo Servico
         </button>
       </PageHeader>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5">
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <DollarSign size={16} className="text-emerald-400" />
-            <span className="text-xs text-white/40">Receita Mensal Recorrente</span>
+            <DollarSign size={16} className="text-emerald-600" />
+            <span className="text-xs text-gray-500">Receita Mensal Recorrente</span>
           </div>
-          <p className="text-2xl font-bold text-emerald-400">R$ {totalMRR.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-          <p className="text-xs text-white/20 mt-1">{recurringServices.length} contratos ativos</p>
+          <p className="text-2xl font-bold text-emerald-600">R$ {totalMRR.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+          <p className="text-xs text-gray-400 mt-1">{recurringServices.length} contratos ativos</p>
         </div>
-        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5">
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Briefcase size={16} className="text-blue-400" />
-            <span className="text-xs text-white/40">Servicos Avulsos</span>
+            <Briefcase size={16} className="text-blue-600" />
+            <span className="text-xs text-gray-500">Servicos Avulsos</span>
           </div>
-          <p className="text-2xl font-bold text-blue-400">R$ {totalFreelancer.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-          <p className="text-xs text-white/20 mt-1">{freelancerServices.length} servicos</p>
+          <p className="text-2xl font-bold text-blue-600">R$ {totalFreelancer.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+          <p className="text-xs text-gray-400 mt-1">{freelancerServices.length} servicos</p>
         </div>
-        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5">
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Users size={16} className="text-amber-500" />
-            <span className="text-xs text-white/40">Total de Servicos</span>
+            <Users size={16} className="text-accent-dark" />
+            <span className="text-xs text-gray-500">Total de Servicos</span>
           </div>
-          <p className="text-2xl font-bold text-amber-500">{services.length}</p>
-          <p className="text-xs text-white/20 mt-1">{clients.length} clientes atendidos</p>
+          <p className="text-2xl font-bold text-accent-dark">{services.length}</p>
+          <p className="text-xs text-gray-400 mt-1">{clients.length} clientes atendidos</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-white/[0.02] border border-white/5 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-gray-50 border border-gray-200 rounded-xl p-1 w-fit">
         <button onClick={() => setActiveTab("RECURRING")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "RECURRING" ? "bg-amber-600/20 text-amber-400" : "text-white/40 hover:text-white/60"}`}>
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "RECURRING" ? "bg-accent/20 text-accent" : "text-gray-500 hover:text-gray-600"}`}>
           <Repeat size={14} /> Recorrentes
         </button>
         <button onClick={() => setActiveTab("FREELANCER")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "FREELANCER" ? "bg-amber-600/20 text-amber-400" : "text-white/40 hover:text-white/60"}`}>
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "FREELANCER" ? "bg-accent/20 text-accent" : "text-gray-500 hover:text-gray-600"}`}>
           <Briefcase size={14} /> Freelancer / Avulso
         </button>
       </div>
@@ -395,35 +396,35 @@ export default function ServicosPage() {
       {/* List */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-amber-500" />
+          <Loader2 size={24} className="animate-spin text-accent-dark" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 text-white/20 text-sm">
+        <div className="text-center py-20 text-gray-400 text-sm">
           Nenhum servico {activeTab === "RECURRING" ? "recorrente" : "avulso"} cadastrado.
         </div>
       ) : activeTab === "RECURRING" ? (
-        <div className="bg-white/[0.03] border border-white/5 rounded-xl overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5">
-                <th className="text-left text-xs text-white/30 font-medium px-5 py-3 uppercase tracking-wider">Servico</th>
-                <th className="text-left text-xs text-white/30 font-medium px-5 py-3 uppercase tracking-wider">Cliente</th>
-                <th className="text-left text-xs text-white/30 font-medium px-5 py-3 uppercase tracking-wider">Valor Mensal</th>
-                <th className="text-left text-xs text-white/30 font-medium px-5 py-3 uppercase tracking-wider">Duracao</th>
-                <th className="text-left text-xs text-white/30 font-medium px-5 py-3 uppercase tracking-wider">Status</th>
-                <th className="text-left text-xs text-white/30 font-medium px-5 py-3 uppercase tracking-wider">Ads</th>
-                <th className="text-right text-xs text-white/30 font-medium px-5 py-3 uppercase tracking-wider"></th>
+              <tr className="border-b border-gray-200">
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Servico</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Cliente</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Valor Mensal</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Duracao</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Status</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Ads</th>
+                <th className="text-right text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider"></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((s) => (
-                <tr key={s.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                  <td className="px-5 py-3.5 text-sm text-white/80">{s.name}</td>
-                  <td className="px-5 py-3.5 text-sm text-white/60">{s.client.name}</td>
-                  <td className="px-5 py-3.5 text-sm text-emerald-400">
+                <tr key={s.id} className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="px-5 py-3.5 text-sm text-gray-700">{s.name}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600"><ClientIdentity client={s.client} /></td>
+                  <td className="px-5 py-3.5 text-sm text-emerald-600">
                     {s.monthlyValue ? `R$ ${s.monthlyValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "-"}
                   </td>
-                  <td className="px-5 py-3.5 text-sm text-white/50">{s.contractMonths ? `${s.contractMonths} meses` : "-"}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-500">{s.contractMonths ? `${s.contractMonths} meses` : "-"}</td>
                   <td className="px-5 py-3.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[s.status] || ""}`}>
                       {statusLabels[s.status] || s.status}
@@ -431,18 +432,18 @@ export default function ServicosPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex gap-1.5">
-                      {s.metaAds && <span className="text-[10px] text-blue-400/80 bg-blue-500/10 px-1.5 py-0.5 rounded">Meta</span>}
-                      {s.googleAds && <span className="text-[10px] text-emerald-400/80 bg-emerald-500/10 px-1.5 py-0.5 rounded">Google</span>}
+                      {s.metaAds && <span className="text-[10px] text-blue-600/80 bg-blue-500/10 px-1.5 py-0.5 rounded">Meta</span>}
+                      {s.googleAds && <span className="text-[10px] text-emerald-600/80 bg-emerald-500/10 px-1.5 py-0.5 rounded">Google</span>}
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => openEdit(s)}
-                        className="p-1.5 rounded-lg hover:bg-amber-500/10 text-white/20 hover:text-amber-400 transition-colors">
+                        className="p-1.5 rounded-lg hover:bg-accent-dark/10 text-gray-400 hover:text-accent transition-colors">
                         <Pencil size={14} />
                       </button>
                       <button onClick={() => setDeleteServiceId(s.id)} disabled={deleteLoading === s.id}
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/20 hover:text-red-400 transition-colors">
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-600 transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -455,34 +456,34 @@ export default function ServicosPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((s) => (
-            <div key={s.id} className="bg-white/[0.03] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
+            <div key={s.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="text-sm font-medium text-white/80">
+                  <h3 className="text-sm font-medium text-gray-700">
                     {s.freelancerType === "OUTRO"
                       ? s.freelancerTypeCustom || "Outro"
                       : freelancerTypeLabels[s.freelancerType || ""] || s.freelancerType}
                   </h3>
-                  <p className="text-xs text-white/30 mt-0.5">{s.client.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5"><ClientIdentity client={s.client} /></p>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[s.status]}`}>
                   {statusLabels[s.status]}
                 </span>
               </div>
-              <p className="text-xl font-bold text-amber-500 mb-2">
+              <p className="text-xl font-bold text-accent-dark mb-2">
                 {s.totalValue ? `R$ ${s.totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "-"}
               </p>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-white/30">
+                <p className="text-xs text-gray-400">
                   {s.paymentMethod === "A_VISTA" ? "A vista" : `Parcelado ${s.installments || "?"}x`}
                 </p>
                 <div className="flex items-center gap-1">
                   <button onClick={() => openEdit(s)}
-                    className="p-1.5 rounded-lg hover:bg-amber-500/10 text-white/20 hover:text-amber-400 transition-colors">
+                    className="p-1.5 rounded-lg hover:bg-accent-dark/10 text-gray-400 hover:text-accent transition-colors">
                     <Pencil size={14} />
                   </button>
                   <button onClick={() => setDeleteServiceId(s.id)} disabled={deleteLoading === s.id}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/20 hover:text-red-400 transition-colors">
+                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-600 transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -495,23 +496,23 @@ export default function ServicosPage() {
       {/* Create Modal */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Novo Servico" size="lg">
         <div className="space-y-5">
-          <div className="flex gap-1 bg-white/[0.02] border border-white/5 rounded-xl p-1">
+          <div className="flex gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
             <button onClick={() => setActiveTab("RECURRING")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "RECURRING" ? "bg-amber-600/20 text-amber-400" : "text-white/40 hover:text-white/60"}`}>
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "RECURRING" ? "bg-accent/20 text-accent" : "text-gray-500 hover:text-gray-600"}`}>
               <Repeat size={14} /> Recorrente
             </button>
             <button onClick={() => setActiveTab("FREELANCER")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "FREELANCER" ? "bg-amber-600/20 text-amber-400" : "text-white/40 hover:text-white/60"}`}>
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${activeTab === "FREELANCER" ? "bg-accent/20 text-accent" : "text-gray-500 hover:text-gray-600"}`}>
               <Briefcase size={14} /> Freelancer / Avulso
             </button>
           </div>
 
           {renderServiceForm(activeTab, false)}
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-white/5">
-            <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-white/50 bg-white/5 hover:bg-white/10 rounded-lg">Cancelar</button>
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancelar</button>
             <button onClick={handleCreate} disabled={createLoading || !fClient || (activeTab === "RECURRING" && !fName.trim())}
-              className="px-6 py-2 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg">
+              className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-50 text-white font-medium rounded-lg">
               {createLoading ? "Criando..." : "Criar Servico"}
             </button>
           </div>
@@ -524,11 +525,11 @@ export default function ServicosPage() {
         <div className="space-y-5">
           {editService && renderServiceForm(editService.type, true)}
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-white/5">
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
             <button onClick={() => { setShowEdit(false); setEditService(null); }}
-              className="px-4 py-2 text-sm text-white/50 bg-white/5 hover:bg-white/10 rounded-lg">Cancelar</button>
+              className="px-4 py-2 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancelar</button>
             <button onClick={handleEdit} disabled={editLoading}
-              className="px-6 py-2 text-sm bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium rounded-lg">
+              className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-50 text-white font-medium rounded-lg">
               {editLoading ? "Salvando..." : "Salvar Alteracoes"}
             </button>
           </div>

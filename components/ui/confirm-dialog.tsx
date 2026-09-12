@@ -46,11 +46,11 @@ export function ConfirmDialog({
 
   if (!open) return null;
 
-  const iconColor = variant === "danger" ? "text-red-400" : "text-amber-400";
-  const iconBg = variant === "danger" ? "bg-red-500/10" : "bg-amber-500/10";
+  const iconColor = variant === "danger" ? "text-red-600" : "text-accent";
+  const iconBg = variant === "danger" ? "bg-red-500/10" : "bg-accent-dark/10";
   const confirmBtnClass = variant === "danger"
     ? "bg-red-500 hover:bg-red-600 text-white"
-    : "bg-amber-500 hover:bg-amber-600 text-white";
+    : "bg-accent-dark hover:bg-accent text-white";
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -58,7 +58,7 @@ export function ConfirmDialog({
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-sm bg-white border border-gray-200 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <div className="p-6">
           {/* Icon */}
           <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mx-auto mb-4`}>
@@ -66,10 +66,10 @@ export function ConfirmDialog({
           </div>
 
           {/* Title */}
-          <h3 className="text-lg font-bold text-white text-center mb-2">{title}</h3>
+          <h3 className="text-lg font-bold text-gray-900 text-center mb-2">{title}</h3>
 
           {/* Message */}
-          <p className="text-sm text-zinc-400 text-center leading-relaxed">{message}</p>
+          <p className="text-sm text-gray-500 text-center leading-relaxed">{message}</p>
         </div>
 
         {/* Actions */}
@@ -77,7 +77,7 @@ export function ConfirmDialog({
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="flex-1 px-4 py-2.5 text-sm font-semibold text-zinc-300 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
           >
             {cancelLabel}
           </button>

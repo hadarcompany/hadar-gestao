@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const receivables = await prisma.receivable.findMany({
     where,
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
     orderBy: { dueDate: "asc" },
   });
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       month: parseInt(month),
       year: parseInt(year),
     },
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
   });
 
   return NextResponse.json(receivable, { status: 201 });
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest) {
   const receivable = await prisma.receivable.update({
     where: { id },
     data,
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
   });
 
   return NextResponse.json(receivable);

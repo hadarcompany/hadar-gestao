@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientIdentity } from "@/components/clients/client-identity";
 import { useState, useEffect, useCallback } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -74,26 +75,26 @@ export default function FinanceiroPage() {
 
   return (
     <div className="min-h-screen bg-transparent w-full pb-10">
-      
+
       {/* HEADER DA PÁGINA */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-2">
-            Gestão Financeira 🍌
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            Gestão Financeira
           </h1>
-          <p className="text-zinc-500 mt-1">Controle de receitas, despesas, caixa e pró-labore.</p>
+          <p className="text-gray-400 mt-1">Controle de receitas, despesas, caixa e pró-labore.</p>
         </div>
 
         {/* TABS (Estilo Hadar) */}
-        <div className="flex bg-zinc-900/80 backdrop-blur-md rounded-xl border border-zinc-800 p-1 overflow-x-auto custom-scrollbar">
+        <div className="flex bg-white/80 backdrop-blur-md rounded-xl border border-gray-200 p-1 overflow-x-auto custom-scrollbar">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.key
-                  ? "bg-[#FF5A00] text-white shadow-lg shadow-[#FF5A00]/20"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  ? "bg-accent text-white shadow-lg shadow-[#FF5A00]/20"
+                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
               }`}
             >
               {tab.icon}
@@ -127,7 +128,7 @@ function DashboardTab() {
     activeClients: number; expectedRevenue: number; receivedRevenue: number;
     totalExpenses: number; grossProfit: number;
     chartData: { name: string; faturamento: number; despesas: number }[];
-    clientRevenue: { clientId: string; name: string; expected: number; received: number }[];
+    clientRevenue: { clientId: string; name: string; logoUrl?: string | null; expected: number; received: number }[];
     expenseByCategory: { category: string; amount: number }[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -174,9 +175,9 @@ function DashboardTab() {
             key={p.months}
             onClick={() => setPeriod(p.months)}
             className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
-              period === p.months 
-                ? "bg-[#FF5A00]/10 text-[#FF5A00] border-[#FF5A00]/30" 
-                : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300"
+              period === p.months
+                ? "bg-accent/10 text-accent border-accent/30"
+                : "bg-white border-gray-200 text-gray-400 hover:text-gray-600"
             }`}
           >
             {p.label}
@@ -185,54 +186,54 @@ function DashboardTab() {
         <button
           onClick={() => setPeriod(-1)}
           className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
-            period === -1 
-              ? "bg-[#FF5A00]/10 text-[#FF5A00] border-[#FF5A00]/30" 
-              : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300"
+            period === -1
+              ? "bg-accent/10 text-accent border-accent/30"
+              : "bg-white border-gray-200 text-gray-400 hover:text-gray-600"
           }`}
         >
           Personalizado
         </button>
-        
+
         {period === -1 && (
           <div className="flex items-center gap-2 ml-2">
             <input type="month" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[#FF5A00]" />
-            <span className="text-zinc-600">—</span>
+              className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-900 outline-none focus:border-accent" />
+            <span className="text-gray-400">—</span>
             <input type="month" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-[#FF5A00]" />
+              className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-900 outline-none focus:border-accent" />
           </div>
         )}
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <KpiCard icon={<Users2 size={18} />} label="Clientes Ativos" value={String(data?.activeClients || 0)} color="text-blue-400" />
-        <KpiCard icon={<TrendingUp size={18} />} label="Fat. Previsto" value={R$(data?.expectedRevenue || 0)} color="text-amber-400" />
-        <KpiCard icon={<DollarSign size={18} />} label="Fat. Recebido" value={R$(data?.receivedRevenue || 0)} color="text-emerald-400" />
-        <KpiCard icon={<TrendingDown size={18} />} label="Despesas Totais" value={R$(data?.totalExpenses || 0)} color="text-red-400" />
+        <KpiCard icon={<Users2 size={18} />} label="Clientes Ativos" value={String(data?.activeClients || 0)} color="text-blue-600" />
+        <KpiCard icon={<TrendingUp size={18} />} label="Fat. Previsto" value={R$(data?.expectedRevenue || 0)} color="text-accent" />
+        <KpiCard icon={<DollarSign size={18} />} label="Fat. Recebido" value={R$(data?.receivedRevenue || 0)} color="text-emerald-600" />
+        <KpiCard icon={<TrendingDown size={18} />} label="Despesas Totais" value={R$(data?.totalExpenses || 0)} color="text-red-600" />
         <KpiCard
           icon={<TrendingUp size={18} />}
           label="Lucro Bruto"
           value={R$(data?.grossProfit || 0)}
-          color={(data?.grossProfit || 0) >= 0 ? "text-emerald-400" : "text-red-400"}
+          color={(data?.grossProfit || 0) >= 0 ? "text-emerald-600" : "text-red-600"}
         />
       </div>
 
       {/* Chart */}
       {(data?.chartData?.length ?? 0) > 0 && (
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl p-6">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-6">
-            <BarChart3 size={16} className="text-[#FF5A00]" /> Faturamento vs Despesas
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl p-6">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-6">
+            <BarChart3 size={16} className="text-accent" /> Faturamento vs Despesas
           </h3>
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={data?.chartData ?? []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 12 }} axisLine={false} tickLine={false} dy={10} />
-              <YAxis tick={{ fill: "#a1a1aa", fontSize: 12 }} axisLine={false} tickLine={false} dx={-10} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: "#71717a", fontSize: 12 }} axisLine={false} tickLine={false} dy={10} />
+              <YAxis tick={{ fill: "#71717a", fontSize: 12 }} axisLine={false} tickLine={false} dx={-10} />
               <Tooltip
-                contentStyle={{ backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: "12px", fontSize: 12, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)" }}
+                contentStyle={{ backgroundColor: "#ffffff", border: "1px solid #e5e5e3", borderRadius: "12px", fontSize: 12, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
                 itemStyle={{ fontWeight: "bold" }}
-                labelStyle={{ color: "#a1a1aa", marginBottom: "4px" }}
+                labelStyle={{ color: "#1c1c1e", marginBottom: "4px" }}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 formatter={(value: any) => [R$(Number(value ?? 0)), ""]}
               />
@@ -246,53 +247,53 @@ function DashboardTab() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Client revenue table */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-zinc-800/60 bg-zinc-900/50">
-            <h3 className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Clientes x Valor Rendido</h3>
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200/60 bg-gray-50">
+            <h3 className="text-xs text-gray-500 font-bold uppercase tracking-wider">Clientes x Valor Rendido</h3>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+              <tr className="border-b border-gray-200/60 bg-gray-50/30">
                 <Th>Cliente</Th><Th align="right">Previsto</Th><Th align="right">Recebido</Th>
               </tr>
             </thead>
             <tbody>
-              {(data?.clientRevenue || []).map((c: { clientId: string; name: string; expected: number; received: number }) => (
-                <tr key={c.clientId} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-3.5 text-sm font-medium text-zinc-200">{c.name}</td>
-                  <td className="px-6 py-3.5 text-sm font-bold text-amber-400 text-right">{R$(c.expected)}</td>
-                  <td className="px-6 py-3.5 text-sm font-bold text-emerald-400 text-right">{R$(c.received)}</td>
+              {(data?.clientRevenue || []).map((c: { clientId: string; name: string; logoUrl?: string | null; expected: number; received: number }) => (
+                <tr key={c.clientId} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-3.5 text-sm font-medium text-gray-800"><ClientIdentity client={c} /></td>
+                  <td className="px-6 py-3.5 text-sm font-bold text-accent text-right">{R$(c.expected)}</td>
+                  <td className="px-6 py-3.5 text-sm font-bold text-emerald-600 text-right">{R$(c.received)}</td>
                 </tr>
               ))}
               {(!data?.clientRevenue || data.clientRevenue.length === 0) && (
-                <tr><td colSpan={3} className="px-6 py-10 text-center text-sm text-zinc-500">Sem dados para este período</td></tr>
+                <tr><td colSpan={3} className="px-6 py-10 text-center text-sm text-gray-400">Sem dados para este período</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
         {/* Expense by category table */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-zinc-800/60 bg-zinc-900/50">
-            <h3 className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Despesas por Categoria</h3>
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200/60 bg-gray-50">
+            <h3 className="text-xs text-gray-500 font-bold uppercase tracking-wider">Despesas por Categoria</h3>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+              <tr className="border-b border-gray-200/60 bg-gray-50/30">
                 <Th>Categoria</Th><Th align="right">Valor</Th>
               </tr>
             </thead>
             <tbody>
               {(data?.expenseByCategory || []).map((e: { category: string; amount: number }) => (
-                <tr key={e.category} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-3.5 text-sm font-medium text-zinc-200">
-                    <span className="bg-zinc-800 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
+                <tr key={e.category} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-3.5 text-sm font-medium text-gray-800">
+                    <span className="bg-gray-100 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
                   </td>
-                  <td className="px-6 py-3.5 text-sm font-bold text-red-400 text-right">{R$(e.amount)}</td>
+                  <td className="px-6 py-3.5 text-sm font-bold text-red-600 text-right">{R$(e.amount)}</td>
                 </tr>
               ))}
               {(!data?.expenseByCategory || data.expenseByCategory.length === 0) && (
-                <tr><td colSpan={2} className="px-6 py-10 text-center text-sm text-zinc-500">Sem despesas registradas</td></tr>
+                <tr><td colSpan={2} className="px-6 py-10 text-center text-sm text-gray-400">Sem despesas registradas</td></tr>
               )}
             </tbody>
           </table>
@@ -304,10 +305,10 @@ function DashboardTab() {
 
 function KpiCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   return (
-    <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl p-5 group hover:border-zinc-700 transition-colors">
+    <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl p-5 group hover:border-gray-300 transition-colors">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">{label}</span>
-        <div className={`w-8 h-8 rounded-lg bg-zinc-800/50 flex items-center justify-center ${color}`}>{icon}</div>
+        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+        <div className={`w-8 h-8 rounded-lg bg-gray-100/50 flex items-center justify-center ${color}`}>{icon}</div>
       </div>
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
     </div>
@@ -320,7 +321,7 @@ function KpiCard({ icon, label, value, color }: { icon: React.ReactNode; label: 
 interface Receivable {
   id: string; amount: number; dueDate: string; paidDate: string | null;
   status: string; month: number; year: number;
-  client: { id: string; name: string };
+  client: { id: string; name: string; logoUrl?: string | null };
 }
 
 function ReceivablesTab({ month, year, setMonth, setYear }: {
@@ -390,50 +391,50 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
   }
 
   const statusBadge = (s: string) => {
-    if (s === "PAID") return <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Pago</span>;
-    if (s === "OVERDUE") return <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Atrasado</span>;
-    return <span className="bg-[#FF5A00]/10 text-[#FF5A00] border border-[#FF5A00]/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Pendente</span>;
+    if (s === "PAID") return <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Pago</span>;
+    if (s === "OVERDUE") return <span className="bg-red-500/10 text-red-600 border border-red-500/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Atrasado</span>;
+    return <span className="bg-accent/10 text-accent border border-accent/20 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">Pendente</span>;
   };
 
   return (
     <div className="animate-in fade-in">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <FilterDialog month={month} year={year} onApply={(m, y) => { setMonth(m); setYear(y); }} />
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-[#FF5A00] hover:bg-[#E04D00] text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Nova Conta
         </button>
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+              <tr className="border-b border-gray-200/60 bg-gray-50/30">
                 <Th>Cliente</Th><Th>Valor</Th><Th>Vencimento</Th><Th>Recebimento</Th><Th>Status</Th><Th>Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-zinc-500">Nenhuma conta a receber neste mês.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma conta a receber neste mês.</td></tr>
               ) : items.map((r) => (
-                <tr key={r.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-zinc-200">{r.client.name}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-emerald-400">{R$(r.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-zinc-400">{new Date(r.dueDate).toLocaleDateString("pt-BR")}</td>
-                  <td className="px-6 py-4 text-sm text-zinc-400">{r.paidDate ? new Date(r.paidDate).toLocaleDateString("pt-BR") : "—"}</td>
+                <tr key={r.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-800"><ClientIdentity client={r.client} /></td>
+                  <td className="px-6 py-4 text-sm font-bold text-emerald-600">{R$(r.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{new Date(r.dueDate).toLocaleDateString("pt-BR")}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{r.paidDate ? new Date(r.paidDate).toLocaleDateString("pt-BR") : "—"}</td>
                   <td className="px-6 py-4">{statusBadge(r.status)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {r.status !== "PAID" ? (
-                        <button onClick={() => markPaid(r.id)} className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 transition-colors">
+                        <button onClick={() => markPaid(r.id)} className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5 transition-colors">
                           <CheckCircle2 size={14} /> Marcar Pago
                         </button>
                       ) : (
-                        <button onClick={() => markPending(r.id)} className="text-xs font-bold text-zinc-500 hover:text-zinc-300 flex items-center gap-1.5 transition-colors">
+                        <button onClick={() => markPending(r.id)} className="text-xs font-bold text-gray-400 hover:text-gray-600 flex items-center gap-1.5 transition-colors">
                           <Clock size={14} /> Desfazer
                         </button>
                       )}
-                      <button onClick={() => setDeleteId(r.id)} className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Excluir">
+                      <button onClick={() => setDeleteId(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors" title="Excluir">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -456,10 +457,10 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
             <Input label="Data de Vencimento" type="date" value={form.dueDate}
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
           </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-zinc-400 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-medium transition-colors">Cancelar</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
             <button onClick={handleCreate} disabled={saving || !form.clientId || !form.amount}
-              className="px-6 py-2 text-sm bg-[#FF5A00] hover:bg-[#E04D00] disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
+              className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Salvando..." : "Criar Lançamento"}
             </button>
           </div>
@@ -531,43 +532,43 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
     <div className="animate-in fade-in">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <FilterDialog month={month} year={year} onApply={(m, y) => { setMonth(m); setYear(y); }} />
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-[#FF5A00] hover:bg-[#E04D00] text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Nova Despesa Fixa
         </button>
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+              <tr className="border-b border-gray-200/60 bg-gray-50/30">
                 <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor</Th><Th>Origem</Th><Th align="right">Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-zinc-500">Nenhuma despesa fixa neste mês.</td></tr>
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa fixa neste mês.</td></tr>
               ) : items.map((e) => (
-                <tr key={e.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-zinc-200">{e.name}</td>
+                <tr key={e.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-800">{e.name}</td>
                   <td className="px-6 py-4 text-sm">
-                    <span className="bg-zinc-800 text-zinc-300 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
+                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
                   </td>
-                  <td className="px-6 py-4 text-sm font-bold text-red-400">{R$(e.amount)}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(e.amount)}</td>
                   <td className="px-6 py-4">
-                    {e.paidWithCash 
-                      ? <span className="text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span> 
-                      : <span className="text-xs text-zinc-500">Operacional</span>}
+                    {e.paidWithCash
+                      ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
+                      : <span className="text-xs text-gray-400">Operacional</span>}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-zinc-500 hover:text-red-400 transition-colors">Excluir</button>
+                    <button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button>
                   </td>
                 </tr>
               ))}
               {items.length > 0 && (
-                <tr className="bg-zinc-950/50">
-                  <td colSpan={2} className="px-6 py-4 text-sm font-bold text-zinc-400 uppercase tracking-wider">Total de Despesas Fixas</td>
-                  <td className="px-6 py-4 text-base font-bold text-red-400">{R$(total)}</td>
+                <tr className="bg-gray-50/50">
+                  <td colSpan={2} className="px-6 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider">Total de Despesas Fixas</td>
+                  <td className="px-6 py-4 text-base font-bold text-red-600">{R$(total)}</td>
                   <td colSpan={2} />
                 </tr>
               )}
@@ -585,17 +586,17 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
             <Input label="Valor (R$)" type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           </div>
           <div className="pt-2">
-            <label className="flex items-center gap-3 text-sm text-zinc-300 font-medium cursor-pointer bg-zinc-950 p-4 rounded-xl border border-zinc-800 hover:border-[#FF5A00]/50 transition-colors">
+            <label className="flex items-center gap-3 text-sm text-gray-600 font-medium cursor-pointer bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-accent/50 transition-colors">
               <input type="checkbox" checked={form.paidWithCash}
                 onChange={(e) => setForm({ ...form, paidWithCash: e.target.checked })}
-                className="w-5 h-5 rounded border-zinc-700 text-[#FF5A00] focus:ring-[#FF5A00] focus:ring-offset-zinc-950 bg-zinc-900" />
+                className="w-5 h-5 rounded border-gray-300 text-accent focus:ring-accent focus:ring-offset-white bg-white" />
               Descontar do Saldo do Caixa (Reserva)
             </label>
           </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-zinc-400 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-medium transition-colors">Cancelar</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
             <button onClick={handleCreate} disabled={saving || !form.name || !form.amount}
-              className="px-6 py-2 text-sm bg-[#FF5A00] hover:bg-[#E04D00] disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
+              className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Salvando..." : "Adicionar Despesa"}
             </button>
           </div>
@@ -667,44 +668,44 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
     <div className="animate-in fade-in">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <FilterDialog month={month} year={year} onApply={(m, y) => { setMonth(m); setYear(y); }} />
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-[#FF5A00] hover:bg-[#E04D00] text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Nova Despesa Avulsa
         </button>
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+              <tr className="border-b border-gray-200/60 bg-gray-50/30">
                 <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor</Th><Th>Data</Th><Th>Origem</Th><Th align="right">Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-zinc-500">Nenhuma despesa avulsa neste mês.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa avulsa neste mês.</td></tr>
               ) : items.map((e) => (
-                <tr key={e.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-zinc-200">{e.name}</td>
+                <tr key={e.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-800">{e.name}</td>
                   <td className="px-6 py-4 text-sm">
-                    <span className="bg-zinc-800 text-zinc-300 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
+                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
                   </td>
-                  <td className="px-6 py-4 text-sm font-bold text-red-400">{R$(e.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-zinc-400">{new Date(e.date).toLocaleDateString("pt-BR")}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(e.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{new Date(e.date).toLocaleDateString("pt-BR")}</td>
                   <td className="px-6 py-4">
-                    {e.paidWithCash 
-                      ? <span className="text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span> 
-                      : <span className="text-xs text-zinc-500">Operacional</span>}
+                    {e.paidWithCash
+                      ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
+                      : <span className="text-xs text-gray-400">Operacional</span>}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-zinc-500 hover:text-red-400 transition-colors">Excluir</button>
+                    <button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button>
                   </td>
                 </tr>
               ))}
               {items.length > 0 && (
-                <tr className="bg-zinc-950/50">
-                  <td colSpan={2} className="px-6 py-4 text-sm font-bold text-zinc-400 uppercase tracking-wider">Total de Despesas Avulsas</td>
-                  <td className="px-6 py-4 text-base font-bold text-red-400">{R$(total)}</td>
+                <tr className="bg-gray-50/50">
+                  <td colSpan={2} className="px-6 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider">Total de Despesas Avulsas</td>
+                  <td className="px-6 py-4 text-base font-bold text-red-600">{R$(total)}</td>
                   <td colSpan={3} />
                 </tr>
               )}
@@ -722,20 +723,20 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
             <Input label="Valor (R$)" type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             <Input label="Data" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </div>
-          
+
           <div className="pt-2">
-            <label className="flex items-center gap-3 text-sm text-zinc-300 font-medium cursor-pointer bg-zinc-950 p-4 rounded-xl border border-zinc-800 hover:border-[#FF5A00]/50 transition-colors">
+            <label className="flex items-center gap-3 text-sm text-gray-600 font-medium cursor-pointer bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-accent/50 transition-colors">
               <input type="checkbox" checked={form.paidWithCash}
                 onChange={(e) => setForm({ ...form, paidWithCash: e.target.checked })}
-                className="w-5 h-5 rounded border-zinc-700 text-[#FF5A00] focus:ring-[#FF5A00] focus:ring-offset-zinc-950 bg-zinc-900" />
+                className="w-5 h-5 rounded border-gray-300 text-accent focus:ring-accent focus:ring-offset-white bg-white" />
               Descontar do Saldo do Caixa (Reserva)
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-zinc-400 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-medium transition-colors">Cancelar</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
             <button onClick={handleCreate} disabled={saving || !form.name || !form.amount || !form.date}
-              className="px-6 py-2 text-sm bg-[#FF5A00] hover:bg-[#E04D00] disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
+              className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Salvando..." : "Adicionar Despesa"}
             </button>
           </div>
@@ -821,45 +822,45 @@ function InvestmentsTab() {
     <div className="animate-in fade-in">
       {/* Header - sem filtro de mês */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="bg-zinc-900/80 border border-zinc-800/60 rounded-2xl px-6 py-4">
-          <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">Total Investido (Geral)</p>
-          <p className="text-2xl font-bold text-red-400">{R$(total)}</p>
+        <div className="bg-white/80 border border-gray-200/60 rounded-2xl px-6 py-4">
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Total Investido (Geral)</p>
+          <p className="text-2xl font-bold text-red-600">{R$(total)}</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-[#FF5A00] hover:bg-[#E04D00] text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Novo Investimento
         </button>
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+              <tr className="border-b border-gray-200/60 bg-gray-50/30">
                 <Th>Descrição</Th><Th>Valor Total</Th><Th>Forma Pgto</Th><Th>Data Início</Th><Th>Origem</Th><Th align="right">Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-zinc-500">Nenhum investimento registrado.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhum investimento registrado.</td></tr>
               ) : items.map((inv) => (
-                <tr key={inv.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-zinc-200">{inv.description}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-red-400">{R$(inv.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-zinc-400">
+                <tr key={inv.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-800">{inv.description}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(inv.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
                     {inv.paymentMethod === "A_VISTA" ? "À vista" : (
                       <span>
                         Parcelado ({inv.installments}x de {R$(inv.amount / (inv.installments || 1))})
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-zinc-400">{new Date(inv.date).toLocaleDateString("pt-BR")}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{new Date(inv.date).toLocaleDateString("pt-BR")}</td>
                   <td className="px-6 py-4">
                     {inv.paidWithCash
-                      ? <span className="text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
-                      : <span className="text-xs text-zinc-500">Operacional</span>}
+                      ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
+                      : <span className="text-xs text-gray-400">Operacional</span>}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => setDeleteId(inv.id)} className="text-xs font-bold text-zinc-500 hover:text-red-400 transition-colors">Excluir</button>
+                    <button onClick={() => setDeleteId(inv.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button>
                   </td>
                 </tr>
               ))}
@@ -893,27 +894,27 @@ function InvestmentsTab() {
 
           {/* Preview de parcelas */}
           {form.paymentMethod === "PARCELADO" && installmentCount > 0 && form.amount && form.firstPaymentDate && (
-            <div className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-4">
-              <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Preview das parcelas</p>
-              <p className="text-sm text-zinc-300">
-                {installmentCount}x de <span className="text-[#FF5A00] font-bold">{R$(installmentValue)}</span> — lançadas automaticamente no financeiro a partir de {new Date(form.firstPaymentDate + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+            <div className="bg-gray-50/50 border border-gray-200 rounded-xl p-4">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Preview das parcelas</p>
+              <p className="text-sm text-gray-600">
+                {installmentCount}x de <span className="text-accent font-bold">{R$(installmentValue)}</span> — lançadas automaticamente no financeiro a partir de {new Date(form.firstPaymentDate + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
               </p>
             </div>
           )}
 
           <div className="pt-2">
-            <label className="flex items-center gap-3 text-sm text-zinc-300 font-medium cursor-pointer bg-zinc-950 p-4 rounded-xl border border-zinc-800 hover:border-[#FF5A00]/50 transition-colors">
+            <label className="flex items-center gap-3 text-sm text-gray-600 font-medium cursor-pointer bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-accent/50 transition-colors">
               <input type="checkbox" checked={form.paidWithCash}
                 onChange={(e) => setForm({ ...form, paidWithCash: e.target.checked })}
-                className="w-5 h-5 rounded border-zinc-700 text-[#FF5A00] focus:ring-[#FF5A00] focus:ring-offset-zinc-950 bg-zinc-900" />
+                className="w-5 h-5 rounded border-gray-300 text-accent focus:ring-accent focus:ring-offset-white bg-white" />
               Investimento pago com Saldo do Caixa
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-zinc-400 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-medium transition-colors">Cancelar</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
             <button onClick={handleCreate} disabled={saving || !form.description || !form.amount || !form.firstPaymentDate || (form.paymentMethod === "PARCELADO" && !form.installments)}
-              className="px-6 py-2 text-sm bg-[#FF5A00] hover:bg-[#E04D00] disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
+              className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Registrando..." : "Registrar Investimento"}
             </button>
           </div>
@@ -970,10 +971,10 @@ function ProLaboreTab({ year, setYear }: { year: number; setYear: (y: number) =>
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      <div className="flex items-center gap-3 mb-4 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-800/50 w-fit">
-        <span className="text-sm font-medium text-zinc-400">Ano de Referência:</span>
+      <div className="flex items-center gap-3 mb-4 bg-white/40 p-4 rounded-2xl border border-gray-200/50 w-fit">
+        <span className="text-sm font-medium text-gray-500">Ano de Referência:</span>
         <select value={year} onChange={(e) => setYear(parseInt(e.target.value))}
-          className="bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-[#FF5A00]/50 transition-colors">
+          className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-900 outline-none focus:border-accent/50 transition-colors">
           {[CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1].map((y) => (
             <option key={y} value={y}>{y}</option>
           ))}
@@ -982,47 +983,47 @@ function ProLaboreTab({ year, setYear }: { year: number; setYear: (y: number) =>
 
       {/* Current month cards - Estilo Hadar */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <KpiCard icon={<DollarSign size={16} />} label="Fat. Recebido" value={R$(c.receivedRevenue)} color="text-emerald-400" />
-        <KpiCard icon={<TrendingDown size={16} />} label="Despesas" value={R$(c.totalExpenses)} color="text-red-400" />
-        <KpiCard icon={<TrendingUp size={16} />} label="Lucro Bruto" value={R$(c.grossProfit)} color={c.grossProfit >= 0 ? "text-emerald-400" : "text-red-400"} />
-        <KpiCard icon={<Wallet size={16} />} label="Caixa (10%)" value={R$(c.cashReserve)} color="text-blue-400" />
-        <KpiCard icon={<PiggyBank size={16} />} label="Distribuível" value={R$(c.distributable)} color="text-[#FF5A00]" />
-        
+        <KpiCard icon={<DollarSign size={16} />} label="Fat. Recebido" value={R$(c.receivedRevenue)} color="text-emerald-600" />
+        <KpiCard icon={<TrendingDown size={16} />} label="Despesas" value={R$(c.totalExpenses)} color="text-red-600" />
+        <KpiCard icon={<TrendingUp size={16} />} label="Lucro Bruto" value={R$(c.grossProfit)} color={c.grossProfit >= 0 ? "text-emerald-600" : "text-red-600"} />
+        <KpiCard icon={<Wallet size={16} />} label="Caixa (10%)" value={R$(c.cashReserve)} color="text-blue-600" />
+        <KpiCard icon={<PiggyBank size={16} />} label="Distribuível" value={R$(c.distributable)} color="text-accent" />
+
         {/* Destaque para os sócios */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl p-5 border-l-4 border-l-purple-500">
-          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block mb-3">Felipe (60%)</span>
-          <p className="text-2xl font-bold text-purple-400">{R$(c.felipe)}</p>
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl p-5 border-l-4 border-l-purple-500">
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Felipe (60%)</span>
+          <p className="text-2xl font-bold text-purple-600">{R$(c.felipe)}</p>
         </div>
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl p-5 border-l-4 border-l-cyan-500">
-          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block mb-3">Alexandre (40%)</span>
-          <p className="text-2xl font-bold text-cyan-400">{R$(c.alexandre)}</p>
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl p-5 border-l-4 border-l-cyan-500">
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Alexandre (40%)</span>
+          <p className="text-2xl font-bold text-cyan-600">{R$(c.alexandre)}</p>
         </div>
       </div>
 
       {/* History table */}
-      <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden mt-8">
-        <div className="px-6 py-4 border-b border-zinc-800/60 bg-zinc-900/50">
-          <h3 className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Histórico de Distribuição {year}</h3>
+      <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden mt-8">
+        <div className="px-6 py-4 border-b border-gray-200/60 bg-gray-50">
+          <h3 className="text-xs text-gray-500 font-bold uppercase tracking-wider">Histórico de Distribuição {year}</h3>
         </div>
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+              <tr className="border-b border-gray-200/60 bg-gray-50/30">
                 <Th>Mês</Th><Th>Faturamento</Th><Th>Despesas</Th><Th>Lucro Bruto</Th><Th>Caixa (10%)</Th><Th>Felipe</Th><Th>Alexandre</Th>
               </tr>
             </thead>
             <tbody>
               {data.history.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-zinc-500">Sem dados processados neste ano.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-400">Sem dados processados neste ano.</td></tr>
               ) : data.history.map((h) => (
-                <tr key={h.label} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold text-zinc-200">{h.label}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-emerald-400">{R$(h.receivedRevenue)}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-red-400">{R$(h.totalExpenses)}</td>
-                  <td className={`px-6 py-4 text-sm font-bold ${h.grossProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{R$(h.grossProfit)}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-blue-400">{R$(h.cashReserve)}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-purple-400">{R$(h.felipe)}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-cyan-400">{R$(h.alexandre)}</td>
+                <tr key={h.label} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-4 text-sm font-bold text-gray-800">{h.label}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-emerald-600">{R$(h.receivedRevenue)}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-red-600">{R$(h.totalExpenses)}</td>
+                  <td className={`px-6 py-4 text-sm font-bold ${h.grossProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{R$(h.grossProfit)}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-blue-600">{R$(h.cashReserve)}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-purple-600">{R$(h.felipe)}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-cyan-600">{R$(h.alexandre)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1109,32 +1110,32 @@ function CashTab() {
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* Big Balance card */}
-      <div className={`bg-zinc-900/80 backdrop-blur-xl border rounded-2xl p-8 relative overflow-hidden transition-colors ${isLow ? "border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.1)]" : "border-zinc-800/60"}`}>
-        
+      <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl p-8 relative overflow-hidden transition-colors ${isLow ? "border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.1)]" : "border-gray-200/60"}`}>
+
         {/* Background glow sutil */}
-        <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none ${isLow ? 'bg-red-500' : 'bg-[#FF5A00]'}`}></div>
+        <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none ${isLow ? 'bg-red-500' : 'bg-accent'}`}></div>
 
         <div className="flex flex-col md:flex-row md:items-end justify-between relative z-10 gap-6">
           <div>
-            <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+            <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
               <Wallet size={16} /> Saldo de Reserva (Caixa)
             </p>
-            <p className={`text-6xl font-bold tracking-tight ${isLow ? "text-red-400" : "text-white"}`}>{R$(balance)}</p>
+            <p className={`text-6xl font-bold tracking-tight ${isLow ? "text-red-600" : "text-gray-900"}`}>{R$(balance)}</p>
             {isLow && (
-              <div className="flex items-center gap-2 mt-4 text-sm font-medium text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg w-fit">
+              <div className="flex items-center gap-2 mt-4 text-sm font-medium text-red-600 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg w-fit">
                 <AlertTriangle size={16} />
                 Atenção: Saldo abaixo do limite de segurança configurado ({R$(minBalance)})
               </div>
             )}
           </div>
-          
+
           <div className="flex gap-3">
             <button onClick={() => setShowConfig(true)}
-              className="flex items-center gap-2 px-5 py-3 text-sm font-bold bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-white hover:border-[#FF5A00]/50 rounded-xl transition-all shadow-sm">
+              className="flex items-center gap-2 px-5 py-3 text-sm font-bold bg-gray-50 border border-gray-200 text-gray-500 hover:text-gray-900 hover:border-accent/50 rounded-xl transition-all shadow-sm">
               <Settings size={16} /> Configurar Limite
             </button>
             <button onClick={() => setShowAporte(true)}
-              className="flex items-center gap-2 px-5 py-3 text-sm font-bold bg-[#FF5A00] hover:bg-[#E04D00] text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
+              className="flex items-center gap-2 px-5 py-3 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
               <Plus size={16} /> Novo Aporte
             </button>
           </div>
@@ -1142,31 +1143,31 @@ function CashTab() {
       </div>
 
       {/* History */}
-      <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/60 rounded-2xl overflow-hidden mt-8">
-        <div className="px-6 py-4 border-b border-zinc-800/60 bg-zinc-900/50">
-          <h3 className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Histórico de Movimentações</h3>
+      <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden mt-8">
+        <div className="px-6 py-4 border-b border-gray-200/60 bg-gray-50">
+          <h3 className="text-xs text-gray-500 font-bold uppercase tracking-wider">Histórico de Movimentações</h3>
         </div>
         <table className="w-full">
           <thead>
-            <tr className="border-b border-zinc-800/60 bg-zinc-950/30">
+            <tr className="border-b border-gray-200/60 bg-gray-50/30">
               <Th>Data</Th><Th>Tipo de Operação</Th><Th>Descrição do Lançamento</Th><Th align="right">Valor</Th>
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 ? (
-              <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-zinc-500">Nenhuma movimentação registrada.</td></tr>
+              <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma movimentação registrada.</td></tr>
             ) : entries.map((e) => {
               const isOut = e.type === "RETIRADA_DESPESA";
               return (
-                <tr key={e.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm text-zinc-400 font-medium">{new Date(e.date).toLocaleDateString("pt-BR")}</td>
+                <tr key={e.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
+                  <td className="px-6 py-4 text-sm text-gray-500 font-medium">{new Date(e.date).toLocaleDateString("pt-BR")}</td>
                   <td className="px-6 py-4 text-sm">
-                    <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${isOut ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                    <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${isOut ? 'bg-red-500/10 text-red-600 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'}`}>
                       {entryTypeLabels[e.type] || e.type}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-zinc-300">{e.description || "—"}</td>
-                  <td className={`px-6 py-4 text-base font-bold text-right ${isOut ? "text-red-400" : "text-emerald-400"}`}>
+                  <td className="px-6 py-4 text-sm text-gray-600">{e.description || "—"}</td>
+                  <td className={`px-6 py-4 text-base font-bold text-right ${isOut ? "text-red-600" : "text-emerald-600"}`}>
                     {isOut ? "- " : "+ "}{R$(e.amount)}
                   </td>
                 </tr>
@@ -1179,13 +1180,13 @@ function CashTab() {
       {/* Aporte Modal */}
       <Modal open={showAporte} onClose={() => setShowAporte(false)} title="Incluir Aporte Manual">
         <div className="space-y-4">
-          <p className="text-sm text-zinc-400 mb-2">Utilize esta opção para injetar dinheiro diretamente na reserva do caixa, independente do faturamento dos serviços.</p>
+          <p className="text-sm text-gray-500 mb-2">Utilize esta opção para injetar dinheiro diretamente na reserva do caixa, independente do faturamento dos serviços.</p>
           <Input label="Valor do Aporte (R$)" type="number" step="0.01" value={aporteAmount} onChange={(e) => setAporteAmount(e.target.value)} />
           <Input label="Descrição ou Origem (Opcional)" value={aporteDesc} onChange={(e) => setAporteDesc(e.target.value)} placeholder="Ex: Aporte dos sócios, Venda de equipamento..." />
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-            <button onClick={() => setShowAporte(false)} className="px-5 py-2.5 text-sm text-zinc-400 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-medium transition-colors">Cancelar</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button onClick={() => setShowAporte(false)} className="px-5 py-2.5 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
             <button onClick={handleAporte} disabled={saving || !aporteAmount}
-              className="px-6 py-2.5 text-sm bg-[#FF5A00] hover:bg-[#E04D00] disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
+              className="px-6 py-2.5 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Processando..." : "Confirmar Aporte"}
             </button>
           </div>
@@ -1196,13 +1197,13 @@ function CashTab() {
       <Modal open={showConfig} onClose={() => setShowConfig(false)} title="Configuração de Segurança do Caixa">
         <div className="space-y-4">
           <Input label="Saldo Mínimo Desejado (R$)" type="number" step="0.01" value={configMin} onChange={(e) => setConfigMin(e.target.value)} />
-          <p className="text-sm text-zinc-500 bg-zinc-900 p-4 rounded-xl border border-zinc-800">
+          <p className="text-sm text-gray-400 bg-white p-4 rounded-xl border border-gray-200">
             O sistema exibirá um alerta vermelho na tela de Caixa sempre que o saldo disponível for inferior a este valor. Ideal para manter a reserva de emergência da agência intacta.
           </p>
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-            <button onClick={() => setShowConfig(false)} className="px-5 py-2.5 text-sm text-zinc-400 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-medium transition-colors">Cancelar</button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button onClick={() => setShowConfig(false)} className="px-5 py-2.5 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
             <button onClick={handleConfigSave} disabled={saving}
-              className="px-6 py-2.5 text-sm bg-[#FF5A00] hover:bg-[#E04D00] disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
+              className="px-6 py-2.5 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Salvando..." : "Salvar Limite"}
             </button>
           </div>
@@ -1216,14 +1217,14 @@ function CashTab() {
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-32">
-      <Loader2 size={32} className="animate-spin text-[#FF5A00]" />
+      <Loader2 size={32} className="animate-spin text-accent" />
     </div>
   );
 }
 
 function Th({ children, align = "left" }: { children: React.ReactNode, align?: "left" | "right" | "center" }) {
   return (
-    <th className={`text-[10px] text-zinc-500 font-bold px-6 py-3 uppercase tracking-wider text-${align}`}>
+    <th className={`text-[10px] text-gray-400 font-bold px-6 py-3 uppercase tracking-wider text-${align}`}>
       {children}
     </th>
   );

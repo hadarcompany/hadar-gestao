@@ -114,42 +114,61 @@ enum GoalStatus {
   ACHIEVED
 }
 
+enum ClientClassification {
+  MRR
+  FREELA
+}
+
+enum NotificationType {
+  MENTION
+  TRANSFER
+  TASK_UPDATE
+}
+
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  password    String
   role        Role     @default(MEMBER)
   permissions Json?
   image       String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   createdTasks  Task[]         @relation("TaskCreator")
   assignments   TaskAssignee[]
   interactions  Interaction[]
   weeklyReviews WeeklyReview[]
 
+  weeklyDemandsCreated ClientWeeklyDemand[]
+  transfersPerformed   TaskTransferEvent[]  @relation("TransferPerformer")
+  chatMessages         ClientChatMessage[]
+  chatReads            ClientChatRead[]
+  notifications        Notification[]
+  uploadedAttachments  TaskAttachment[]
+
   @@map("users")
 }
 
 model Client {
-  id                String       @id @default(cuid())
-  name              String
-  email             String?
-  phone             String?
-  driveLink         String?
-  contractLink      String?
-  briefing          String?
-  status            ClientStatus @default(ACTIVE)
-  contractStartDate DateTime?
-  renewalDate       DateTime?
-  brandColors       String[]     @default([])
-  brandFontPrimary  String?
+  id                 String                @id @default(cuid())
+  name               String
+  email              String?
+  phone              String?
+  driveLink          String?
+  contractLink       String?
+  briefing           String?
+  status             ClientStatus          @default(ACTIVE)
+  contractStartDate  DateTime?
+  renewalDate        DateTime?
+  brandColors        String[]              @default([])
+  brandFontPrimary   String?
   brandFontSecondary String?
-  logoUrl           String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  logoUrl            String?
+  classification     ClientClassification?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   tasks            Task[]
   interactions     Interaction[]
@@ -158,8 +177,31 @@ model Client {
   receivables      Receivable[]
   healthScores     ClientHealthScore[]
   contentCalendars ContentCalendar[]
+  weeklyDemands    ClientWeeklyDemand[]
+  chatMessages     ClientChatMessage[]
+  chatReads        ClientChatRead[]
 
   @@map("clients")
+}
+
+/// Demanda semanal contratada por tipo de entrega, com vigência.
+/// Ao alterar a demanda, a linha atual é encerrada (effectiveTo) e uma nova é criada,
+/// preservando a avaliação de semanas passadas.
+model ClientWeeklyDemand {
+  id            String    @id @default(cuid())
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  deliveryType  String
+  quantity      Int
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([clientId, deliveryType])
+  @@map("client_weekly_demands")
 }
 
 model Task {
@@ -171,6 +213,9 @@ model Task {
   priority      TaskPriority @default(MEDIUM)
   startDate     DateTime?
   dueDate       DateTime?
+  publishDate   DateTime?
+  completedAt   DateTime?
+  isExtra       Boolean      @default(false)
   estimatedTime Float?
   actualTime    Float?
   checklist     Json?
@@ -184,17 +229,101 @@ model Task {
   createdById String
   createdBy   User    @relation("TaskCreator", fields: [createdById], references: [id])
 
-  assignees        TaskAssignee[]
-  calendarItems    ContentCalendarItem[]
+  assignees      TaskAssignee[]
+  calendarItems  ContentCalendarItem[]
+  transferEvents TaskTransferEvent[]
+  chatMessages   ClientChatMessage[]
+  attachments    TaskAttachment[]
 
   @@map("tasks")
 }
 
+/// Arquivo anexado a uma tarefa. `data` guarda o arquivo como data URL base64,
+/// mesma convenção já usada em Client.logoUrl e User.image.
+model TaskAttachment {
+  id           String   @id @default(cuid())
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName     String
+  mimeType     String
+  size         Int
+  data         String
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_attachments")
+}
+
+/// Histórico de transferência de responsáveis (quem transferiu, de quem, para quem).
+model TaskTransferEvent {
+  id            String   @id @default(cuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fromUserIds   String[] @default([])
+  toUserIds     String[] @default([])
+  note          String?
+  performedById String
+  performedBy   User     @relation("TransferPerformer", fields: [performedById], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_transfer_events")
+}
+
+/// Chat interno por cliente (equipe autorizada apenas). Mensagens de sistema (isSystem=true)
+/// registram eventos automáticos, como transferências de tarefa.
+model ClientChatMessage {
+  id               String   @id @default(cuid())
+  clientId         String
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  authorId         String?
+  author           User?    @relation(fields: [authorId], references: [id])
+  content          String
+  isSystem         Boolean  @default(false)
+  taskId           String?
+  task             Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  mentionedUserIds String[] @default([])
+  createdAt        DateTime @default(now())
+
+  @@index([clientId, createdAt])
+  @@map("client_chat_messages")
+}
+
+/// Marca até onde cada usuário já leu o chat de um cliente (para indicar não lidas).
+model ClientChatRead {
+  clientId   String
+  userId     String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt DateTime @default(now())
+
+  @@id([clientId, userId])
+  @@map("client_chat_reads")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  taskId    String?
+  clientId  String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
 model TaskAssignee {
   taskId String
-  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   assignedAt DateTime @default(now())
 
@@ -203,10 +332,10 @@ model TaskAssignee {
 }
 
 model Interaction {
-  id       String          @id @default(cuid())
-  type     InteractionType
-  content  String
-  date     DateTime        @default(now())
+  id      String          @id @default(cuid())
+  type    InteractionType
+  content String
+  date    DateTime        @default(now())
 
   clientId String
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -217,25 +346,25 @@ model Interaction {
 }
 
 model Service {
-  id            String      @id @default(cuid())
-  type          ServiceType
-  name          String?
-  contractMonths Int?
-  monthlyValue  Float?
-  startDate     DateTime?
-  nextRenewal   DateTime?
-  metaAds       Boolean     @default(false)
-  googleAds     Boolean     @default(false)
+  id                String      @id @default(cuid())
+  type              ServiceType
+  name              String?
+  contractMonths    Int?
+  monthlyValue      Float?
+  startDate         DateTime?
+  nextRenewal       DateTime?
+  metaAds           Boolean     @default(false)
+  googleAds         Boolean     @default(false)
   deliveriesPerWeek Int?
-  deliveryTypes String[]    @default([])
+  deliveryTypes     String[]    @default([])
 
-  freelancerType    FreelancerServiceType?
+  freelancerType       FreelancerServiceType?
   freelancerTypeCustom String?
-  totalValue        Float?
-  paymentMethod     PaymentMethod?
-  installments      Int?
-  status            ServiceStatus @default(IN_PROGRESS)
-  dataPrimeiraParcela DateTime?
+  totalValue           Float?
+  paymentMethod        PaymentMethod?
+  installments         Int?
+  status               ServiceStatus          @default(IN_PROGRESS)
+  dataPrimeiraParcela  DateTime?
 
   clientId  String
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -288,7 +417,7 @@ model Receivable {
   year     Int
 
   clientId  String
-  client    Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -348,8 +477,8 @@ model CashEntry {
 }
 
 model CashConfig {
-  id         String @id @default("singleton")
-  minBalance Float  @default(1000)
+  id         String   @id @default("singleton")
+  minBalance Float    @default(1000)
   updatedAt  DateTime @updatedAt
 
   @@map("cash_config")

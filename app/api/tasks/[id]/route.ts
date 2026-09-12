@@ -2,37 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { TASK_TEMPLATES, generateChecklist } from "@/lib/task-templates";
+import { TASK_INCLUDE } from "@/lib/task-transfer";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const task = await prisma.task.findUnique({
     where: { id: params.id },
-    include: {
-      client: { select: { id: true, name: true } },
-      createdBy: { select: { id: true, name: true } },
-      assignees: { include: { user: { select: { id: true, name: true } } } },
-    },
+    include: TASK_INCLUDE,
   });
 
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(task);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { assigneeIds, ...data } = body;
+  // assigneeIds/transferNote são tratados por /api/tasks/[id]/transfer (histórico + chat +
+  // notificação centralizados); aqui apenas edições diretas do formulário/lista são aplicadas.
+  const { assigneeIds, transferNote, ...data } = body;
+  void transferNote;
 
-  if (data.startDate) data.startDate = new Date(data.startDate);
-  if (data.dueDate) data.dueDate = new Date(data.dueDate);
-  if (data.estimatedTime) data.estimatedTime = parseFloat(data.estimatedTime);
-  if (data.actualTime) data.actualTime = parseFloat(data.actualTime);
+  if (data.startDate !== undefined) data.startDate = data.startDate ? new Date(data.startDate) : null;
+  if (data.dueDate !== undefined) data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+  if (data.publishDate !== undefined) data.publishDate = data.publishDate ? new Date(data.publishDate) : null;
+  if (data.estimatedTime !== undefined) data.estimatedTime = data.estimatedTime === "" || data.estimatedTime === null ? null : parseFloat(data.estimatedTime);
+  if (data.actualTime !== undefined) data.actualTime = data.actualTime === "" || data.actualTime === null ? null : parseFloat(data.actualTime);
 
   const updateData: Record<string, unknown> = { ...data };
+
+  if (data.status !== undefined) {
+    updateData.completedAt = data.status === "COMPLETED" ? new Date() : null;
+  }
 
   if (assigneeIds) {
     await prisma.taskAssignee.deleteMany({ where: { taskId: params.id } });
@@ -44,11 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const task = await prisma.task.update({
     where: { id: params.id },
     data: updateData,
-    include: {
-      client: { select: { id: true, name: true } },
-      createdBy: { select: { id: true, name: true } },
-      assignees: { include: { user: { select: { id: true, name: true } } } },
-    },
+    include: TASK_INCLUDE,
   });
 
   // AUTOMAÇÃO: Calendário Editorial concluído → criar sub-tarefas de produção
@@ -129,7 +132,8 @@ async function createEditorialSubTasks(
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

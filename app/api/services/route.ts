@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const services = await prisma.service.findMany({
     where,
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, logoUrl: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   const service = await prisma.service.create({
     data: data as any,
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, logoUrl: true } },
     },
   });
 

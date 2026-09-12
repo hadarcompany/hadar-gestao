@@ -3,5 +3,6 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  image: string | null;
   permissions: Record<string, string> | null;
 }

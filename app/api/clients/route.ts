@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       status: body.status || "ACTIVE",
       contractStartDate: body.contractStartDate ? new Date(body.contractStartDate) : null,
       renewalDate: body.renewalDate ? new Date(body.renewalDate) : null,
+      classification: body.classification || null,
     },
   });
 

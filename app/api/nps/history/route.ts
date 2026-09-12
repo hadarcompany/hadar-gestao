@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const scores = await prisma.clientHealthScore.findMany({
     where,
-    include: { client: { select: { id: true, name: true } } },
+    include: { client: { select: { id: true, name: true, logoUrl: true } } },
     orderBy: [{ year: "asc" }, { month: "asc" }],
   });
 
