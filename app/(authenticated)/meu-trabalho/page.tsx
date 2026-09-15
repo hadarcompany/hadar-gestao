@@ -8,7 +8,10 @@ import { TaskRow } from "@/components/tasks/task-row";
 import { Avatar } from "@/components/ui/avatar";
 import { type TaskData } from "@/lib/types";
 import { getTaskBucket } from "@/lib/dates";
-import { Loader2, Plus, Bell, CheckSquare, AtSign, ArrowLeftRight, ExternalLink } from "lucide-react";
+import {
+  Loader2, Plus, Bell, CheckSquare, AtSign, ArrowLeftRight, ExternalLink, Check, CheckCheck,
+  ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type TabKey = "ALL" | "TODAY" | "OVERDUE" | "UPCOMING" | "COMPLETED";
@@ -32,18 +35,31 @@ interface NotificationItem {
   createdAt: string;
 }
 
+interface ClientInfo { id: string; name: string; status: string }
+
+interface ClientGroup {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  active: boolean;
+  tasks: TaskData[];
+  overdue: number;
+}
+
 export default function MeuTrabalhoPage() {
   const { user } = useAuth();
   const [area, setArea] = useState<"tasks" | "notifications">("tasks");
 
   const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [clients, setClients] = useState<{ id: string; name: string; image?: string | null }[]>([]);
+  const [clients, setClients] = useState<ClientInfo[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string; image?: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [tab, setTab] = useState<TabKey>("ALL");
   const [clientFilter, setClientFilter] = useState("");
+  // Clientes nascem fechados: as tarefas aparecem ao clicar no cliente.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -75,7 +91,9 @@ export default function MeuTrabalhoPage() {
   useEffect(() => {
     fetchTasks();
     fetchNotifications();
-    fetch("/api/clients").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
+    fetch("/api/clients").then((r) => r.json()).then((d) =>
+      setClients(d.map((c: ClientInfo) => ({ id: c.id, name: c.name, status: c.status })))
+    );
     fetch("/api/users").then((r) => r.json()).then(setUsers);
   }, [fetchTasks, fetchNotifications]);
 
@@ -115,6 +133,40 @@ export default function MeuTrabalhoPage() {
 
   const displayedTasks = buckets[tab];
 
+  // Mesma organização do histórico: por cliente, ativos em cima e inativos embaixo.
+  const { activeGroups, inactiveGroups } = useMemo(() => {
+    const statusById = new Map(clients.map((c) => [c.id, c.status]));
+    const groups = new Map<string, ClientGroup>();
+    for (const task of displayedTasks) {
+      const id = task.client?.id ?? "no-client";
+      let group = groups.get(id);
+      if (!group) {
+        group = {
+          id,
+          name: task.client?.name ?? "Sem cliente",
+          logoUrl: task.client?.logoUrl,
+          active: id === "no-client" || statusById.get(id) !== "INACTIVE",
+          tasks: [],
+          overdue: 0,
+        };
+        groups.set(id, group);
+      }
+      group.tasks.push(task);
+      if (getTaskBucket(task) === "OVERDUE") group.overdue++;
+    }
+    const list = [...groups.values()].sort((a, b) =>
+      a.id === "no-client" ? 1 : b.id === "no-client" ? -1 : a.name.localeCompare(b.name)
+    );
+    return { activeGroups: list.filter((g) => g.active), inactiveGroups: list.filter((g) => !g.active) };
+  }, [displayedTasks, clients]);
+
+  const allGroups = [...activeGroups, ...inactiveGroups];
+  const allExpanded = allGroups.length > 0 && allGroups.every((g) => expanded[g.id]);
+
+  function toggleAll() {
+    setExpanded(allExpanded ? {} : Object.fromEntries(allGroups.map((g) => [g.id, true])));
+  }
+
   function handleRowUpdated(updated: TaskData) {
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
@@ -122,12 +174,29 @@ export default function MeuTrabalhoPage() {
     setTasks((prev) => [clone, ...prev]);
   }
 
-  async function markNotificationRead(n: NotificationItem) {
-    if (!n.read) {
-      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-      setUnreadCount((c) => Math.max(0, c - 1));
-      await fetch(`/api/notifications/${n.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ read: true }) }).catch(() => {});
-    }
+  function markRead(n: NotificationItem) {
+    if (n.read) return;
+    setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+    setUnreadCount((c) => Math.max(0, c - 1));
+    fetch(`/api/notifications/${n.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ read: true }),
+    }).catch(() => {});
+  }
+
+  function markAllRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+    fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markAllRead: true }),
+    }).catch(() => {});
+  }
+
+  async function openNotification(n: NotificationItem) {
+    markRead(n);
     if (n.taskId) {
       const res = await fetch(`/api/tasks/${n.taskId}`);
       if (res.ok) setSelectedTask(await res.json());
@@ -139,6 +208,52 @@ export default function MeuTrabalhoPage() {
     if (type === "TRANSFER") return <ArrowLeftRight size={14} className="text-accent-dark" />;
     return <Bell size={14} className="text-gray-400" />;
   };
+
+  function GroupList({ groups }: { groups: ClientGroup[] }) {
+    return (
+      <div className="space-y-2">
+        {groups.map((g) => {
+          const open = !!expanded[g.id];
+          return (
+            <div key={g.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpanded((prev) => ({ ...prev, [g.id]: !prev[g.id] }))}
+                aria-expanded={open}
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left"
+              >
+                {open ? <ChevronDown size={15} className="text-gray-400 shrink-0" /> : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
+                <Avatar name={g.name} image={g.logoUrl} size={24} className="object-contain shrink-0" />
+                <span className="flex-1 min-w-0 text-sm font-semibold text-gray-800 truncate">{g.name}</span>
+                {g.overdue > 0 && (
+                  <span className="text-[11px] font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full shrink-0">
+                    {g.overdue} {g.overdue === 1 ? "atrasada" : "atrasadas"}
+                  </span>
+                )}
+                <span className="text-[11px] text-gray-400 shrink-0">
+                  {g.tasks.length} {g.tasks.length === 1 ? "tarefa" : "tarefas"}
+                </span>
+              </button>
+              {open && (
+                <div className="border-t border-gray-100">
+                  {g.tasks.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      users={users}
+                      showClient={false}
+                      onUpdated={handleRowUpdated}
+                      onCloned={handleRowCloned}
+                      onOpenDetail={setSelectedTask}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-transparent w-full pb-10">
@@ -217,6 +332,15 @@ export default function MeuTrabalhoPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={toggleAll}
+                disabled={allGroups.length === 0}
+                title={allExpanded ? "Recolher todos" : "Expandir todos"}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all disabled:opacity-50"
+              >
+                {allExpanded ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+                {allExpanded ? "Recolher" : "Expandir"}
+              </button>
               <select
                 value={clientFilter}
                 onChange={(e) => setClientFilter(e.target.value)}
@@ -234,45 +358,75 @@ export default function MeuTrabalhoPage() {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            {loading ? (
-              <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-accent" /></div>
-            ) : displayedTasks.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-14">Nenhuma tarefa nesta aba.</p>
-            ) : (
-              displayedTasks.map((task) => (
-                <TaskRow key={task.id} task={task} users={users} onUpdated={handleRowUpdated} onCloned={handleRowCloned} onOpenDetail={setSelectedTask} />
-              ))
-            )}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 bg-white border border-gray-200 rounded-xl"><Loader2 size={24} className="animate-spin text-accent" /></div>
+          ) : allGroups.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-14 bg-white border border-gray-200 rounded-xl">Nenhuma tarefa nesta aba.</p>
+          ) : (
+            <div className="space-y-6">
+              {activeGroups.length > 0 && (
+                <section>
+                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Clientes ativos ({activeGroups.length})</h2>
+                  {/* Chamado como função: como componente interno, remontaria as linhas a cada
+                      render e fecharia os menus abertos (etiquetas, status, transferir). */}
+                  {GroupList({ groups: activeGroups })}
+                </section>
+              )}
+              {inactiveGroups.length > 0 && (
+                <section>
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Clientes inativos ({inactiveGroups.length})</h2>
+                  {GroupList({ groups: inactiveGroups })}
+                </section>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {unreadCount > 0 && (
+            <div className="flex justify-end px-4 py-2 border-b border-gray-100">
+              <button onClick={markAllRead} className="flex items-center gap-1 text-[11px] font-medium text-accent hover:text-accent-dark">
+                <CheckCheck size={13} /> Marcar todas como lidas
+              </button>
+            </div>
+          )}
           {notifLoading ? (
             <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-accent" /></div>
           ) : notifications.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-14">Nenhuma notificação por aqui.</p>
           ) : (
             notifications.map((n) => (
-              <button
+              <div
                 key={n.id}
-                onClick={() => markNotificationRead(n)}
                 className={cn(
-                  "w-full flex items-start gap-3 text-left px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors",
+                  "flex items-start gap-1 pr-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors",
                   !n.read && "bg-accent/5"
                 )}
               >
-                <span className="mt-0.5 shrink-0">{notifIcon(n.type)}</span>
-                <span className="flex-1 min-w-0">
-                  <span className="flex items-center gap-2">
-                    <span className={cn("text-sm truncate", n.read ? "text-gray-600" : "text-gray-900 font-semibold")}>{n.title}</span>
-                    {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
+                <button onClick={() => openNotification(n)} className="flex-1 min-w-0 flex items-start gap-3 text-left pl-4 py-3">
+                  <span className="mt-0.5 shrink-0">{notifIcon(n.type)}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className={cn("text-sm truncate", n.read ? "text-gray-600" : "text-gray-900 font-semibold")}>{n.title}</span>
+                      {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
+                    </span>
+                    {n.body && <span className="block text-xs text-gray-400 mt-0.5 truncate">{n.body}</span>}
+                    <span className="block text-[11px] text-gray-300 mt-1">{new Date(n.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                   </span>
-                  {n.body && <span className="block text-xs text-gray-400 mt-0.5 truncate">{n.body}</span>}
-                  <span className="block text-[11px] text-gray-300 mt-1">{new Date(n.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-                </span>
-                {n.taskId && <ExternalLink size={13} className="text-gray-300 shrink-0 mt-1" />}
-              </button>
+                  {n.taskId && <ExternalLink size={13} className="text-gray-300 shrink-0 mt-1" />}
+                </button>
+                {!n.read && (
+                  <button
+                    type="button"
+                    onClick={() => markRead(n)}
+                    title="Marcar como lida"
+                    aria-label="Marcar como lida"
+                    className="mt-2.5 p-1.5 rounded-md text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 shrink-0 transition-colors"
+                  >
+                    <Check size={15} />
+                  </button>
+                )}
+              </div>
             ))
           )}
         </div>

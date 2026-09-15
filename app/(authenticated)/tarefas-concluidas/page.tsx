@@ -252,13 +252,13 @@ export default function TarefasConcluidasPage() {
           {activeGroups.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Clientes ativos ({activeGroups.length})</h2>
-              <GroupList groups={activeGroups} />
+              {GroupList({ groups: activeGroups })}
             </section>
           )}
           {inactiveGroups.length > 0 && (
             <section>
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Clientes inativos ({inactiveGroups.length})</h2>
-              <GroupList groups={inactiveGroups} />
+              {GroupList({ groups: inactiveGroups })}
             </section>
           )}
         </div>

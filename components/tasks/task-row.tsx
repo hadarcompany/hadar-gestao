@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import { type TaskData, type UserSummary } from "@/lib/types";
-import { statusLabel, statusColor } from "@/lib/status-labels";
 import { getTaskBucket, formatDayMonthBR } from "@/lib/dates";
 import { Avatar } from "@/components/ui/avatar";
+import { Floating } from "@/components/ui/floating";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
+import { StatusBadge } from "@/components/tasks/status-badge";
 import { TaskLabels } from "@/components/tasks/label-picker";
 import {
   Copy, ArrowLeftRight, Info, Calendar as CalendarIcon,
@@ -38,14 +39,14 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
   const [editingDate, setEditingDate] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
-  const [saving, setSaving] = useState<"title" | "date" | "transfer" | "clone" | "status" | null>(null);
+  const [saving, setSaving] = useState<"title" | "date" | "clone" | "status" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
-  const rowRef = useRef<HTMLDivElement>(null);
+  const assigneeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { setTitleValue(task.title); }, [task.title]);
-  useEffect(() => { if (editingTitle) titleInputRef.current?.focus(); }, [editingTitle]);
+  useEffect(() => { if (editingTitle) { titleInputRef.current?.focus(); titleInputRef.current?.select(); } }, [editingTitle]);
   useEffect(() => { if (editingDate) { dateInputRef.current?.focus(); try { dateInputRef.current?.showPicker?.(); } catch { /* not supported */ } } }, [editingDate]);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       onUpdated(updated);
       setEditingTitle(false);
     } catch {
-      setError("Não foi possível salvar o nome. Tente novamente.");
+      setError("Não foi possível salvar o nome.");
       setTitleValue(task.title);
     } finally {
       setSaving(null);
@@ -83,7 +84,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       onUpdated(updated);
       setEditingDate(false);
     } catch {
-      setError("Não foi possível salvar o prazo. Tente novamente.");
+      setError("Não foi possível salvar o prazo.");
     } finally {
       setSaving(null);
     }
@@ -101,7 +102,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
     }
   }
 
-  // Prioridade e etiquetas mudam na hora na tela; se a gravação falhar, volta ao valor anterior.
+  // Status, prioridade e etiquetas mudam na hora na tela; se a gravação falhar, voltam ao valor anterior.
   async function quickUpdate(changes: Partial<TaskData>, message: string) {
     const previous = task;
     onUpdated({ ...task, ...changes });
@@ -130,7 +131,6 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
 
   return (
     <div
-      ref={rowRef}
       onClick={() => onOpenDetail(task)}
       className="group relative flex items-center gap-3 px-3 py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors text-sm cursor-pointer"
     >
@@ -151,18 +151,14 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
           : isDone ? <CheckCircle2 size={17} /> : <Circle size={17} />}
       </button>
 
-      {/* status */}
-      <span className={cn("shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap", statusColor(task.status))}>
-        {statusLabel(task.status)}
-      </span>
+      <StatusBadge status={task.status} onChange={(status) => quickUpdate({ status }, "Não foi possível alterar o status.")} />
 
-      {/* prioridade */}
       <PriorityBadge
         priority={task.priority}
         onChange={(priority) => quickUpdate({ priority }, "Não foi possível alterar a prioridade.")}
       />
 
-      {/* title (editable inline) + description access */}
+      {/* título: clique renomeia; o resto da linha abre a tarefa */}
       <div className="flex-1 min-w-0 flex items-center gap-1.5">
         {editingTitle ? (
           <input
@@ -173,15 +169,22 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             onBlur={saveTitle}
             onKeyDown={(e) => {
               if (e.key === "Enter") saveTitle();
-              if (e.key === "Escape") { setTitleValue(task.title); setEditingTitle(false); }
+              if (e.key === "Escape") { e.stopPropagation(); setTitleValue(task.title); setEditingTitle(false); }
             }}
+            aria-label="Nome da tarefa"
             className="w-full bg-white border border-accent/50 rounded px-1.5 py-0.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-accent/30"
           />
         ) : (
           <span
-            onDoubleClick={(e) => { e.stopPropagation(); setEditingTitle(true); }}
-            title="Clique para abrir · duplo clique para renomear"
-            className={cn("truncate text-left font-medium max-w-[280px]", isDone ? "text-gray-400 line-through" : "text-gray-800")}
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); setEditingTitle(true); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setEditingTitle(true); } }}
+            title="Clique para renomear"
+            className={cn(
+              "truncate text-left font-medium max-w-[280px] cursor-text rounded px-0.5 -mx-0.5 hover:bg-white hover:ring-1 hover:ring-gray-200",
+              isDone ? "text-gray-400 line-through" : "text-gray-800"
+            )}
           >
             {saving === "title" ? <Loader2 size={12} className="inline animate-spin mr-1" /> : null}
             {task.title}
@@ -222,6 +225,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             <span className="text-[10px]">{updatesCount}</span>
           </span>
         )}
+        {error && <span role="alert" className="shrink-0 text-[11px] text-red-600 bg-red-50 rounded px-1.5 py-0.5">{error}</span>}
       </div>
 
       {/* etiquetas */}
@@ -241,9 +245,10 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
         </span>
       )}
 
-      {/* assignee / transfer */}
-      <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+      {/* responsável / transferir: o painel flutua fora da lista para não ser cortado */}
+      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
+          ref={assigneeRef}
           type="button"
           onClick={() => setShowTransfer((v) => !v)}
           title="Transferir responsável"
@@ -254,14 +259,14 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             {assignee?.name ?? "Sem responsável"}{extraAssignees > 0 ? ` +${extraAssignees}` : ""}
           </span>
         </button>
-        {showTransfer && (
-          <TransferPopover
+        <Floating anchorRef={assigneeRef} open={showTransfer} onClose={() => setShowTransfer(false)} width={264} className="p-3">
+          <TransferPanel
             task={task}
             users={users}
-            onClose={() => setShowTransfer(false)}
+            onCancel={() => setShowTransfer(false)}
             onTransferred={(t) => { onUpdated(t); setShowTransfer(false); }}
           />
-        )}
+        </Floating>
       </div>
 
       {/* due date */}
@@ -307,7 +312,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
         </button>
         <button
           type="button"
-          onClick={() => setShowTransfer((v) => !v)}
+          onClick={() => setShowTransfer(true)}
           title="Transferir"
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-accent-dark transition-colors"
         >
@@ -322,37 +327,22 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
           Detalhes
         </button>
       </div>
-
-      {error && (
-        <div className="absolute right-2 -bottom-1 translate-y-full z-30 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1 shadow-sm">
-          {error}
-        </div>
-      )}
     </div>
   );
 }
 
-function TransferPopover({
-  task, users, onClose, onTransferred,
+function TransferPanel({
+  task, users, onCancel, onTransferred,
 }: {
   task: TaskData;
   users: UserSummary[];
-  onClose: () => void;
+  onCancel: () => void;
   onTransferred: (t: TaskData) => void;
 }) {
   const [selected, setSelected] = useState<string[]>(task.assignees.map((a) => a.user.id));
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [onClose]);
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
@@ -381,12 +371,9 @@ function TransferPopover({
   }
 
   return (
-    <div
-      ref={ref}
-      className="absolute z-30 top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl p-3"
-    >
+    <>
       <p className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Transferir para</p>
-      <div className="max-h-32 overflow-y-auto space-y-1 mb-2">
+      <div className="max-h-40 overflow-y-auto space-y-1 mb-2">
         {users.map((u) => (
           <label key={u.id} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
             <input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggle(u.id)} className="rounded accent-current text-accent" />
@@ -404,13 +391,13 @@ function TransferPopover({
       />
       {error && <p className="text-[11px] text-red-600 mb-2">{error}</p>}
       <div className="flex gap-2">
-        <button onClick={onClose} className="flex-1 py-1.5 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+        <button type="button" onClick={onCancel} className="flex-1 py-1.5 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
           <XIcon size={12} className="inline mr-1" /> Cancelar
         </button>
-        <button onClick={confirm} disabled={saving} className="flex-1 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent-dark rounded-lg transition-colors disabled:opacity-50">
+        <button type="button" onClick={confirm} disabled={saving} className="flex-1 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent-dark rounded-lg transition-colors disabled:opacity-50">
           {saving ? <Loader2 size={12} className="inline animate-spin" /> : <Check size={12} className="inline mr-1" />} Confirmar
         </button>
       </div>
-    </div>
+    </>
   );
 }

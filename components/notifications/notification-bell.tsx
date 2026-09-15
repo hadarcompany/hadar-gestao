@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { type TaskData, type UserSummary } from "@/lib/types";
-import { Bell, AtSign, ArrowLeftRight, CheckCheck, ExternalLink, Loader2 } from "lucide-react";
+import { Bell, AtSign, ArrowLeftRight, CheckCheck, Check, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NotificationItem {
@@ -83,16 +83,19 @@ export function NotificationBell() {
     };
   }, [open, load]);
 
+  function markRead(n: NotificationItem) {
+    if (n.read) return;
+    setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+    setUnread((c) => Math.max(0, c - 1));
+    fetch(`/api/notifications/${n.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ read: true }),
+    }).catch(() => {});
+  }
+
   async function openItem(n: NotificationItem) {
-    if (!n.read) {
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-      setUnread((c) => Math.max(0, c - 1));
-      fetch(`/api/notifications/${n.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ read: true }),
-      }).catch(() => {});
-    }
+    markRead(n);
     if (!n.taskId) return;
 
     setOpeningId(n.id);
@@ -162,27 +165,39 @@ export function NotificationBell() {
               <p className="text-xs text-gray-400 text-center py-10">Nenhuma notificação por aqui.</p>
             ) : (
               items.slice(0, 20).map((n) => (
-                <button
+                <div
                   key={n.id}
-                  onClick={() => openItem(n)}
                   className={cn(
-                    "w-full flex items-start gap-3 text-left px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors",
+                    "flex items-start gap-1 pr-2 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors",
                     !n.read && "bg-accent/5"
                   )}
                 >
-                  <span className="mt-0.5 shrink-0"><TypeIcon type={n.type} /></span>
-                  <span className="flex-1 min-w-0">
-                    <span className="flex items-center gap-2">
-                      <span className={cn("text-sm truncate", n.read ? "text-gray-600" : "text-gray-900 font-semibold")}>{n.title}</span>
-                      {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
+                  <button onClick={() => openItem(n)} className="flex-1 min-w-0 flex items-start gap-3 text-left pl-4 py-3">
+                    <span className="mt-0.5 shrink-0"><TypeIcon type={n.type} /></span>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center gap-2">
+                        <span className={cn("text-sm truncate", n.read ? "text-gray-600" : "text-gray-900 font-semibold")}>{n.title}</span>
+                        {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
+                      </span>
+                      {n.body && <span className="block text-xs text-gray-400 mt-0.5 line-clamp-2">{n.body}</span>}
+                      <span className="block text-[11px] text-gray-300 mt-1">{timeAgo(n.createdAt)}</span>
                     </span>
-                    {n.body && <span className="block text-xs text-gray-400 mt-0.5 line-clamp-2">{n.body}</span>}
-                    <span className="block text-[11px] text-gray-300 mt-1">{timeAgo(n.createdAt)}</span>
-                  </span>
-                  {openingId === n.id
-                    ? <Loader2 size={13} className="text-accent animate-spin shrink-0 mt-1" />
-                    : n.taskId && <ExternalLink size={13} className="text-gray-300 shrink-0 mt-1" />}
-                </button>
+                    {openingId === n.id
+                      ? <Loader2 size={13} className="text-accent animate-spin shrink-0 mt-1" />
+                      : n.taskId && <ExternalLink size={13} className="text-gray-300 shrink-0 mt-1" />}
+                  </button>
+                  {!n.read && (
+                    <button
+                      type="button"
+                      onClick={() => markRead(n)}
+                      title="Marcar como lida"
+                      aria-label="Marcar como lida"
+                      className="mt-2.5 p-1.5 rounded-md text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 shrink-0 transition-colors"
+                    >
+                      <Check size={14} />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>
