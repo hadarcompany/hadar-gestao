@@ -37,3 +37,36 @@ export function extractMentions(content: string, users: { id: string; name: stri
   }
   return Array.from(ids);
 }
+
+/**
+ * Notifica quem foi @mencionado num texto da tarefa. Com `previousContent` (edição),
+ * só avisa quem foi marcado agora — quem já estava no texto não é notificado de novo.
+ */
+export async function notifyMentions(params: {
+  content: string | null | undefined;
+  previousContent?: string | null;
+  authorId: string;
+  task: { id: string; title: string; clientId: string | null };
+}) {
+  if (!params.content) return [];
+  const users = await prisma.user.findMany({ select: { id: true, name: true } });
+  const already = new Set(params.previousContent ? extractMentions(params.previousContent, users) : []);
+  const ids = extractMentions(params.content, users).filter((id) => id !== params.authorId && !already.has(id));
+  if (ids.length === 0) return [];
+
+  const author = users.find((u) => u.id === params.authorId)?.name.split(" ")[0] ?? "Alguém";
+  const body = params.content.slice(0, 140);
+  await Promise.all(
+    ids.map((userId) =>
+      createNotification({
+        userId,
+        type: "MENTION",
+        title: `${author} mencionou você em "${params.task.title}"`,
+        body,
+        taskId: params.task.id,
+        clientId: params.task.clientId,
+      })
+    )
+  );
+  return ids;
+}

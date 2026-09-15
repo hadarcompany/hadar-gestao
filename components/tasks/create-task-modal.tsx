@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "@/components/tasks/mention-textarea";
 import { SelectField } from "@/components/ui/select-field";
 import { MultiSelect } from "@/components/ui/multi-select";
 import {
@@ -226,7 +226,18 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Textarea label="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalhes da tarefa..." />
+          <div className="space-y-1.5">
+            <label className="block text-xs text-gray-500 uppercase tracking-wider font-medium">Descrição</label>
+            <MentionTextarea
+              value={description}
+              onChange={setDescription}
+              users={users}
+              rows={4}
+              ariaLabel="Descrição da tarefa"
+              placeholder="Detalhes da tarefa… use @ para marcar alguém"
+              className="bg-gray-100"
+            />
+          </div>
           <div className="space-y-4">
             <Input label="Tempo Estimado (horas)" type="number" step="0.5" value={estimatedTime} onChange={(e) => setEstimatedTime(e.target.value)} placeholder="Ex: 2.5" />
             <MultiSelect label="Tags" options={[]} value={tags} onChange={setTags} placeholder="Adicione tags..." allowCustom />

@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { ClientIdentity } from "@/components/clients/client-identity";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,7 @@ interface TaskDetailModalProps {
   onClose: () => void;
   task: TaskData | null;
   onUpdated: () => void;
-  /** Mudanças salvas na hora (prioridade, etiquetas) que a lista deve refletir sem fechar o modal. */
+  /** Mudanças salvas na hora (prioridade, etiquetas, descrição) que a lista deve refletir sem fechar o modal. */
   onTaskChanged?: (task: TaskData) => void;
   onAttachmentsChanged?: () => void;
   users?: UserSummary[];
@@ -63,11 +63,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
   const [transferMode, setTransferMode] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  // Descrição: editável direto, salva sozinha ao sair do campo.
-  const [description, setDescription] = useState("");
-  const [descState, setDescState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const savedDescription = useRef("");
 
   // Edit mode fields
   const [editTitle, setEditTitle] = useState("");
@@ -106,9 +101,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
       setPriority(task.priority);
       setLabelIds(task.labelIds ?? []);
       setInlineError(null);
-      setDescription(task.description ?? "");
-      savedDescription.current = task.description ?? "";
-      setDescState("idle");
       setEditMode(false);
       setTransferMode(false);
       setPreviewIndex(null);
@@ -200,23 +192,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
     saveInline({ labelIds: next }, () => setLabelIds(previous), "Não foi possível salvar as etiquetas.");
   }
 
-  async function saveDescription() {
-    if (!task || description === savedDescription.current) return;
-    setDescState("saving");
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: description.trim() ? description : null }),
-      });
-      if (!res.ok) throw new Error();
-      savedDescription.current = description;
-      setDescState("saved");
-    } catch {
-      setDescState("error");
-    }
-  }
-
   async function handleDelete() {
     if (!task) return;
     try {
@@ -300,13 +275,13 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
     if (!task) return;
     setSaving(true);
     try {
+      // A descrição não vai aqui: ela é salva pela própria linha do tempo, que pode estar mais nova.
       const payload: Record<string, unknown> = {
         checklist,
         status,
         actualTime: actualTime ? parseFloat(actualTime) : null,
         area: area || null,
         projectId: projectId || null,
-        description: description.trim() ? description : null,
         priority,
         labelIds,
       };
@@ -518,28 +493,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
             </>
           )}
 
-          {/* Descrição editável direto (salva ao sair do campo) */}
-          {!transferMode && (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 focus-within:border-accent/40 focus-within:bg-white transition-colors">
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="task-description" className="text-xs text-gray-400 uppercase tracking-wider">Descrição</label>
-                <span className="text-[11px] text-gray-400 h-4">
-                  {descState === "saving" && <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Salvando</span>}
-                  {descState === "saved" && <span className="inline-flex items-center gap-1 text-emerald-600"><Check size={11} /> Salvo</span>}
-                  {descState === "error" && <span className="text-red-600">Não foi possível salvar. Tente de novo.</span>}
-                </span>
-              </div>
-              <textarea
-                id="task-description"
-                value={description}
-                onChange={(e) => { setDescription(e.target.value); if (descState !== "idle") setDescState("idle"); }}
-                onBlur={saveDescription}
-                placeholder="Clique para escrever a descrição da tarefa..."
-                rows={Math.min(14, Math.max(3, description.split("\n").length + 1))}
-                className="w-full bg-transparent text-sm text-gray-700 placeholder:text-gray-400 resize-y focus:outline-none"
-              />
-            </div>
-          )}
+          {/* Descrição e atualizações: uma linha do tempo só, com @menção */}
+          {!transferMode && <TaskUpdates task={task} users={users} onTaskChanged={onTaskChanged} />}
 
           {/* Status, área, projeto e tempo (sempre visíveis, fora da transferência) */}
           {!transferMode && (
@@ -678,9 +633,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
               )}
             </div>
           )}
-
-          {/* Atualizações com @menção */}
-          {!transferMode && <TaskUpdates taskId={task.id} users={users} />}
 
           {/* Actions (not in transfer mode) */}
           {!transferMode && (

@@ -43,8 +43,11 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   if (data.actualTime !== undefined) data.actualTime = data.actualTime === "" || data.actualTime === null ? null : parseFloat(data.actualTime);
 
   const updateData: Record<string, unknown> = { ...data };
+  const before = await prisma.task.findUnique({ where: { id: params.id }, select: { status: true, description: true } });
 
-  if (data.status !== undefined) {
+  // Só carimba a conclusão quando o status muda de fato: salvar o modal reenvia o status atual,
+  // e regravar completedAt bagunçaria a data do histórico.
+  if (data.status !== undefined && data.status !== before?.status) {
     updateData.completedAt = data.status === "COMPLETED" ? new Date() : null;
   }
 
@@ -60,6 +63,15 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
     data: updateData,
     include: TASK_INCLUDE,
   });
+
+  if (data.description !== undefined && data.description !== before?.description) {
+    try {
+      const { notifyMentions } = await import("@/lib/notifications");
+      await notifyMentions({ content: task.description, previousContent: before?.description, authorId: auth.id, task });
+    } catch (e) {
+      console.error("Falha ao notificar menções:", e);
+    }
+  }
 
   // AUTOMAÇÃO: Calendário Editorial concluído → criar sub-tarefas de produção
   if (

@@ -69,5 +69,14 @@ export async function POST(req: NextRequest) {
     include: TASK_INCLUDE,
   });
 
+  if (task.description) {
+    try {
+      const { notifyMentions } = await import("@/lib/notifications");
+      await notifyMentions({ content: task.description, authorId: auth.id, task });
+    } catch (e) {
+      console.error("Falha ao notificar menções:", e);
+    }
+  }
+
   return NextResponse.json(await withMedia(task), { status: 201 });
 }
