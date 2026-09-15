@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       // Sempre sincroniza role/permissions do Prisma para garantir metadados corretos
       if (prismaUser) {
         await admin.auth.admin.updateUserById(authUser.id, {
-          user_metadata: { name: prismaUser.name, image: prismaUser.image },
+          user_metadata: { name: prismaUser.name },
           app_metadata: {
             prisma_id: prismaUser.id,
             role: prismaUser.role,
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   if (authUser) {
     await admin.auth.admin.updateUserById(authUser.id, {
       password,
-      user_metadata: { name: prismaUser.name, image: prismaUser.image },
+      user_metadata: { name: prismaUser.name },
       app_metadata: {
         prisma_id: prismaUser.id,
         role: prismaUser.role,
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       email: prismaUser.email,
       password,
       email_confirm: true,
-      user_metadata: { name: prismaUser.name, image: prismaUser.image },
+      user_metadata: { name: prismaUser.name },
       app_metadata: {
         prisma_id: prismaUser.id,
         role: prismaUser.role,

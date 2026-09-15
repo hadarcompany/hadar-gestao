@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
     if (authUser) {
       await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
         ...(plainPassword ? { password: plainPassword } : {}),
-        user_metadata: { name: user.name, image: user.image },
+        user_metadata: { name: user.name },
         app_metadata: {
           prisma_id: user.id,
           role: user.role,

@@ -26,9 +26,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = supabaseRef.current;
 
   useEffect(() => {
+    // A foto não vem no token (ver get-server-auth): é carregada à parte e
+    // preenchida depois, para o cookie de sessão não crescer com base64.
+    async function loadPhoto() {
+      try {
+        const res = await fetch("/api/users/me");
+        if (!res.ok) return;
+        const me = await res.json();
+        setUser((prev) => (prev ? { ...prev, image: me.image ?? null } : prev));
+      } catch {
+        // avatar cai para as iniciais do nome
+      }
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ? parseUser(session.user) : null);
       setIsLoading(false);
+      if (session?.user) loadPhoto();
     });
 
     const {
@@ -36,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ? parseUser(session.user) : null);
       setIsLoading(false);
+      if (session?.user) loadPhoto();
     });
 
     return () => subscription.unsubscribe();
@@ -67,7 +82,7 @@ function parseUser(supabaseUser: any): AuthUser {
     email: supabaseUser.email ?? "",
     name: (supabaseUser.user_metadata?.name as string) ?? supabaseUser.email ?? "",
     role: (meta.role as string) ?? "MEMBER",
-    image: (supabaseUser.user_metadata?.image as string) ?? null,
+    image: null,
     permissions: (meta.permissions as Record<string, string>) ?? null,
   };
 }
