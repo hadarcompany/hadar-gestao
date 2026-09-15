@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -17,12 +18,12 @@ export async function GET(req: NextRequest) {
   const services = await prisma.service.findMany({
     where,
     include: {
-      client: { select: { id: true, name: true, logoUrl: true } },
+      client: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(services);
+  return NextResponse.json(await withMedia(services));
 }
 
 export async function POST(req: NextRequest) {
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
   const service = await prisma.service.create({
     data: data as any,
     include: {
-      client: { select: { id: true, name: true, logoUrl: true } },
+      client: { select: { id: true, name: true } },
     },
   });
 
@@ -122,5 +123,5 @@ export async function POST(req: NextRequest) {
     console.error("Error auto-generating receivables:", e);
   }
 
-  return NextResponse.json(service, { status: 201 });
+  return NextResponse.json(await withMedia(service), { status: 201 });
 }

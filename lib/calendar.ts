@@ -59,8 +59,8 @@ export async function getCalendarWeeks(params: { clientId: string | null; anchor
       ...(clientId ? { clientId } : {}),
     },
     include: {
-      client: { select: { id: true, name: true, logoUrl: true } },
-      assignees: { include: { user: { select: { id: true, name: true, image: true } } } },
+      client: { select: { id: true, name: true } },
+      assignees: { include: { user: { select: { id: true, name: true } } } },
     },
     orderBy: { publishDate: "asc" },
   });

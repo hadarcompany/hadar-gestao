@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
 
 const TASK_INCLUDE = {
-  client: { select: { id: true, name: true, logoUrl: true } },
+  client: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
-  assignees: { include: { user: { select: { id: true, name: true, image: true } } } },
+  assignees: { include: { user: { select: { id: true, name: true } } } },
   attachments: {
     select: {
       id: true, fileName: true, mimeType: true, size: true, createdAt: true,

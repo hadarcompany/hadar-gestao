@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 import { isAdmin } from "@/lib/permissions";
 import bcrypt from "bcryptjs";
 
@@ -32,7 +33,8 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   if (body.permissions !== undefined) data.permissions = body.permissions;
   if (body.role !== undefined) data.role = body.role;
   if (body.name !== undefined) data.name = body.name;
-  if (body.image !== undefined) data.image = body.image;
+  // Só aceita imagem nova (data URL) ou remoção: o link devolvido pela API nunca volta para o banco.
+  if (body.image === null || (typeof body.image === "string" && body.image.startsWith("data:image/"))) data.image = body.image;
 
   let plainPassword: string | undefined;
   if (body.password) {
@@ -43,7 +45,7 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const user = await prisma.user.update({
     where: { id: params.id },
     data,
-    select: { id: true, name: true, email: true, role: true, image: true, permissions: true },
+    select: { id: true, name: true, email: true, role: true, permissions: true },
   });
 
   // Sincroniza com Supabase Auth (metadados e, se alterada, a senha)
@@ -67,5 +69,5 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
     console.error("Falha ao sincronizar metadata Supabase:", e);
   }
 
-  return NextResponse.json(user);
+  return NextResponse.json(await withMedia(user, "user"));
 }

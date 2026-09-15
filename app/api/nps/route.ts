@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { loadMediaIndex } from "@/lib/media";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -12,15 +13,16 @@ export async function GET(req: NextRequest) {
 
   const clients = await prisma.client.findMany({
     where: { status: "ACTIVE" },
-    select: { id: true, name: true, logoUrl: true },
+    select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 
   const scores = await prisma.clientHealthScore.findMany({
     where: { month, year },
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
   });
 
+  const media = await loadMediaIndex();
   const clientScores = clients.map((client) => {
     const score = scores.find((s) => s.clientId === client.id);
     if (score) {
@@ -41,7 +43,7 @@ export async function GET(req: NextRequest) {
       return {
         clientId: client.id,
         clientName: client.name,
-        logoUrl: client.logoUrl,
+        logoUrl: media.logo(client.id),
         hasScore: true,
         scoreId: score.id,
         churn: {
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
     return {
       clientId: client.id,
       clientName: client.name,
-        logoUrl: client.logoUrl,
+        logoUrl: media.logo(client.id),
       hasScore: false,
       scoreId: null,
       churn: { satisfactionDelivery: 0, serviceQuality: 0, deadlineCompliance: 0, perceivedResult: 0, npsScore: 0, avg: 0 },

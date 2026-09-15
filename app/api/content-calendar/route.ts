@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 function buildItems(reels: number, carroseis: number, criativosTrafico: number) {
   const items: { type: string; index: number }[] = [];
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   const calendars = await prisma.contentCalendar.findMany({
     where,
     include: {
-      client: { select: { id: true, name: true, logoUrl: true } },
+      client: { select: { id: true, name: true } },
       items: {
         include: {
           task: { select: { id: true, title: true, status: true } },
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
     orderBy: { weekStart: "asc" },
   });
 
-  return NextResponse.json(calendars);
+  return NextResponse.json(await withMedia(calendars));
 }
 
 export async function POST(req: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
       },
     },
     include: {
-      client: { select: { id: true, name: true, logoUrl: true } },
+      client: { select: { id: true, name: true } },
       items: {
         include: { task: { select: { id: true, title: true, status: true } } },
         orderBy: [{ type: "asc" }, { index: "asc" }],
@@ -67,5 +68,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json(calendar);
+  return NextResponse.json(await withMedia(calendar));
 }

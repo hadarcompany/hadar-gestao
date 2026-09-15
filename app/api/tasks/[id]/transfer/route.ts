@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { transferTask } from "@/lib/task-transfer";
+import { withMedia } from "@/lib/media";
 
 export async function POST(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
       note: typeof body.note === "string" ? body.note : null,
       performedById: auth.id,
     });
-    return NextResponse.json(task);
+    return NextResponse.json(await withMedia(task));
   } catch (e) {
     const code = (e as { code?: string }).code;
     if (code === "NOT_FOUND") return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });

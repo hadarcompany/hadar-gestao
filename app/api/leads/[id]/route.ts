@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
-const OWNER_SELECT = { select: { id: true, name: true, image: true } };
+const OWNER_SELECT = { select: { id: true, name: true } };
 const CLOSED_STAGES = ["FECHADO", "PERDIDO"];
 
 export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
@@ -35,7 +36,7 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
     include: { owner: OWNER_SELECT },
   });
 
-  return NextResponse.json(lead);
+  return NextResponse.json(await withMedia(lead));
 }
 
 export async function DELETE(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {

@@ -2,6 +2,7 @@ import { TASK_INCLUDE } from "@/lib/task-transfer";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     orderBy: { [sort]: order },
   });
 
-  return NextResponse.json(tasks);
+  return NextResponse.json(await withMedia(tasks));
 }
 
 export async function POST(req: NextRequest) {
@@ -65,5 +66,5 @@ export async function POST(req: NextRequest) {
     include: TASK_INCLUDE,
   });
 
-  return NextResponse.json(task, { status: 201 });
+  return NextResponse.json(await withMedia(task), { status: 201 });
 }

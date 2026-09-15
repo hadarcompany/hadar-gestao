@@ -3,6 +3,7 @@ import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { dateKeyToUTCDate, dateKeyToUTCEndOfDay, getCurrentWeekRange, getTodayKey, toDateKey } from "@/lib/dates";
 import { TASK_INCLUDE } from "@/lib/task-transfer";
+import { applyMedia, loadMediaIndex } from "@/lib/media";
 
 /**
  * period = intervalo [from, to] em chaves YYYY-MM-DD. Se ausente, usa a semana
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     }),
     prisma.client.findMany({
       where: { renewalDate: { gte: todayStart, lte: new Date(todayStart.getTime() + 30 * 24 * 60 * 60 * 1000) } },
-      select: { id: true, name: true, logoUrl: true, renewalDate: true },
+      select: { id: true, name: true, renewalDate: true },
       orderBy: { renewalDate: "asc" },
     }),
   ]);
@@ -51,10 +52,11 @@ export async function GET(req: NextRequest) {
     take: 12,
   });
 
+  const media = await loadMediaIndex();
   return NextResponse.json({
     range: { from: fromKey, to: toKey },
     stats: { pending, inProgress, overdue, completedInRange },
-    nextDeliveries: nextDeliveries.map((t) => ({ ...t, dueDateKey: toDateKey(t.dueDate) })),
-    upcomingRenewals,
+    nextDeliveries: applyMedia(nextDeliveries.map((t) => ({ ...t, dueDateKey: toDateKey(t.dueDate) })), media),
+    upcomingRenewals: applyMedia(upcomingRenewals, media, "client"),
   });
 }

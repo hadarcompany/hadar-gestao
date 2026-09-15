@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 export async function GET() {
   const auth = await getServerAuth();
@@ -8,7 +9,7 @@ export async function GET() {
 
   const recurringServices = await prisma.service.findMany({
     where: { type: "RECURRING" },
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -16,16 +17,16 @@ export async function GET() {
 
   const freelancerServices = await prisma.service.findMany({
     where: { type: "FREELANCER" },
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
   });
 
   const totalFreelancer = freelancerServices.reduce((sum, s) => sum + (s.totalValue || 0), 0);
 
-  return NextResponse.json({
+  return NextResponse.json(await withMedia({
     totalMRR,
     totalFreelancer,
     recurringServices,
     freelancerServices,
-  });
+  }));
 }

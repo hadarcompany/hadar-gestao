@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -16,11 +17,11 @@ export async function GET(req: NextRequest) {
 
   const receivables = await prisma.receivable.findMany({
     where,
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
     orderBy: { dueDate: "asc" },
   });
 
-  return NextResponse.json(receivables);
+  return NextResponse.json(await withMedia(receivables));
 }
 
 export async function POST(req: NextRequest) {
@@ -38,10 +39,10 @@ export async function POST(req: NextRequest) {
       month: parseInt(month),
       year: parseInt(year),
     },
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
   });
 
-  return NextResponse.json(receivable, { status: 201 });
+  return NextResponse.json(await withMedia(receivable), { status: 201 });
 }
 
 export async function DELETE(req: NextRequest) {
@@ -71,8 +72,8 @@ export async function PATCH(req: NextRequest) {
   const receivable = await prisma.receivable.update({
     where: { id },
     data,
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
   });
 
-  return NextResponse.json(receivable);
+  return NextResponse.json(await withMedia(receivable));
 }

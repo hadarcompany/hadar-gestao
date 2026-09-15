@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 import { resetChecklistForClone, TASK_INCLUDE } from "@/lib/task-transfer";
 
 /** Clona uma tarefa como registro independente: novo id, começa PENDING,
@@ -43,5 +44,5 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
     include: TASK_INCLUDE,
   });
 
-  return NextResponse.json(clone, { status: 201 });
+  return NextResponse.json(await withMedia(clone), { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const accesses = await prisma.access.findMany({
     where,
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
     orderBy: { platform: "asc" },
   });
 
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     password: isAdmin ? a.password : "••••••••",
   }));
 
-  return NextResponse.json(data);
+  return NextResponse.json(await withMedia(data));
 }
 
 export async function POST(req: NextRequest) {
@@ -42,8 +43,8 @@ export async function POST(req: NextRequest) {
       observations: body.observations || null,
       clientId: body.clientId,
     },
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
   });
 
-  return NextResponse.json(access, { status: 201 });
+  return NextResponse.json(await withMedia(access), { status: 201 });
 }

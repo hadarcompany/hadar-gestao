@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 import { TASK_TEMPLATES, generateChecklist } from "@/lib/task-templates";
 import { TASK_INCLUDE } from "@/lib/task-transfer";
 
@@ -15,7 +16,7 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   });
 
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(task);
+  return NextResponse.json(await withMedia(task));
 }
 
 export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
@@ -63,7 +64,7 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
     await createEditorialSubTasks(task, auth.id);
   }
 
-  return NextResponse.json(task);
+  return NextResponse.json(await withMedia(task));
 }
 
 async function createEditorialSubTasks(

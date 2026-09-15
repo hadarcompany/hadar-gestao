@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
-const OWNER_SELECT = { select: { id: true, name: true, image: true } };
+const OWNER_SELECT = { select: { id: true, name: true } };
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     orderBy: [{ stageChangedAt: "desc" }],
   });
 
-  return NextResponse.json(leads);
+  return NextResponse.json(await withMedia(leads));
 }
 
 export async function POST(req: NextRequest) {
@@ -54,5 +55,5 @@ export async function POST(req: NextRequest) {
     include: { owner: OWNER_SELECT },
   });
 
-  return NextResponse.json(lead, { status: 201 });
+  return NextResponse.json(await withMedia(lead), { status: 201 });
 }

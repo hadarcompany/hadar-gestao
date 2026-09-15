@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 export async function GET() {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const clients = await prisma.client.findMany({
+    omit: { logoUrl: true },
     include: {
       _count: { select: { tasks: true } },
       interactions: { orderBy: { date: "desc" }, take: 5, include: { author: { select: { name: true } } } },
@@ -14,7 +16,7 @@ export async function GET() {
     orderBy: { name: "asc" },
   });
 
-  return NextResponse.json(clients);
+  return NextResponse.json(await withMedia(clients, "client"));
 }
 
 export async function POST(req: NextRequest) {

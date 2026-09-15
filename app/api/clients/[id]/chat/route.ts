@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 import { createNotification, extractMentions } from "@/lib/notifications";
 
 export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
     prisma.clientChatMessage.findMany({
       where: { clientId: params.id },
       include: {
-        author: { select: { id: true, name: true, image: true } },
+        author: { select: { id: true, name: true } },
         task: { select: { id: true, title: true, status: true } },
       },
       orderBy: { createdAt: "asc" },
@@ -21,7 +22,7 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
     prisma.clientChatRead.findUnique({ where: { clientId_userId: { clientId: params.id, userId: auth.id } } }),
   ]);
 
-  return NextResponse.json({ messages, lastReadAt: readState?.lastReadAt ?? null });
+  return NextResponse.json(await withMedia({ messages, lastReadAt: readState?.lastReadAt ?? null }));
 }
 
 export async function POST(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
@@ -73,5 +74,5 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
     create: { clientId: params.id, userId: auth.id },
   });
 
-  return NextResponse.json(message, { status: 201 });
+  return NextResponse.json(await withMedia(message), { status: 201 });
 }

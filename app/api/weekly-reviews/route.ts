@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 import { startOfWeek } from "date-fns";
 
 export async function GET(req: NextRequest) {
@@ -17,11 +18,11 @@ export async function GET(req: NextRequest) {
 
   const reviews = await prisma.weeklyReview.findMany({
     where,
-    include: { user: { select: { id: true, name: true, image: true } } },
+    include: { user: { select: { id: true, name: true } } },
     orderBy: { weekStart: "desc" },
   });
 
-  return NextResponse.json(reviews);
+  return NextResponse.json(await withMedia(reviews));
 }
 
 export async function POST(req: NextRequest) {
@@ -63,8 +64,8 @@ export async function POST(req: NextRequest) {
       improvements,
       tasksCompleted,
     },
-    include: { user: { select: { id: true, name: true, image: true } } },
+    include: { user: { select: { id: true, name: true } } },
   });
 
-  return NextResponse.json(review, { status: 201 });
+  return NextResponse.json(await withMedia(review), { status: 201 });
 }

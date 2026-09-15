@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { dataUrlResponse } from "@/lib/media";
 
 export async function POST(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
@@ -37,4 +38,13 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   });
 
   return NextResponse.json({ ok: true });
+}
+
+export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
+  const params = await routeParams;
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const client = await prisma.client.findUnique({ where: { id: params.id }, select: { logoUrl: true } });
+  return dataUrlResponse(client?.logoUrl);
 }

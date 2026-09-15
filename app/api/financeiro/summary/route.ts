@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { loadMediaIndex } from "@/lib/media";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     where: {
       OR: months.map((m) => ({ month: m.month, year: m.year })),
     },
-    include: { client: { select: { id: true, name: true, logoUrl: true } } },
+    include: { client: { select: { id: true, name: true } } },
   });
 
   const expectedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
     .filter((r) => r.status === "PAID")
     .reduce((sum, r) => sum + r.amount, 0);
 
+  const media = await loadMediaIndex();
   const clientRevenue = new Map<string, { name: string; logoUrl: string | null; expected: number; received: number }>();
   receivables.forEach((r) => {
     const existing = clientRevenue.get(r.clientId);
@@ -44,7 +46,7 @@ export async function GET(req: NextRequest) {
     } else {
       clientRevenue.set(r.clientId, {
         name: r.client.name,
-        logoUrl: r.client.logoUrl,
+        logoUrl: media.logo(r.clientId),
         expected: r.amount,
         received: r.status === "PAID" ? r.amount : 0,
       });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { getCalendarWeeks } from "@/lib/calendar";
+import { withMedia } from "@/lib/media";
 import { getCurrentWeekRange } from "@/lib/dates";
 
 export async function GET(req: NextRequest) {
@@ -13,5 +14,5 @@ export async function GET(req: NextRequest) {
   const count = Math.min(6, Math.max(1, parseInt(searchParams.get("count") || "4", 10)));
 
   const weeks = await getCalendarWeeks({ clientId, anchorWeekStart: anchor, count });
-  return NextResponse.json({ weeks });
+  return NextResponse.json(await withMedia({ weeks }));
 }

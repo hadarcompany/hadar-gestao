@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { withMedia } from "@/lib/media";
 
 async function syncItems(calendarId: string, type: string, newCount: number) {
   const existing = await prisma.contentCalendarItem.findMany({
@@ -54,7 +55,7 @@ export async function PATCH(
   const updated = await prisma.contentCalendar.findUnique({
     where: { id },
     include: {
-      client: { select: { id: true, name: true, logoUrl: true } },
+      client: { select: { id: true, name: true } },
       items: {
         include: { task: { select: { id: true, title: true, status: true } } },
         orderBy: [{ type: "asc" }, { index: "asc" }],
@@ -62,7 +63,7 @@ export async function PATCH(
     },
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json(await withMedia(updated));
 }
 
 export async function DELETE(
