@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/auth-context";
 import { ClientIdentity } from "@/components/clients/client-identity";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { SelectField } from "@/components/ui/select-field";
@@ -11,6 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Avatar } from "@/components/ui/avatar";
+import { PriorityBadge } from "@/components/tasks/priority-badge";
+import { TaskLabels } from "@/components/tasks/label-picker";
+import { TaskUpdates } from "@/components/tasks/task-updates";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task-templates";
 import { AREAS, areaInfo } from "@/lib/areas";
 import { formatDateBR } from "@/lib/dates";
@@ -37,18 +41,23 @@ interface TaskDetailModalProps {
   onClose: () => void;
   task: TaskData | null;
   onUpdated: () => void;
+  /** Mudanças salvas na hora (prioridade, etiquetas) que a lista deve refletir sem fechar o modal. */
+  onTaskChanged?: (task: TaskData) => void;
   onAttachmentsChanged?: () => void;
   users?: UserSummary[];
   clients?: { id: string; name: string }[];
 }
 
-export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsChanged, users = [], clients = [] }: TaskDetailModalProps) {
+export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged, onAttachmentsChanged, users = [], clients = [] }: TaskDetailModalProps) {
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [status, setStatus] = useState("");
   const [actualTime, setActualTime] = useState("");
   const [area, setArea] = useState("");
   const [projectId, setProjectId] = useState("");
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [priority, setPriority] = useState("MEDIUM");
+  const [labelIds, setLabelIds] = useState<string[]>([]);
+  const [inlineError, setInlineError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [transferMode, setTransferMode] = useState(false);
@@ -62,7 +71,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
 
   // Edit mode fields
   const [editTitle, setEditTitle] = useState("");
-  const [editPriority, setEditPriority] = useState("");
   const [editClientId, setEditClientId] = useState("");
   const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
   const [editStartDate, setEditStartDate] = useState("");
@@ -95,6 +103,9 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
       setActualTime(task.actualTime ? String(task.actualTime) : "");
       setArea(task.area ?? "");
       setProjectId(task.projectId ?? "");
+      setPriority(task.priority);
+      setLabelIds(task.labelIds ?? []);
+      setInlineError(null);
       setDescription(task.description ?? "");
       savedDescription.current = task.description ?? "";
       setDescState("idle");
@@ -102,7 +113,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
       setTransferMode(false);
       setPreviewIndex(null);
       setEditTitle(task.title);
-      setEditPriority(task.priority);
       setEditClientId(task.clientId || "");
       setEditAssigneeIds(task.assignees.map((a) => a.user.id));
       setEditStartDate(task.startDate ? task.startDate.slice(0, 10) : "");
@@ -158,6 +168,36 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
 
   function toggleCheckItem(id: string) {
     setChecklist((prev) => prev.map((c) => c.id === id ? { ...c, checked: !c.checked } : c));
+  }
+
+  /** Salva na hora um campo do topo (prioridade, etiquetas) e avisa a lista. */
+  async function saveInline(changes: Record<string, unknown>, rollback: () => void, message: string) {
+    if (!task) return;
+    setInlineError(null);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes),
+      });
+      if (!res.ok) throw new Error();
+      onTaskChanged?.(await res.json());
+    } catch {
+      rollback();
+      setInlineError(message);
+    }
+  }
+
+  function changePriority(next: string) {
+    const previous = priority;
+    setPriority(next);
+    saveInline({ priority: next }, () => setPriority(previous), "Não foi possível alterar a prioridade.");
+  }
+
+  function changeLabels(next: string[]) {
+    const previous = labelIds;
+    setLabelIds(next);
+    saveInline({ labelIds: next }, () => setLabelIds(previous), "Não foi possível salvar as etiquetas.");
   }
 
   async function saveDescription() {
@@ -267,11 +307,12 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
         area: area || null,
         projectId: projectId || null,
         description: description.trim() ? description : null,
+        priority,
+        labelIds,
       };
 
       if (editMode) {
         payload.title = editTitle;
-        payload.priority = editPriority;
         payload.clientId = editClientId || null;
         payload.assigneeIds = editAssigneeIds;
         payload.startDate = editStartDate || null;
@@ -293,11 +334,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
   }
 
   const statusOpt = STATUS_OPTIONS.find((s) => s.value === task.status);
-  const priorityOpt = PRIORITY_OPTIONS.find((p) => p.value === task.priority);
   const taskArea = areaInfo(task.area);
-
   const statusVariant = ({ PENDING: "default", IN_PROGRESS: "info", IN_REVIEW: "purple", COMPLETED: "success", CANCELLED: "danger" } as const)[task.status] || "default";
-  const priorityVariant = ({ LOW: "default", MEDIUM: "warning", HIGH: "warning", URGENT: "danger" } as const)[task.priority] || "default";
 
   return (
     <>
@@ -368,7 +406,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
               {/* View mode */}
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={statusVariant}>{statusOpt?.label ?? ""}</Badge>
-                <Badge variant={priorityVariant}>{priorityOpt?.label ?? ""}</Badge>
+                <PriorityBadge priority={priority} onChange={changePriority} />
                 {task.type && <Badge>{task.type.replace(/_/g, " ")}</Badge>}
                 {taskArea && <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", taskArea.color)}>{taskArea.label}</span>}
                 {task.project && (
@@ -391,6 +429,12 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
                   </button>
                 </div>
               </div>
+
+              <div className="flex items-start gap-2">
+                <Tag size={14} className="text-gray-400 mt-1 shrink-0" />
+                <TaskLabels labelIds={labelIds} onChange={changeLabels} />
+              </div>
+              {inlineError && <p className="text-xs text-red-600">{inlineError}</p>}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 {task.client && (
@@ -423,7 +467,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
 
               {task.tags?.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Tag size={14} className="text-gray-400" />
+                  <span className="text-[11px] text-gray-400">Tags:</span>
                   {task.tags.map((tag) => (
                     <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{tag}</span>
                   ))}
@@ -453,7 +497,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
               />
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <SelectField label="Prioridade" value={editPriority} onChange={setEditPriority}
+                <SelectField label="Prioridade" value={priority} onChange={setPriority}
                   options={PRIORITY_OPTIONS.map((p) => ({ value: p.value, label: p.label }))} />
                 <Input label="Tempo Estimado (h)" type="number" step="0.5" value={editEstimatedTime}
                   onChange={(e) => setEditEstimatedTime(e.target.value)} />
@@ -572,7 +616,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
                       {images.map((att, i) => (
                         <div key={att.id} className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-white">
-                          <button type="button" onClick={() => setPreviewIndex(i)} title={`Ampliar ${att.fileName}`} className="w-full h-full">
+                          <button type="button" onClick={() => setPreviewIndex(i)} title={`Ampliar ${att.fileName}`} className="w-full h-full cursor-zoom-in">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={`${attachmentUrl(att.id)}?inline=1`} alt={att.fileName} loading="lazy" className="w-full h-full object-cover" />
                           </button>
@@ -635,6 +679,9 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
             </div>
           )}
 
+          {/* Atualizações com @menção */}
+          {!transferMode && <TaskUpdates taskId={task.id} users={users} />}
+
           {/* Actions (not in transfer mode) */}
           {!transferMode && (
             <div className="flex items-center gap-3 pt-2 border-t border-gray-200">
@@ -661,14 +708,14 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
         </div>
       </Modal>
 
-      {/* Prévia de imagem em popup */}
-      {preview && (
+      {/* Prévia de imagem: vai direto para o body, acima do modal (z-[100]). */}
+      {preview && createPortal(
         <div
           role="dialog"
           aria-modal="true"
           aria-label={preview.fileName}
           onClick={() => setPreviewIndex(null)}
-          className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-6"
+          className="fixed inset-0 z-[200] bg-black/85 flex items-center justify-center p-6"
         >
           <div className="relative flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -717,7 +764,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
               </button>
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
       <ConfirmDialog

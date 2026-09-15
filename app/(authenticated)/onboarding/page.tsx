@@ -256,6 +256,7 @@ export default function OnboardingPage() {
         task={selectedTask}
         onAttachmentsChanged={fetchProjects}
         onUpdated={() => { fetchProjects(); setSelectedTask(null); }}
+        onTaskChanged={updateTask}
         users={users}
         clients={clients}
       />

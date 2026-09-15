@@ -5,9 +5,11 @@ import { type TaskData, type UserSummary } from "@/lib/types";
 import { statusLabel, statusColor } from "@/lib/status-labels";
 import { getTaskBucket, formatDayMonthBR } from "@/lib/dates";
 import { Avatar } from "@/components/ui/avatar";
+import { PriorityBadge } from "@/components/tasks/priority-badge";
+import { TaskLabels } from "@/components/tasks/label-picker";
 import {
   Copy, ArrowLeftRight, Info, Calendar as CalendarIcon,
-  Loader2, Check, X as XIcon, Paperclip, CheckCircle2, Circle,
+  Loader2, Check, X as XIcon, Paperclip, CheckCircle2, Circle, MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +58,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
   const assignee = task.assignees[0]?.user;
   const extraAssignees = task.assignees.length - 1;
   const isDone = task.status === "COMPLETED";
+  const updatesCount = task._count?.updates ?? 0;
 
   async function saveTitle() {
     const trimmed = titleValue.trim();
@@ -95,6 +98,18 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       setError(isDone ? "Não foi possível reabrir a tarefa." : "Não foi possível concluir a tarefa.");
     } finally {
       setSaving(null);
+    }
+  }
+
+  // Prioridade e etiquetas mudam na hora na tela; se a gravação falhar, volta ao valor anterior.
+  async function quickUpdate(changes: Partial<TaskData>, message: string) {
+    const previous = task;
+    onUpdated({ ...task, ...changes });
+    try {
+      onUpdated(await patchTask(task.id, changes));
+    } catch {
+      onUpdated(previous);
+      setError(message);
     }
   }
 
@@ -140,6 +155,12 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       <span className={cn("shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap", statusColor(task.status))}>
         {statusLabel(task.status)}
       </span>
+
+      {/* prioridade */}
+      <PriorityBadge
+        priority={task.priority}
+        onChange={(priority) => quickUpdate({ priority }, "Não foi possível alterar a prioridade.")}
+      />
 
       {/* title (editable inline) + description access */}
       <div className="flex-1 min-w-0 flex items-center gap-1.5">
@@ -195,6 +216,21 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             <span className="text-[10px]">{task.attachments.length}</span>
           </span>
         )}
+        {updatesCount > 0 && (
+          <span title={`${updatesCount} atualização(ões)`} className="shrink-0 flex items-center gap-0.5 text-gray-400">
+            <MessageSquare size={12} />
+            <span className="text-[10px]">{updatesCount}</span>
+          </span>
+        )}
+      </div>
+
+      {/* etiquetas */}
+      <div className="hidden lg:flex shrink-0 max-w-[240px]">
+        <TaskLabels
+          compact
+          labelIds={task.labelIds ?? []}
+          onChange={(labelIds) => quickUpdate({ labelIds }, "Não foi possível salvar as etiquetas.")}
+        />
       </div>
 
       {/* client */}

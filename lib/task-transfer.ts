@@ -5,6 +5,7 @@ const TASK_INCLUDE = {
   client: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   project: { select: { id: true, name: true } },
+  _count: { select: { updates: true } },
   assignees: { include: { user: { select: { id: true, name: true } } } },
   attachments: {
     select: {

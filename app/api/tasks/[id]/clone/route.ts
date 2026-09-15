@@ -33,6 +33,9 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
       checklist: original.checklist ? JSON.parse(JSON.stringify(resetChecklistForClone(original.checklist))) : null,
       extraFields: original.extraFields ?? undefined,
       tags: original.tags,
+      labelIds: original.labelIds,
+      area: original.area,
+      projectId: original.projectId,
       clientId: original.clientId,
       createdById: auth.id,
       assignees: {

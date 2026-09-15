@@ -158,6 +158,7 @@ model User {
   notifications        Notification[]
   uploadedAttachments  TaskAttachment[]
   ownedLeads           Lead[]               @relation("LeadOwner")
+  taskUpdates          TaskUpdate[]
 
   @@map("users")
 }
@@ -230,6 +231,7 @@ model Task {
   isExtra       Boolean      @default(false)
   area          String?
   projectId     String?
+  labelIds      String[]     @default([])
   estimatedTime Float?
   actualTime    Float?
   checklist     Json?
@@ -249,9 +251,38 @@ model Task {
   chatMessages   ClientChatMessage[]
   attachments    TaskAttachment[]
   project        Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  updates        TaskUpdate[]
 
   @@index([projectId])
   @@map("tasks")
+}
+
+/// Etiqueta personalizável (nome + cor). As tarefas guardam os ids em `Task.labelIds`,
+/// então renomear ou trocar a cor reflete em todas de uma vez.
+model TaskLabel {
+  id        String   @id @default(cuid())
+  name      String
+  color     String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("task_labels")
+}
+
+/// Atualização (comentário) numa tarefa. `mentionedUserIds` guarda quem foi @mencionado
+/// e notificado no momento da publicação.
+model TaskUpdate {
+  id               String   @id @default(cuid())
+  taskId           String
+  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId         String?
+  author           User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  content          String
+  mentionedUserIds String[] @default([])
+  createdAt        DateTime @default(now())
+
+  @@index([taskId, createdAt])
+  @@map("task_updates")
 }
 
 /// Agrupa tarefas com prazo, status e progresso. `kind` ONBOARDING marca o projeto

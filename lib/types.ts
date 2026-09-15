@@ -45,6 +45,8 @@ export interface TaskData {
   area: string | null;
   projectId: string | null;
   project?: { id: string; name: string } | null;
+  labelIds: string[];
+  _count?: { updates: number };
   createdBy: { id: string; name: string };
   assignees: Array<{ user: UserSummary }>;
   attachments?: TaskAttachmentData[];

@@ -163,6 +163,7 @@ export default function DashboardPage() {
         task={selectedTask}
         onAttachmentsChanged={() => fetchData(range.from, range.to)}
         onUpdated={() => { fetchData(range.from, range.to); setSelectedTask(null); }}
+        onTaskChanged={handleRowUpdated}
         users={users}
         clients={clients}
       />

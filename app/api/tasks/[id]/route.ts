@@ -36,6 +36,9 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   if (data.publishDate !== undefined) data.publishDate = data.publishDate ? new Date(data.publishDate) : null;
   if (data.area !== undefined) data.area = data.area || null;
   if (data.projectId !== undefined) data.projectId = data.projectId || null;
+  if (data.labelIds !== undefined) {
+    data.labelIds = Array.isArray(data.labelIds) ? data.labelIds.filter((id: unknown) => typeof id === "string") : [];
+  }
   if (data.estimatedTime !== undefined) data.estimatedTime = data.estimatedTime === "" || data.estimatedTime === null ? null : parseFloat(data.estimatedTime);
   if (data.actualTime !== undefined) data.actualTime = data.actualTime === "" || data.actualTime === null ? null : parseFloat(data.actualTime);
 

@@ -295,6 +295,7 @@ export default function TarefasPage() {
         task={selectedTask}
         onAttachmentsChanged={fetchTasks}
         onUpdated={() => { fetchTasks(); setSelectedTask(null); }}
+        onTaskChanged={handleRowUpdated}
         users={users}
         clients={clients}
       />

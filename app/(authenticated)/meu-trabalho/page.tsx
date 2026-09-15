@@ -286,6 +286,7 @@ export default function MeuTrabalhoPage() {
         task={selectedTask}
         onAttachmentsChanged={fetchTasks}
         onUpdated={() => { fetchTasks(); setSelectedTask(null); }}
+        onTaskChanged={handleRowUpdated}
         users={users}
         clients={clients}
       />
