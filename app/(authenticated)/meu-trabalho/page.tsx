@@ -332,15 +332,17 @@ export default function MeuTrabalhoPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={toggleAll}
-                disabled={allGroups.length === 0}
-                title={allExpanded ? "Recolher todos" : "Expandir todos"}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all disabled:opacity-50"
-              >
-                {allExpanded ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
-                {allExpanded ? "Recolher" : "Expandir"}
-              </button>
+              {tab === "COMPLETED" && (
+                <button
+                  onClick={toggleAll}
+                  disabled={allGroups.length === 0}
+                  title={allExpanded ? "Recolher todos" : "Expandir todos"}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all disabled:opacity-50"
+                >
+                  {allExpanded ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+                  {allExpanded ? "Recolher" : "Expandir"}
+                </button>
+              )}
               <select
                 value={clientFilter}
                 onChange={(e) => setClientFilter(e.target.value)}
@@ -360,8 +362,22 @@ export default function MeuTrabalhoPage() {
 
           {loading ? (
             <div className="flex items-center justify-center py-16 bg-white border border-gray-200 rounded-xl"><Loader2 size={24} className="animate-spin text-accent" /></div>
-          ) : allGroups.length === 0 ? (
+          ) : displayedTasks.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-14 bg-white border border-gray-200 rounded-xl">Nenhuma tarefa nesta aba.</p>
+          ) : tab !== "COMPLETED" ? (
+            // Abas do dia a dia: lista direta. Só as concluídas, que acumulam, ficam por cliente.
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              {displayedTasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  users={users}
+                  onUpdated={handleRowUpdated}
+                  onCloned={handleRowCloned}
+                  onOpenDetail={setSelectedTask}
+                />
+              ))}
+            </div>
           ) : (
             <div className="space-y-6">
               {activeGroups.length > 0 && (
