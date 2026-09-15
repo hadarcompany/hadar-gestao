@@ -191,6 +191,7 @@ model Client {
   weeklyDemands    ClientWeeklyDemand[]
   chatMessages     ClientChatMessage[]
   chatReads        ClientChatRead[]
+  projects         Project[]
 
   @@map("clients")
 }
@@ -227,6 +228,8 @@ model Task {
   publishDate   DateTime?
   completedAt   DateTime?
   isExtra       Boolean      @default(false)
+  area          String?
+  projectId     String?
   estimatedTime Float?
   actualTime    Float?
   checklist     Json?
@@ -245,8 +248,33 @@ model Task {
   transferEvents TaskTransferEvent[]
   chatMessages   ClientChatMessage[]
   attachments    TaskAttachment[]
+  project        Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
+  @@index([projectId])
   @@map("tasks")
+}
+
+/// Agrupa tarefas com prazo, status e progresso. `kind` ONBOARDING marca o projeto
+/// criado automaticamente para cliente novo (no máximo um por cliente).
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  kind        String    @default("GERAL")
+  status      String    @default("EM_ANDAMENTO")
+  color       String?
+  dueDate     DateTime?
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tasks Task[]
+
+  @@index([kind])
+  @@index([clientId])
+  @@map("projects")
 }
 
 /// Arquivo anexado a uma tarefa. `data` guarda o arquivo como data URL base64,

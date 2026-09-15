@@ -39,5 +39,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Cliente que já entra ativo ganha o projeto de onboarding; prospecto só quando virar ativo.
+  if (client.status !== "PROSPECT") {
+    try {
+      const { createClientOnboarding } = await import("@/lib/onboarding");
+      await createClientOnboarding(client, auth.id);
+    } catch (e) {
+      console.error("Falha ao gerar o onboarding do cliente:", e);
+    }
+  }
+
   return NextResponse.json(client, { status: 201 });
 }

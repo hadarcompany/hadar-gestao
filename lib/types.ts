@@ -42,6 +42,9 @@ export interface TaskData {
   updatedAt: string;
   clientId: string | null;
   client: ClientSummary | null;
+  area: string | null;
+  projectId: string | null;
+  project?: { id: string; name: string } | null;
   createdBy: { id: string; name: string };
   assignees: Array<{ user: UserSummary }>;
   attachments?: TaskAttachmentData[];

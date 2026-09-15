@@ -7,20 +7,45 @@ import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { TaskRow } from "@/components/tasks/task-row";
 import { SelectField } from "@/components/ui/select-field";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from "@/lib/task-templates";
+import { AREAS, areaInfo } from "@/lib/areas";
 import { type TaskData } from "@/lib/types";
-import { Plus, Filter, ArrowUpDown, Loader2, ChevronDown, ChevronRight, Briefcase, User, Search, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import {
+  Plus, Filter, ArrowUpDown, Loader2, ChevronDown, ChevronRight, Briefcase, User, Search,
+  ChevronsDownUp, ChevronsUpDown, Layers, FolderKanban,
+} from "lucide-react";
 import Link from "next/link";
+
+type GroupBy = "client" | "assignee" | "area" | "project";
+
+const GROUP_OPTIONS: { key: GroupBy; label: string; icon: typeof User; search: string }[] = [
+  { key: "client", label: "Cliente", icon: Briefcase, search: "Buscar cliente" },
+  { key: "assignee", label: "Responsável", icon: User, search: "Buscar responsável" },
+  { key: "area", label: "Área", icon: Layers, search: "Buscar área" },
+  { key: "project", label: "Projeto", icon: FolderKanban, search: "Buscar projeto" },
+];
+
+interface TaskGroup {
+  id: string;
+  name: string;
+  tasks: TaskData[];
+  order: number;
+  color?: string;
+  image?: string | null;
+}
+
+// Grupos "sem X" sempre por último.
+const LAST = 999;
 
 export default function TarefasPage() {
   const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [users, setUsers] = useState<{ id: string; name: string; image?: string | null }[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string; email?: string | null; image?: string | null }[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string; image?: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  const [groupBy, setGroupBy] = useState<"client" | "assignee">("client");
+  const [groupBy, setGroupBy] = useState<GroupBy>("client");
   // Grupos nascem fechados: a lista serve primeiro para achar o cliente, depois as tarefas.
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [groupSearch, setGroupSearch] = useState("");
@@ -73,33 +98,50 @@ export default function TarefasPage() {
 
   const groupedTasks = useMemo(() => {
     const activeTasks = tasks.filter((t) => t.status !== "COMPLETED" && t.status !== "CANCELLED");
-    const groups: Record<string, { id: string; name: string; tasks: TaskData[] }> = {};
+    const groups: Record<string, TaskGroup> = {};
+
+    function push(key: string, init: Omit<TaskGroup, "tasks">, task: TaskData) {
+      if (!groups[key]) groups[key] = { ...init, tasks: [] };
+      groups[key].tasks.push(task);
+    }
 
     activeTasks.forEach((task) => {
       if (groupBy === "client") {
-        const clientId = task.client?.id || "no-client";
-        const clientName = task.client?.name || "Sem cliente";
-        if (!groups[clientId]) groups[clientId] = { id: clientId, name: clientName, tasks: [] };
-        groups[clientId].tasks.push(task);
-      } else {
+        const id = task.client?.id || "no-client";
+        push(id, { id, name: task.client?.name || "Sem cliente", order: task.client ? 0 : LAST, image: task.client?.logoUrl }, task);
+      } else if (groupBy === "assignee") {
         const assignee = task.assignees[0]?.user;
-        const assigneeId = assignee?.id || "unassigned";
-        const assigneeName = assignee?.name || "Sem responsável";
-        if (!groups[assigneeId]) groups[assigneeId] = { id: assigneeId, name: assigneeName, tasks: [] };
-        groups[assigneeId].tasks.push(task);
+        const id = assignee?.id || "unassigned";
+        push(id, { id, name: assignee?.name || "Sem responsável", order: assignee ? 0 : LAST, image: assignee?.image }, task);
+      } else if (groupBy === "area") {
+        const info = areaInfo(task.area);
+        const id = info?.value || "no-area";
+        push(id, { id, name: info?.label || "Sem área", order: info ? AREAS.indexOf(info) : LAST, color: info?.bar }, task);
+      } else {
+        const id = task.project?.id || "no-project";
+        push(id, { id, name: task.project?.name || "Sem projeto", order: task.project ? 0 : LAST }, task);
       }
     });
 
     const term = groupSearch.trim().toLowerCase();
     return Object.values(groups)
       .filter((g) => !term || g.name.toLowerCase().includes(term))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   }, [tasks, groupBy, groupSearch]);
 
   const toggleGroup = (id: string) => setExpandedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   const allExpanded = groupedTasks.length > 0 && groupedTasks.every((g) => expandedGroups[g.id]);
   const toggleAll = () =>
     setExpandedGroups(allExpanded ? {} : Object.fromEntries(groupedTasks.map((g) => [g.id, true])));
+
+  const searchPlaceholder = GROUP_OPTIONS.find((o) => o.key === groupBy)?.search ?? "Buscar";
+
+  function GroupIcon({ group }: { group: TaskGroup }) {
+    if (groupBy === "client") return <Avatar name={group.name} image={group.image} size={22} className="object-contain" />;
+    if (groupBy === "assignee") return <Avatar name={group.name} image={group.image} size={22} className="text-[10px]" />;
+    if (groupBy === "area") return <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: group.color ?? "#d1d5db" }} />;
+    return <FolderKanban size={14} className="text-gray-400" />;
+  }
 
   return (
     <div className="min-h-screen bg-transparent w-full pb-10">
@@ -113,22 +155,17 @@ export default function TarefasPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-white border border-gray-200 rounded-lg p-0.5">
-            <button
-              onClick={() => setGroupBy("client")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                groupBy === "client" ? "bg-accent text-white" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-              }`}
-            >
-              <Briefcase size={13} /> Cliente
-            </button>
-            <button
-              onClick={() => setGroupBy("assignee")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                groupBy === "assignee" ? "bg-accent text-white" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-              }`}
-            >
-              <User size={13} /> Responsável
-            </button>
+            {GROUP_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setGroupBy(opt.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  groupBy === opt.key ? "bg-accent text-white" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                }`}
+              >
+                <opt.icon size={13} /> {opt.label}
+              </button>
+            ))}
           </div>
 
           <div className="relative">
@@ -136,7 +173,7 @@ export default function TarefasPage() {
             <input
               value={groupSearch}
               onChange={(e) => setGroupSearch(e.target.value)}
-              placeholder={groupBy === "client" ? "Buscar cliente" : "Buscar responsável"}
+              placeholder={searchPlaceholder}
               className="w-44 pl-7 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-lg text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-accent/50"
             />
           </div>
@@ -210,10 +247,14 @@ export default function TarefasPage() {
           {groupedTasks.map((group) => {
             const isCollapsed = !expandedGroups[group.id];
             return (
-              <div key={group.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <button onClick={() => toggleGroup(group.id)} className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition-colors">
+              <div
+                key={group.id}
+                className="bg-white border border-gray-200 rounded-xl overflow-hidden"
+                style={group.color ? { borderLeft: `4px solid ${group.color}` } : undefined}
+              >
+                <button onClick={() => toggleGroup(group.id)} aria-expanded={!isCollapsed} className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-2">
-                    {groupBy === "client" ? <Avatar name={group.name} image={group.tasks[0]?.client?.logoUrl} size={22} className="object-contain" /> : <User size={13} className="text-gray-400" />}
+                    <GroupIcon group={group} />
                     <span className="text-sm font-semibold text-gray-800">{group.name}</span>
                     <span className="text-[11px] text-gray-400">({group.tasks.length})</span>
                   </div>

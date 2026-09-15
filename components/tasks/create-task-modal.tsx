@@ -15,10 +15,12 @@ import {
   type TaskType,
   type ChecklistItem,
 } from "@/lib/task-templates";
+import { AREAS, areaForType, defaultAssigneeFor } from "@/lib/areas";
 import { Plus, Trash2, GripVertical } from "lucide-react";
 
-interface User { id: string; name: string; }
+interface User { id: string; name: string; email?: string | null; }
 interface Client { id: string; name: string; }
+interface ProjectOption { id: string; name: string; status: string; clientId: string | null }
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -28,14 +30,20 @@ interface CreateTaskModalProps {
   clients: Client[];
   initialClientId?: string;
   initialPublishDate?: string;
+  initialProjectId?: string;
 }
 
-export function CreateTaskModal({ open, onClose, onCreated, users, clients, initialClientId, initialPublishDate }: CreateTaskModalProps) {
+export function CreateTaskModal({ open, onClose, onCreated, users, clients, initialClientId, initialPublishDate, initialProjectId }: CreateTaskModalProps) {
   const [loading, setLoading] = useState(false);
   const [taskType, setTaskType] = useState<string>("");
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  // Enquanto ninguém mexe nos responsáveis, eles seguem o padrão da área escolhida.
+  const [assigneesTouched, setAssigneesTouched] = useState(false);
+  const [area, setArea] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [status, setStatus] = useState("PENDING");
   const [priority, setPriority] = useState("MEDIUM");
   const [startDate, setStartDate] = useState("");
@@ -53,12 +61,21 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
   useEffect(() => {
     if (open) {
       setTaskType(""); setTitle(""); setClientId(initialClientId || ""); setAssigneeIds([]);
+      setAssigneesTouched(false); setArea(""); setProjectId(initialProjectId || "");
       setStatus("PENDING"); setPriority("MEDIUM"); setStartDate(""); setDueDate("");
       setPublishDate(initialPublishDate || ""); setIsExtra(false);
       setDescription(""); setTags([]); setEstimatedTime(""); setChecklist([]);
       setExtraFields({}); setNewChecklistItem("");
     }
-  }, [open, initialClientId, initialPublishDate]);
+  }, [open, initialClientId, initialPublishDate, initialProjectId]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/projects?summary=1")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setProjects)
+      .catch(() => setProjects([]));
+  }, [open]);
 
   // Load template when type changes
   useEffect(() => {
@@ -69,7 +86,21 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
       setChecklist(generateChecklist(template.checklist));
       setExtraFields({});
     }
+    const typeArea = areaForType(taskType);
+    if (typeArea) setArea(typeArea);
   }, [taskType]);
+
+  useEffect(() => {
+    if (!open || assigneesTouched) return;
+    const suggested = defaultAssigneeFor(area, users);
+    setAssigneeIds(suggested ? [suggested] : []);
+  }, [open, area, users, assigneesTouched]);
+
+  function chooseProject(id: string) {
+    setProjectId(id);
+    const project = projects.find((p) => p.id === id);
+    if (project?.clientId && !clientId) setClientId(project.clientId);
+  }
 
   function addChecklistItem() {
     if (!newChecklistItem.trim()) return;
@@ -103,6 +134,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
           estimatedTime: estimatedTime || null,
           checklist, extraFields: Object.keys(extraFields).length > 0 ? extraFields : null,
           tags, clientId: clientId || null, assigneeIds,
+          area: area || null, projectId: projectId || null,
         }),
       });
 
@@ -117,6 +149,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
 
   const currentTemplate = taskType ? TASK_TEMPLATES[taskType as TaskType] : null;
   const slideCount = parseInt((extraFields.qtd_slides as string) || "0") || 0;
+  const suggestedByArea = !assigneesTouched && area && assigneeIds.length > 0;
 
   return (
     <Modal open={open} onClose={onClose} title="Criar Tarefa" size="xl">
@@ -142,13 +175,35 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
           />
         </div>
 
-        <MultiSelect
-          label="Responsável(is)"
-          options={users.map((u) => ({ value: u.id, label: u.name }))}
-          value={assigneeIds}
-          onChange={setAssigneeIds}
-          placeholder="Selecione responsáveis..."
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="Área"
+            value={area}
+            onChange={setArea}
+            placeholder="Sem área"
+            options={AREAS.map((a) => ({ value: a.value, label: a.label }))}
+          />
+          <SelectField
+            label="Projeto"
+            value={projectId}
+            onChange={chooseProject}
+            placeholder="Sem projeto"
+            options={projects
+              .filter((p) => p.status !== "CONCLUIDO" || p.id === projectId)
+              .map((p) => ({ value: p.id, label: p.name }))}
+          />
+        </div>
+
+        <div>
+          <MultiSelect
+            label="Responsável(is)"
+            options={users.map((u) => ({ value: u.id, label: u.name }))}
+            value={assigneeIds}
+            onChange={(v) => { setAssigneesTouched(true); setAssigneeIds(v); }}
+            placeholder="Selecione responsáveis..."
+          />
+          {suggestedByArea && <p className="text-[11px] text-gray-400 mt-1">Sugerido pela área. Você pode trocar.</p>}
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <SelectField label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))} />

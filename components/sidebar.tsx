@@ -16,6 +16,8 @@ import {
   CalendarDays,
   Target,
   Filter,
+  FolderKanban,
+  Rocket,
   Settings,
   LogOut,
   ChevronLeft,
@@ -50,6 +52,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: "Operação",
     items: [
       { href: "/tarefas", label: "Tarefas", icon: CheckSquare, permKey: "tarefas" },
+      { href: "/projetos", label: "Projetos", icon: FolderKanban, permKey: "tarefas" },
       { href: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, permKey: "meu-trabalho" },
       { href: "/calendario", label: "Calendário", icon: Calendar, permKey: "calendario" },
       { href: "/minha-semana", label: "Minha Semana", icon: CalendarDays, permKey: "minha-semana" },
@@ -60,6 +63,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: "Clientes",
     items: [
       { href: "/pipeline", label: "Pipeline", icon: Filter, permKey: "pipeline" },
+      { href: "/onboarding", label: "Onboarding", icon: Rocket, permKey: "clientes" },
       { href: "/clientes", label: "Clientes", icon: Users, permKey: "clientes" },
       { href: "/servicos", label: "Serviços", icon: Wrench, permKey: "servicos" },
       { href: "/nps", label: "NPS", icon: Star, permKey: "nps" },

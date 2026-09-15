@@ -347,23 +347,44 @@ export default function ClientesPage() {
         <div className="space-y-6">
           <ClientTable
             title="Clientes MRR"
-            subtitle="Contratos recorrentes/mensais"
-            clients={clients.filter((c) => c.classification === "MRR")}
+            subtitle="Ativos · contratos recorrentes/mensais"
+            clients={clients.filter((c) => c.status === "ACTIVE" && c.classification === "MRR")}
             onSelect={(c) => { fetchClientDetail(c.id); setShowDetail(true); }}
           />
           <ClientTable
             title="Clientes Freela"
-            subtitle="Trabalhos pontuais"
-            clients={clients.filter((c) => c.classification === "FREELA")}
+            subtitle="Ativos · trabalhos pontuais"
+            clients={clients.filter((c) => c.status === "ACTIVE" && c.classification === "FREELA")}
             onSelect={(c) => { fetchClientDetail(c.id); setShowDetail(true); }}
           />
           <ClientTable
             title="Sem classificação"
-            subtitle="Ainda não classificados como MRR ou Freela"
-            clients={clients.filter((c) => !c.classification)}
+            subtitle="Ativos ainda não classificados como MRR ou Freela"
+            clients={clients.filter((c) => c.status === "ACTIVE" && !c.classification)}
             onSelect={(c) => { fetchClientDetail(c.id); setShowDetail(true); }}
             hideIfEmpty
           />
+          <ClientTable
+            title="Prospectos"
+            subtitle="Ainda não fecharam contrato"
+            clients={clients.filter((c) => c.status === "PROSPECT")}
+            onSelect={(c) => { fetchClientDetail(c.id); setShowDetail(true); }}
+            hideIfEmpty
+          />
+          {clients.some((c) => c.status === "INACTIVE") && (
+            <details className="group">
+              <summary className="cursor-pointer list-none flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800 mb-3 select-none">
+                <ChevronRight size={15} className="transition-transform group-open:rotate-90" />
+                Clientes inativos ({clients.filter((c) => c.status === "INACTIVE").length})
+              </summary>
+              <ClientTable
+                title="Inativos"
+                subtitle="Contratos encerrados ou pausados"
+                clients={clients.filter((c) => c.status === "INACTIVE")}
+                onSelect={(c) => { fetchClientDetail(c.id); setShowDetail(true); }}
+              />
+            </details>
+          )}
         </div>
       )}
 

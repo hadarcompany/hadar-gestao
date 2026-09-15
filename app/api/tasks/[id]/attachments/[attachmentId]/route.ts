@@ -3,8 +3,11 @@ import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/permissions";
 
-/** Baixa o arquivo (decodifica o data URL e devolve como binário, não como JSON). */
-export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string; attachmentId: string }> }) {
+/** Imagens que podem ser exibidas na própria página (SVG fica de fora: pode executar script). */
+const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+/** Devolve o arquivo. Com ?inline=1, imagens seguras vão para exibição (prévia); o resto baixa. */
+export async function GET(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string; attachmentId: string }> }) {
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,13 +19,15 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
 
   const base64 = attachment.data.split(",")[1] ?? "";
   const buffer = Buffer.from(base64, "base64");
+  const inline = new URL(req.url).searchParams.get("inline") === "1" && INLINE_TYPES.has(attachment.mimeType);
+  const name = encodeURIComponent(attachment.fileName);
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
-      "Content-Type": "application/octet-stream",
+      "Content-Type": inline ? attachment.mimeType : "application/octet-stream",
       "X-Content-Type-Options": "nosniff",
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(attachment.fileName)}"; filename*=UTF-8''${encodeURIComponent(attachment.fileName)}`,
-      "Cache-Control": "private, no-store",
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${name}"; filename*=UTF-8''${name}`,
+      "Cache-Control": inline ? "private, max-age=3600" : "private, no-store",
     },
   });
 }

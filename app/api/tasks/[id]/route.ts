@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
 import { TASK_TEMPLATES, generateChecklist } from "@/lib/task-templates";
 import { TASK_INCLUDE } from "@/lib/task-transfer";
+import { areaForType } from "@/lib/areas";
 
 export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
@@ -33,6 +34,8 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   if (data.startDate !== undefined) data.startDate = data.startDate ? new Date(data.startDate) : null;
   if (data.dueDate !== undefined) data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
   if (data.publishDate !== undefined) data.publishDate = data.publishDate ? new Date(data.publishDate) : null;
+  if (data.area !== undefined) data.area = data.area || null;
+  if (data.projectId !== undefined) data.projectId = data.projectId || null;
   if (data.estimatedTime !== undefined) data.estimatedTime = data.estimatedTime === "" || data.estimatedTime === null ? null : parseFloat(data.estimatedTime);
   if (data.actualTime !== undefined) data.actualTime = data.actualTime === "" || data.actualTime === null ? null : parseFloat(data.actualTime);
 
@@ -119,6 +122,7 @@ async function createEditorialSubTasks(
         data: {
           title: `${template.label} ${i + 1}${clientName}`,
           type: sub.type,
+          area: areaForType(sub.type),
           status: "PENDING",
           priority: "MEDIUM",
           dueDate,

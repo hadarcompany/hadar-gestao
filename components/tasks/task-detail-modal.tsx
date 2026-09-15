@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { ClientIdentity } from "@/components/clients/client-identity";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { SelectField } from "@/components/ui/select-field";
@@ -12,15 +12,25 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task-templates";
+import { AREAS, areaInfo } from "@/lib/areas";
 import { formatDateBR } from "@/lib/dates";
 import { type TaskData, type UserSummary, type TaskAttachmentData } from "@/lib/types";
-import { CheckSquare, Square, Clock, User, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip, Upload, Download, Loader2 } from "lucide-react";
+import {
+  CheckSquare, Square, Clock, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip,
+  Upload, Download, Loader2, X, ChevronLeft, ChevronRight, FolderKanban,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+/** Tipos exibidos inline (SVG fica de fora: pode carregar script). */
+const PREVIEWABLE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+interface ProjectOption { id: string; name: string; status: string }
 
 interface TaskDetailModalProps {
   open: boolean;
@@ -36,15 +46,22 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [status, setStatus] = useState("");
   const [actualTime, setActualTime] = useState("");
+  const [area, setArea] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [transferMode, setTransferMode] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Descrição: editável direto, salva sozinha ao sair do campo.
+  const [description, setDescription] = useState("");
+  const [descState, setDescState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const savedDescription = useRef("");
+
   // Edit mode fields
   const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
   const [editPriority, setEditPriority] = useState("");
   const [editClientId, setEditClientId] = useState("");
   const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
@@ -65,6 +82,10 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
+  const images = attachments.filter((a) => PREVIEWABLE.has(a.mimeType));
+  const files = attachments.filter((a) => !PREVIEWABLE.has(a.mimeType));
 
   useEffect(() => {
     if (task) {
@@ -72,11 +93,15 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
       setChecklist(Array.isArray(task.checklist) ? task.checklist : []);
       setStatus(task.status);
       setActualTime(task.actualTime ? String(task.actualTime) : "");
+      setArea(task.area ?? "");
+      setProjectId(task.projectId ?? "");
+      setDescription(task.description ?? "");
+      savedDescription.current = task.description ?? "";
+      setDescState("idle");
       setEditMode(false);
       setTransferMode(false);
-      // Pre-fill edit fields
+      setPreviewIndex(null);
       setEditTitle(task.title);
-      setEditDescription(task.description || "");
       setEditPriority(task.priority);
       setEditClientId(task.clientId || "");
       setEditAssigneeIds(task.assignees.map((a) => a.user.id));
@@ -85,7 +110,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
       setEditPublishDate(task.publishDate ? task.publishDate.slice(0, 10) : "");
       setEditIsExtra(task.isExtra);
       setEditEstimatedTime(task.estimatedTime ? String(task.estimatedTime) : "");
-      // Transfer fields start with current assignees
       setTransferAssigneeIds(task.assignees.map((a) => a.user.id));
       setTransferNote("");
     }
@@ -104,13 +128,53 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
     return () => controller.abort();
   }, [open, task?.id]);
 
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/projects?summary=1")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setProjects)
+      .catch(() => setProjects([]));
+  }, [open]);
+
+  // Setas navegam entre as imagens; Esc fecha só a prévia (captura antes do modal).
+  useEffect(() => {
+    if (previewIndex === null) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") { e.stopPropagation(); setPreviewIndex(null); }
+      else if (e.key === "ArrowRight") setPreviewIndex((i) => (i === null ? i : (i + 1) % images.length));
+      else if (e.key === "ArrowLeft") setPreviewIndex((i) => (i === null ? i : (i - 1 + images.length) % images.length));
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [previewIndex, images.length]);
+
   if (!task) return null;
 
+  const attachmentUrl = (id: string) => `/api/tasks/${task.id}/attachments/${id}`;
+  const canDelete = (att: TaskAttachmentData) => user?.role === "ADMIN" || user?.id === att.uploadedBy.id;
   const checkDone = checklist.filter((c) => c.checked).length;
   const checkTotal = checklist.length;
+  const preview = previewIndex !== null ? images[previewIndex] : null;
 
   function toggleCheckItem(id: string) {
     setChecklist((prev) => prev.map((c) => c.id === id ? { ...c, checked: !c.checked } : c));
+  }
+
+  async function saveDescription() {
+    if (!task || description === savedDescription.current) return;
+    setDescState("saving");
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: description.trim() ? description : null }),
+      });
+      if (!res.ok) throw new Error();
+      savedDescription.current = description;
+      setDescState("saved");
+    } catch {
+      setDescState("error");
+    }
   }
 
   async function handleDelete() {
@@ -160,6 +224,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
         throw new Error(j.error || "Não foi possível remover o arquivo");
       }
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      setPreviewIndex(null);
       onAttachmentsChanged?.();
     } catch (e) {
       setAttachmentError((e as Error).message);
@@ -176,10 +241,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
       const res = await fetch(`/api/tasks/${task.id}/transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          toUserIds: transferAssigneeIds,
-          note: transferNote || null,
-        }),
+        body: JSON.stringify({ toUserIds: transferAssigneeIds, note: transferNote || null }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -202,11 +264,13 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
         checklist,
         status,
         actualTime: actualTime ? parseFloat(actualTime) : null,
+        area: area || null,
+        projectId: projectId || null,
+        description: description.trim() ? description : null,
       };
 
       if (editMode) {
         payload.title = editTitle;
-        payload.description = editDescription || null;
         payload.priority = editPriority;
         payload.clientId = editClientId || null;
         payload.assigneeIds = editAssigneeIds;
@@ -230,6 +294,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
 
   const statusOpt = STATUS_OPTIONS.find((s) => s.value === task.status);
   const priorityOpt = PRIORITY_OPTIONS.find((p) => p.value === task.priority);
+  const taskArea = areaInfo(task.area);
 
   const statusVariant = ({ PENDING: "default", IN_PROGRESS: "info", IN_REVIEW: "purple", COMPLETED: "success", CANCELLED: "danger" } as const)[task.status] || "default";
   const priorityVariant = ({ LOW: "default", MEDIUM: "warning", HIGH: "warning", URGENT: "danger" } as const)[task.priority] || "default";
@@ -305,6 +370,12 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
                 <Badge variant={statusVariant}>{statusOpt?.label ?? ""}</Badge>
                 <Badge variant={priorityVariant}>{priorityOpt?.label ?? ""}</Badge>
                 {task.type && <Badge>{task.type.replace(/_/g, " ")}</Badge>}
+                {taskArea && <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", taskArea.color)}>{taskArea.label}</span>}
+                {task.project && (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    <FolderKanban size={11} /> {task.project.name}
+                  </span>
+                )}
                 <div className="ml-auto flex items-center gap-2">
                   <button
                     onClick={() => { setTransferError(null); setTransferMode(true); }}
@@ -358,13 +429,6 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
                   ))}
                 </div>
               )}
-
-              {task.description && (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                  <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Descrição</h3>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{task.description}</p>
-                </div>
-              )}
             </>
           ) : (
             <>
@@ -407,17 +471,43 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
                   Demanda extra (acima do combinado)
                 </label>
               </div>
-
-              <Textarea label="Descrição" value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)} placeholder="Detalhes da tarefa..." />
             </>
           )}
 
-          {/* Editable Status + Time (always visible, not in transfer mode) */}
+          {/* Descrição editável direto (salva ao sair do campo) */}
           {!transferMode && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <SelectField label="Alterar Status" value={status} onChange={setStatus}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 focus-within:border-accent/40 focus-within:bg-white transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="task-description" className="text-xs text-gray-400 uppercase tracking-wider">Descrição</label>
+                <span className="text-[11px] text-gray-400 h-4">
+                  {descState === "saving" && <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Salvando</span>}
+                  {descState === "saved" && <span className="inline-flex items-center gap-1 text-emerald-600"><Check size={11} /> Salvo</span>}
+                  {descState === "error" && <span className="text-red-600">Não foi possível salvar. Tente de novo.</span>}
+                </span>
+              </div>
+              <textarea
+                id="task-description"
+                value={description}
+                onChange={(e) => { setDescription(e.target.value); if (descState !== "idle") setDescState("idle"); }}
+                onBlur={saveDescription}
+                placeholder="Clique para escrever a descrição da tarefa..."
+                rows={Math.min(14, Math.max(3, description.split("\n").length + 1))}
+                className="w-full bg-transparent text-sm text-gray-700 placeholder:text-gray-400 resize-y focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Status, área, projeto e tempo (sempre visíveis, fora da transferência) */}
+          {!transferMode && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <SelectField label="Status" value={status} onChange={setStatus}
                 options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))} />
+              <SelectField label="Área" value={area} onChange={setArea} placeholder="Sem área"
+                options={AREAS.map((a) => ({ value: a.value, label: a.label }))} />
+              <SelectField label="Projeto" value={projectId} onChange={setProjectId} placeholder="Sem projeto"
+                options={projects
+                  .filter((p) => p.status !== "CONCLUIDO" || p.id === projectId)
+                  .map((p) => ({ value: p.id, label: p.name }))} />
               <Input label="Tempo Real (horas)" type="number" step="0.5" value={actualTime}
                 onChange={(e) => setActualTime(e.target.value)} placeholder="0" />
             </div>
@@ -477,43 +567,70 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
               {loadingAttachments ? <p className="text-xs text-gray-400">Carregando anexos...</p> : attachments.length === 0 ? (
                 <p className="text-xs text-gray-400">Nenhum arquivo anexado ainda.</p>
               ) : (
-                <div className="space-y-1.5">
-                  {attachments.map((att) => (
-                    <div key={att.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
-                      <Paperclip size={13} className="text-gray-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <a
-                          href={`/api/tasks/${task.id}/attachments/${att.id}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm text-gray-700 hover:text-accent-dark truncate block"
-                          title={att.fileName}
-                        >
-                          {att.fileName}
-                        </a>
-                        <p className="text-[11px] text-gray-400">
-                          {formatFileSize(att.size)} · {att.uploadedBy.name} · {new Date(att.createdAt).toLocaleDateString("pt-BR")}
-                        </p>
-                      </div>
-                      <a
-                        href={`/api/tasks/${task.id}/attachments/${att.id}`}
-                        download={att.fileName}
-                        title="Baixar"
-                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-accent-dark transition-colors shrink-0"
-                      >
-                        <Download size={14} />
-                      </a>
-                      {(user?.role === "ADMIN" || user?.id === att.uploadedBy.id) && <button
-                        disabled={deletingAttachment !== null || uploading || loadingAttachments}
-                        onClick={() => handleDeleteAttachment(att.id)}
-                        title="Remover"
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors shrink-0"
-                      >
-                        <Trash2 size={14} />
-                      </button>}
+                <>
+                  {images.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
+                      {images.map((att, i) => (
+                        <div key={att.id} className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-white">
+                          <button type="button" onClick={() => setPreviewIndex(i)} title={`Ampliar ${att.fileName}`} className="w-full h-full">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`${attachmentUrl(att.id)}?inline=1`} alt={att.fileName} loading="lazy" className="w-full h-full object-cover" />
+                          </button>
+                          {canDelete(att) && (
+                            <button
+                              type="button"
+                              disabled={deletingAttachment !== null || uploading}
+                              onClick={() => handleDeleteAttachment(att.id)}
+                              title="Remover"
+                              className="absolute top-1 right-1 p-1 rounded-md bg-white/90 text-gray-500 hover:text-red-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                            >
+                              {deletingAttachment === att.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                            </button>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {files.length > 0 && (
+                    <div className="space-y-1.5">
+                      {files.map((att) => (
+                        <div key={att.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                          <Paperclip size={13} className="text-gray-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <a
+                              href={attachmentUrl(att.id)}
+                              download={att.fileName}
+                              className="text-sm text-gray-700 hover:text-accent-dark truncate block"
+                              title={`Baixar ${att.fileName}`}
+                            >
+                              {att.fileName}
+                            </a>
+                            <p className="text-[11px] text-gray-400">
+                              {formatFileSize(att.size)} · {att.uploadedBy.name} · {new Date(att.createdAt).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                          <a
+                            href={attachmentUrl(att.id)}
+                            download={att.fileName}
+                            title="Baixar"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-accent-dark transition-colors shrink-0"
+                          >
+                            <Download size={14} />
+                          </a>
+                          {canDelete(att) && <button
+                            disabled={deletingAttachment !== null || uploading || loadingAttachments}
+                            onClick={() => handleDeleteAttachment(att.id)}
+                            title="Remover"
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors shrink-0"
+                          >
+                            <Trash2 size={14} />
+                          </button>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -543,6 +660,65 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onAttachmentsC
           )}
         </div>
       </Modal>
+
+      {/* Prévia de imagem em popup */}
+      {preview && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={preview.fileName}
+          onClick={() => setPreviewIndex(null)}
+          className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-6"
+        >
+          <div className="relative flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${attachmentUrl(preview.id)}?inline=1`}
+              alt={preview.fileName}
+              className="max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl bg-white"
+            />
+            <div className="mt-3 flex items-center gap-3 text-sm text-white/90">
+              <span className="truncate max-w-[50vw]">{preview.fileName}</span>
+              {images.length > 1 && <span className="text-white/50">{(previewIndex ?? 0) + 1}/{images.length}</span>}
+              <a
+                href={attachmentUrl(preview.id)}
+                download={preview.fileName}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition-colors"
+              >
+                <Download size={14} /> Baixar
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPreviewIndex(null)}
+              aria-label="Fechar prévia"
+              className="absolute -top-3 -right-3 p-1.5 rounded-full bg-white text-gray-700 shadow-lg hover:bg-gray-100"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Imagem anterior"
+                onClick={(e) => { e.stopPropagation(); setPreviewIndex((i) => (i === null ? i : (i - 1 + images.length) % images.length)); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/15 hover:bg-white/30 text-white"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                type="button"
+                aria-label="Próxima imagem"
+                onClick={(e) => { e.stopPropagation(); setPreviewIndex((i) => (i === null ? i : (i + 1) % images.length)); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/15 hover:bg-white/30 text-white"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <ConfirmDialog
         open={showDeleteConfirm}

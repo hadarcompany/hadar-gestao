@@ -1,4 +1,5 @@
 import { TASK_INCLUDE } from "@/lib/task-transfer";
+import { areaForType } from "@/lib/areas";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   const {
     title, type, description, status, priority,
     startDate, dueDate, publishDate, isExtra, estimatedTime, checklist,
-    extraFields, tags, clientId, assigneeIds,
+    extraFields, tags, clientId, assigneeIds, area, projectId,
   } = body;
 
   const task = await prisma.task.create({
@@ -53,6 +54,8 @@ export async function POST(req: NextRequest) {
       dueDate: dueDate ? new Date(dueDate) : null,
       publishDate: publishDate ? new Date(publishDate) : null,
       isExtra: !!isExtra,
+      area: area || areaForType(type),
+      projectId: projectId || null,
       estimatedTime: estimatedTime ? parseFloat(estimatedTime) : null,
       checklist: checklist || null,
       extraFields: extraFields || null,

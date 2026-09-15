@@ -45,11 +45,22 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
 
   // O logo só muda por /api/clients/[id]/logo; aqui ele chegaria como link e sobrescreveria a imagem.
   delete body.logoUrl;
+  const before = await prisma.client.findUnique({ where: { id: params.id }, select: { status: true } });
   const client = await prisma.client.update({
     where: { id: params.id },
     data: body,
     omit: { logoUrl: true },
   });
+
+  // Prospecto (ou inativo) que vira ativo ganha o onboarding, se ainda não tiver um.
+  if (client.status === "ACTIVE" && before?.status !== "ACTIVE") {
+    try {
+      const { createClientOnboarding } = await import("@/lib/onboarding");
+      await createClientOnboarding(client, auth.id);
+    } catch (e) {
+      console.error("Falha ao gerar o onboarding do cliente:", e);
+    }
+  }
 
   return NextResponse.json(await withMedia(client, "client"));
 }
