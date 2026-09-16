@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
       data: { status: "OVERDUE" },
     });
 
-    const [paid, pendingReceivables, overdueReceivables, fixed, variableExpenses, investments] = await Promise.all([
+    const [paid, pendingReceivables, overdueReceivables, upcomingReceivables, fixed, variableExpenses, investments] = await Promise.all([
       prisma.receivable.findMany({
         where: {
           asaasPaymentId: { not: null },
@@ -87,6 +87,12 @@ export async function GET(req: NextRequest) {
         where: { asaasPaymentId: { not: null }, status: "OVERDUE" },
         select: { amount: true, dueDate: true, clientId: true, client: { select: { id: true, name: true } } },
         orderBy: { dueDate: "asc" },
+      }),
+      prisma.receivable.findMany({
+        where: { asaasPaymentId: { not: null }, status: "PENDING", dueDate: { gte: todayStart } },
+        select: { id: true, amount: true, dueDate: true, client: { select: { id: true, name: true } } },
+        orderBy: { dueDate: "asc" },
+        take: 8,
       }),
       prisma.fixedExpense.findMany({ where: { month: currentMonth, year: currentYear }, select: { amount: true } }),
       prisma.variableExpense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } }, select: { amount: true } }),
@@ -112,6 +118,12 @@ export async function GET(req: NextRequest) {
       expenses,
       result: received - expenses,
       overdueClients: Array.from(overdueByClient.values()).slice(0, 5),
+      upcomingCharges: upcomingReceivables.map((item) => ({
+        id: item.id,
+        amount: item.amount,
+        dueDate: item.dueDate,
+        client: item.client,
+      })),
     };
   }
 
@@ -124,6 +136,10 @@ export async function GET(req: NextRequest) {
     financialSummary: financialSummary ? {
       ...financialSummary,
       overdueClients: applyMedia(financialSummary.overdueClients, media, "client"),
+      upcomingCharges: financialSummary.upcomingCharges.map((charge) => ({
+        ...charge,
+        client: applyMedia(charge.client, media, "client"),
+      })),
     } : null,
   }, { headers: { "Cache-Control": "no-store" } });
 }
