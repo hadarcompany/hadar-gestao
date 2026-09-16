@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -15,12 +16,20 @@ export default function AuthenticatedLayout({
 }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const financeAllowed = user?.role === "ADMIN" || user?.permissions?.financeiro === "view" || user?.permissions?.financeiro === "edit";
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
     }
   }, [isLoading, user, router]);
+
+  useEffect(() => {
+    if (!isLoading && user && pathname.startsWith("/financeiro") && !financeAllowed) {
+      router.replace("/dashboard");
+    }
+  }, [financeAllowed, isLoading, pathname, router, user]);
 
   if (isLoading) {
     return (
@@ -31,6 +40,7 @@ export default function AuthenticatedLayout({
   }
 
   if (!user) return null;
+  if (pathname.startsWith("/financeiro") && !financeAllowed) return null;
 
   return (
     <LabelsProvider>

@@ -10,7 +10,7 @@ import { FilterDialog } from "@/components/ui/filter-dialog";
 import {
   BarChart3, CreditCard, ShoppingBag, PiggyBank, Users2,
   Wallet, Plus, Loader2, AlertTriangle, CheckCircle2, Clock, TrendingUp,
-  TrendingDown, DollarSign, Settings, Trash2, WalletCards,
+  TrendingDown, DollarSign, Settings, Trash2, Pencil, WalletCards,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -52,13 +52,14 @@ const VARIABLE_CATEGORIES = [
   { value: "ALIMENTACAO", label: "Alimentação" },
   { value: "LOCOMOCAO", label: "Locomoção" },
   { value: "MATERIAL", label: "Material" },
+  { value: "TRAFEGO_PAGO", label: "Tráfego Pago" },
   { value: "OUTROS", label: "Outros" },
 ];
 
 const CATEGORY_LABELS: Record<string, string> = {
   IMPOSTOS: "Impostos", MARKETING: "Marketing", SOFTWARES: "Softwares",
   EQUIPE: "Equipe", LOCACAO: "Locação", OUTROS: "Outros",
-  ALIMENTACAO: "Alimentação", LOCOMOCAO: "Locomoção", MATERIAL: "Material",
+  ALIMENTACAO: "Alimentação", LOCOMOCAO: "Locomoção", MATERIAL: "Material", TRAFEGO_PAGO: "Tráfego Pago",
   INVESTIMENTOS: "Investimentos",
 };
 
@@ -503,6 +504,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
   const [items, setItems] = useState<FixedExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", category: "OUTROS", amount: "", paidWithCash: false });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -517,15 +519,16 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
-  async function handleCreate() {
+  async function handleSave() {
     setSaving(true);
     try {
-      await fetch("/api/financeiro/fixed-expenses", {
-        method: "POST",
+      await fetch(editId ? "/api/financeiro/fixed-expenses" : "/api/financeiro/fixed-expenses", {
+        method: editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, month, year }),
+        body: JSON.stringify({ ...form, ...(editId ? { id: editId } : { month, year }) }),
       });
       setShowModal(false);
+      setEditId(null);
       setForm({ name: "", category: "OUTROS", amount: "", paidWithCash: false });
       fetch_();
     } finally { setSaving(false); }
@@ -534,6 +537,12 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
   async function handleDelete(id: string) {
     await fetch(`/api/financeiro/fixed-expenses?id=${id}`, { method: "DELETE" });
     fetch_();
+  }
+
+  function openEdit(item: FixedExpense) {
+    setEditId(item.id);
+    setForm({ name: item.name, category: item.category, amount: String(item.amount), paidWithCash: item.paidWithCash });
+    setShowModal(true);
   }
 
   const total = items.reduce((s, e) => s + e.amount, 0);
@@ -571,7 +580,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
                       : <span className="text-xs text-gray-400">Operacional</span>}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button>
+                    <div className="flex justify-end gap-3"><button onClick={() => openEdit(e)} className="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-accent transition-colors"><Pencil size={13} /> Editar</button><button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button></div>
                   </td>
                 </tr>
               ))}
@@ -588,7 +597,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
       )}
 
       {/* Modal Despesa Fixa */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Nova Despesa Fixa">
+      <Modal open={showModal} onClose={() => { setShowModal(false); setEditId(null); }} title={editId ? "Editar Despesa Fixa" : "Nova Despesa Fixa"}>
         <div className="space-y-4">
           <Input label="Título da Despesa" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Aluguel, Contador..." />
           <div className="grid grid-cols-2 gap-4">
@@ -605,9 +614,9 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
-            <button onClick={handleCreate} disabled={saving || !form.name || !form.amount}
+            <button onClick={handleSave} disabled={saving || !form.name || !form.amount}
               className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
-              {saving ? "Salvando..." : "Adicionar Despesa"}
+              {saving ? "Salvando..." : editId ? "Salvar alterações" : "Adicionar Despesa"}
             </button>
           </div>
         </div>
@@ -639,6 +648,7 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
   const [items, setItems] = useState<VariableExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", category: "OUTROS", amount: "", date: "", paidWithCash: false });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -653,15 +663,16 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
-  async function handleCreate() {
+  async function handleSave() {
     setSaving(true);
     try {
       await fetch("/api/financeiro/variable-expenses", {
-        method: "POST",
+        method: editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, ...(editId ? { id: editId } : {}) }),
       });
       setShowModal(false);
+      setEditId(null);
       setForm({ name: "", category: "OUTROS", amount: "", date: "", paidWithCash: false });
       fetch_();
     } finally { setSaving(false); }
@@ -670,6 +681,12 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
   async function handleDelete(id: string) {
     await fetch(`/api/financeiro/variable-expenses?id=${id}`, { method: "DELETE" });
     fetch_();
+  }
+
+  function openEdit(item: VariableExpense) {
+    setEditId(item.id);
+    setForm({ name: item.name, category: item.category, amount: String(item.amount), date: item.date.slice(0, 10), paidWithCash: item.paidWithCash });
+    setShowModal(true);
   }
 
   const total = items.reduce((s, e) => s + e.amount, 0);
@@ -708,7 +725,7 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
                       : <span className="text-xs text-gray-400">Operacional</span>}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button>
+                    <div className="flex justify-end gap-3"><button onClick={() => openEdit(e)} className="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-accent transition-colors"><Pencil size={13} /> Editar</button><button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button></div>
                   </td>
                 </tr>
               ))}
@@ -725,7 +742,7 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
       )}
 
       {/* Modal Despesa Avulsa */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Nova Despesa Avulsa">
+      <Modal open={showModal} onClose={() => { setShowModal(false); setEditId(null); }} title={editId ? "Editar Despesa Avulsa" : "Nova Despesa Avulsa"}>
         <div className="space-y-4">
           <Input label="Título da Despesa" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Almoço Reunião, Material..." />
           <SelectField label="Categoria" value={form.category} onChange={(v) => setForm({ ...form, category: v })} options={VARIABLE_CATEGORIES} />
@@ -745,9 +762,9 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
-            <button onClick={handleCreate} disabled={saving || !form.name || !form.amount || !form.date}
+            <button onClick={handleSave} disabled={saving || !form.name || !form.amount || !form.date}
               className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
-              {saving ? "Salvando..." : "Adicionar Despesa"}
+              {saving ? "Salvando..." : editId ? "Salvar alterações" : "Adicionar Despesa"}
             </button>
           </div>
         </div>
@@ -821,6 +838,24 @@ function InvestmentsTab() {
   }
 
   const total = items.reduce((s, e) => s + e.amount, 0);
+  const progress = (investment: Investment) => {
+    const totalAmount = investment.amount || 0;
+    const start = new Date(investment.date);
+    if (investment.paymentMethod === "A_VISTA" || !investment.installments || investment.installments <= 1) {
+      const paid = start.getTime() <= Date.now() ? totalAmount : 0;
+      return { paid, remaining: Math.max(0, totalAmount - paid), monthly: 0 };
+    }
+    const now = new Date();
+    let elapsed = (now.getUTCFullYear() - start.getUTCFullYear()) * 12 + (now.getUTCMonth() - start.getUTCMonth());
+    if (now.getUTCDate() < start.getUTCDate()) elapsed--;
+    const paidInstallments = Math.max(0, Math.min(investment.installments, elapsed + 1));
+    const monthly = totalAmount / investment.installments;
+    const paid = Math.min(totalAmount, monthly * paidInstallments);
+    return { paid, remaining: Math.max(0, totalAmount - paid), monthly: paidInstallments < investment.installments ? monthly : 0 };
+  };
+  const paidTotal = items.reduce((s, e) => s + progress(e).paid, 0);
+  const remainingTotal = items.reduce((s, e) => s + progress(e).remaining, 0);
+  const monthlyTotal = items.reduce((s, e) => s + progress(e).monthly, 0);
 
   // Preview de parcelas
   const installmentCount = parseInt(form.installments) || 0;
@@ -832,9 +867,13 @@ function InvestmentsTab() {
     <div className="animate-in fade-in">
       {/* Header - sem filtro de mês */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="bg-white/80 border border-gray-200/60 rounded-2xl px-6 py-4">
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Total Investido (Geral)</p>
-          <p className="text-2xl font-bold text-red-600">{R$(total)}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[["Total", total, "text-red-600"], ["Já pago", paidTotal, "text-emerald-600"], ["Restante", remainingTotal, "text-amber-600"], ["Parcelas / mês", monthlyTotal, "text-blue-600"]].map(([label, value, color]) => (
+            <div key={String(label)} className="bg-white/80 border border-gray-200/60 rounded-2xl px-5 py-3 min-w-[145px]">
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">{label}</p>
+              <p className={`text-xl font-bold ${color}`}>{R$(Number(value))}</p>
+            </div>
+          ))}
         </div>
         <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Novo Investimento
@@ -846,16 +885,19 @@ function InvestmentsTab() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200/60 bg-gray-50/30">
-                <Th>Descrição</Th><Th>Valor Total</Th><Th>Forma Pgto</Th><Th>Data Início</Th><Th>Origem</Th><Th align="right">Ações</Th>
+                <Th>Descrição</Th><Th>Valor Total</Th><Th>Já pago</Th><Th>Restante</Th><Th>Parcela/mês</Th><Th>Forma Pgto</Th><Th>Data Início</Th><Th>Origem</Th><Th align="right">Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhum investimento registrado.</td></tr>
+                <tr><td colSpan={9} className="px-6 py-12 text-center text-sm text-gray-400">Nenhum investimento registrado.</td></tr>
               ) : items.map((inv) => (
                 <tr key={inv.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{inv.description}</td>
                   <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(inv.amount)}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-emerald-600">{R$(progress(inv).paid)}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-amber-600">{R$(progress(inv).remaining)}</td>
+                  <td className="px-6 py-4 text-sm text-blue-600">{progress(inv).monthly > 0 ? R$(progress(inv).monthly) : "—"}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {inv.paymentMethod === "A_VISTA" ? "À vista" : (
                       <span>

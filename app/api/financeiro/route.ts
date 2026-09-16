@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
+import { canView } from "@/lib/permissions";
 
 export async function GET() {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso ao financeiro." }, { status: 403 });
 
   const recurringServices = await prisma.service.findMany({
     where: { type: "RECURRING" },

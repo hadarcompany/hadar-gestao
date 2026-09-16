@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
+import { canEdit, canView } from "@/lib/permissions";
 
 const OWNER_SELECT = { select: { id: true, name: true } };
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const financialVisible = canView(auth, "financeiro");
 
   const { searchParams } = new URL(req.url);
   const stage = searchParams.get("stage");
@@ -23,12 +25,13 @@ export async function GET(req: NextRequest) {
     orderBy: [{ stageChangedAt: "desc" }],
   });
 
-  return NextResponse.json(await withMedia(leads));
+  return NextResponse.json(await withMedia(financialVisible ? leads : leads.map((lead) => ({ ...lead, value: null }))));
 }
 
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const canManageFinance = canEdit(auth, "financeiro");
 
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
       origin: body.origin || null,
       product: body.product || null,
       stage,
-      value: body.value === "" || body.value == null ? null : Number(body.value),
+      value: canManageFinance && body.value !== "" && body.value != null ? Number(body.value) : null,
       notes: body.notes || null,
       lostReason: body.lostReason || null,
       ownerId: body.ownerId || auth.id,

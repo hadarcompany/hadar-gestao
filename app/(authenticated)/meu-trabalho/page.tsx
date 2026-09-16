@@ -164,7 +164,12 @@ export default function MeuTrabalhoPage() {
   }
 
   function handleRowUpdated(updated: TaskData) {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setTasks((prev) => {
+      if (user?.id && !updated.assignees.some((assignee) => assignee.user.id === user.id)) {
+        return prev.filter((task) => task.id !== updated.id);
+      }
+      return prev.map((task) => (task.id === updated.id ? updated : task));
+    });
   }
   function handleRowCloned(clone: TaskData) {
     setTasks((prev) => [clone, ...prev]);

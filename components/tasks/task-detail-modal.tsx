@@ -262,7 +262,9 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || "Não foi possível transferir a tarefa");
       }
+      const updated: TaskData = await res.json();
       setTransferMode(false);
+      onTaskChanged?.(updated);
       onUpdated();
     } catch (e) {
       setTransferError((e as Error).message || "Não foi possível transferir a tarefa");

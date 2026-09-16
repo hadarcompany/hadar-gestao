@@ -92,6 +92,7 @@ enum VariableExpenseCategory {
   ALIMENTACAO
   LOCOMOCAO
   MATERIAL
+  TRAFEGO_PAGO
   OUTROS
 }
 

@@ -3,6 +3,7 @@ import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { loadMediaIndex } from "@/lib/media";
 import { dateKeyToUTCDate } from "@/lib/dates";
+import { canView } from "@/lib/permissions";
 
 function periodDateRange(startMonth: number, startYear: number, endMonth: number, endYear: number) {
   const start = dateKeyToUTCDate(`${startYear}-${String(startMonth).padStart(2, "0")}-01`);
@@ -15,6 +16,7 @@ function periodDateRange(startMonth: number, startYear: number, endMonth: number
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso ao financeiro." }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const startMonth = parseInt(searchParams.get("startMonth") || String(new Date().getMonth() + 1));
@@ -36,7 +38,13 @@ export async function GET(req: NextRequest) {
   const dueReceivables = await prisma.receivable.findMany({
     where: {
       asaasPaymentId: { not: null },
-      OR: months.map((m) => ({ month: m.month, year: m.year })),
+      // Cobranças pagas com competência ajustada pertencem ao mês informado
+      // na competência; as demais continuam seguindo o vencimento.
+      OR: months.flatMap((m) => [
+        { status: "PAID", revenueCompetenceMonth: m.month, revenueCompetenceYear: m.year },
+        { status: "PAID", revenueCompetenceMonth: null, revenueCompetenceYear: null, month: m.month, year: m.year },
+        { status: { not: "PAID" }, month: m.month, year: m.year },
+      ]),
     },
     include: { client: { select: { id: true, name: true } } },
   });

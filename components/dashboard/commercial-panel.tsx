@@ -17,9 +17,10 @@ interface CommercialData {
   closedDeals: number;
   lostDeals: number;
   conversionRate: number;
-  totalSales: number;
-  avgTicket: number;
-  mrr: number;
+  financialVisible: boolean;
+  totalSales: number | null;
+  avgTicket: number | null;
+  mrr: number | null;
   goal: { title: string; target: number } | null;
   funnel: { stage: string; label: string; count: number; value: number }[];
   topProducts: BreakdownRow[];
@@ -50,12 +51,14 @@ export function CommercialPanel() {
     { label: "Leads no mês", value: String(data?.leadsInMonth ?? 0), icon: Users, color: "text-blue-600", bg: "bg-blue-500/10" },
     { label: "Negócios fechados", value: String(data?.closedDeals ?? 0), icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-500/10" },
     { label: "Taxa de conversão", value: `${(data?.conversionRate ?? 0).toFixed(0)}%`, icon: Percent, color: "text-purple-600", bg: "bg-purple-500/10" },
-    { label: "Total em vendas", value: BRL(data?.totalSales ?? 0), icon: DollarSign, color: "text-accent", bg: "bg-accent/10" },
-    { label: "Ticket médio", value: BRL(data?.avgTicket ?? 0), icon: Receipt, color: "text-amber-600", bg: "bg-amber-500/10" },
-    { label: "Recorrência (MRR)", value: BRL(data?.mrr ?? 0), icon: Repeat, color: "text-gray-600", bg: "bg-gray-100" },
+    ...(data?.financialVisible ? [
+      { label: "Total em vendas", value: BRL(data.totalSales ?? 0), icon: DollarSign, color: "text-accent", bg: "bg-accent/10" },
+      { label: "Ticket médio", value: BRL(data.avgTicket ?? 0), icon: Receipt, color: "text-amber-600", bg: "bg-amber-500/10" },
+      { label: "Recorrência (MRR)", value: BRL(data.mrr ?? 0), icon: Repeat, color: "text-gray-600", bg: "bg-gray-100" },
+    ] : []),
   ];
 
-  const goalPct = data?.goal && data.goal.target > 0 ? Math.min(100, (data.totalSales / data.goal.target) * 100) : null;
+  const goalPct = data?.financialVisible && data.goal && data.goal.target > 0 ? Math.min(100, ((data.totalSales ?? 0) / data.goal.target) * 100) : null;
   const funnelMax = Math.max(1, ...(data?.funnel.map((f) => f.count) ?? [1]));
 
   return (
@@ -83,7 +86,7 @@ export function CommercialPanel() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
+      <div className={cn("grid grid-cols-2 gap-3 mb-4", data?.financialVisible ? "lg:grid-cols-6" : "lg:grid-cols-3")}>
         {cards.map((card) => (
           <div key={card.label} className="bg-white border border-gray-200 rounded-xl px-3 py-3">
             <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-2", card.bg)}>
@@ -98,11 +101,11 @@ export function CommercialPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Meta x realizado + funil */}
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Meta x vendas realizadas</h3>
-          {data?.goal ? (
+          {data?.financialVisible && <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Meta x vendas realizadas</h3>}
+          {data?.financialVisible && data.goal ? (
             <div className="mb-5">
               <div className="flex items-end justify-between mb-1.5">
-                <span className="text-lg font-bold text-gray-900">{BRL(data.totalSales)}</span>
+                <span className="text-lg font-bold text-gray-900">{BRL(data.totalSales ?? 0)}</span>
                 <span className="text-xs text-gray-400">meta {BRL(data.goal.target)}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -113,11 +116,11 @@ export function CommercialPanel() {
               </div>
               <p className="text-[11px] text-gray-400 mt-1">{(goalPct ?? 0).toFixed(0)}% da meta de {data.goal.title}</p>
             </div>
-          ) : (
+          ) : data?.financialVisible ? (
             <p className="text-xs text-gray-400 mb-5">
               Nenhuma meta de receita cadastrada para este mês. Defina em Metas para acompanhar aqui.
             </p>
-          )}
+          ) : null}
 
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Funil de conversão</h3>
           <div className="space-y-2">
@@ -133,7 +136,7 @@ export function CommercialPanel() {
                     />
                   </div>
                   <span className="w-8 shrink-0 text-right text-xs font-semibold text-gray-700">{f.count}</span>
-                  <span className="w-24 shrink-0 text-right text-[11px] text-gray-400">{f.value > 0 ? BRL(f.value) : "—"}</span>
+                  {data?.financialVisible && <span className="w-24 shrink-0 text-right text-[11px] text-gray-400">{f.value > 0 ? BRL(f.value) : "—"}</span>}
                 </div>
               );
             })}
@@ -141,7 +144,7 @@ export function CommercialPanel() {
         </div>
 
         <div className="space-y-4">
-          <Breakdown title="Produtos mais vendidos" rows={data?.topProducts ?? []} empty="Nenhuma venda no mês." showValue />
+          <Breakdown title="Produtos mais vendidos" rows={data?.topProducts ?? []} empty="Nenhuma venda no mês." showValue={Boolean(data?.financialVisible)} />
           <Breakdown title="Leads por origem" rows={data?.leadsByOrigin ?? []} empty="Nenhum lead no mês." />
         </div>
       </div>

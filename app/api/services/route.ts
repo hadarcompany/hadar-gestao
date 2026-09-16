@@ -3,12 +3,14 @@ import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
 import { dateKeyToUTCDate, getTodayKey } from "@/lib/dates";
+import { canEdit, canView } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const financialVisible = canView(auth, "financeiro");
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
   const [year, month] = todayKey.split("-").map(Number);
   const today = dateKeyToUTCDate(todayKey);
 
-  await prisma.receivable.updateMany({
+  if (financialVisible) await prisma.receivable.updateMany({
     where: { asaasPaymentId: { not: null }, status: "PENDING", dueDate: { lt: today } },
     data: { status: "OVERDUE" },
   });
@@ -36,7 +38,7 @@ export async function GET(req: NextRequest) {
   });
 
   const clientIds = [...new Set(services.map((service) => service.clientId))];
-  const charges = clientIds.length > 0 ? await prisma.receivable.findMany({
+  const charges = financialVisible && clientIds.length > 0 ? await prisma.receivable.findMany({
     where: { clientId: { in: clientIds }, asaasPaymentId: { not: null }, month, year },
     select: { clientId: true, amount: true, status: true, asaasInvoiceUrl: true },
   }) : [];
@@ -60,10 +62,16 @@ export async function GET(req: NextRequest) {
     const financial = financialByClient.get(service.clientId) || { billed: 0, paid: 0, pending: 0, overdue: 0, chargeCount: 0, invoiceUrl: null };
     const contracted = contractedByClient.get(service.clientId) || 0;
     const status = financial.overdue > 0 ? "OVERDUE" : financial.pending > 0 ? "PENDING" : financial.paid > 0 ? "PAID" : "NOT_FOUND";
-    return {
+    if (!financialVisible) return {
       ...service,
-      asaas: { ...financial, status, contracted, difference: financial.billed - contracted },
+      monthlyValue: null,
+      totalValue: null,
+      paymentMethod: null,
+      installments: null,
+      dataPrimeiraParcela: null,
+      asaas: null,
     };
+    return { ...service, asaas: { ...financial, status, contracted, difference: financial.billed - contracted } };
   });
 
   const contracted = activeRecurring.reduce((sum, service) => sum + (service.monthlyValue || 0), 0);
@@ -75,14 +83,16 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     services: await withMedia(enrichedServices),
+    financialVisible,
     period: { month, year },
-    asaasSummary: { contracted, billed, paid, pending, overdue, discrepancies },
+    asaasSummary: financialVisible ? { contracted, billed, paid, pending, overdue, discrepancies } : null,
   }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const canManageFinance = canEdit(auth, "financeiro");
 
   const body = await req.json();
 
@@ -94,7 +104,7 @@ export async function POST(req: NextRequest) {
   if (body.type === "RECURRING") {
     data.name = body.name;
     data.contractMonths = body.contractMonths ? parseInt(body.contractMonths) : null;
-    data.monthlyValue = body.monthlyValue ? parseFloat(body.monthlyValue) : null;
+    if (canManageFinance) data.monthlyValue = body.monthlyValue ? parseFloat(body.monthlyValue) : null;
     data.startDate = body.startDate ? new Date(body.startDate) : null;
     data.metaAds = body.metaAds || false;
     data.googleAds = body.googleAds || false;
@@ -109,11 +119,13 @@ export async function POST(req: NextRequest) {
   } else {
     data.freelancerType = body.freelancerType || null;
     data.freelancerTypeCustom = body.freelancerTypeCustom || null;
-    data.totalValue = body.totalValue ? parseFloat(body.totalValue) : null;
-    data.paymentMethod = body.paymentMethod || null;
-    data.installments = body.installments ? parseInt(body.installments) : null;
+    if (canManageFinance) {
+      data.totalValue = body.totalValue ? parseFloat(body.totalValue) : null;
+      data.paymentMethod = body.paymentMethod || null;
+      data.installments = body.installments ? parseInt(body.installments) : null;
+      data.dataPrimeiraParcela = body.dataPrimeiraParcela ? new Date(body.dataPrimeiraParcela) : null;
+    }
     data.status = body.status || "IN_PROGRESS";
-    data.dataPrimeiraParcela = body.dataPrimeiraParcela ? new Date(body.dataPrimeiraParcela) : null;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

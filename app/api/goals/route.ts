@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { dateKeyToUTCDate } from "@/lib/dates";
+import { canEdit, canView } from "@/lib/permissions";
 
 async function calculateCurrentValue(
   type: string,
@@ -116,8 +117,9 @@ export async function GET(req: NextRequest) {
   const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
   const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
   const period = searchParams.get("period") || "MONTHLY";
+  const financialVisible = canView(auth, "financeiro");
 
-  const where: Record<string, unknown> = { year };
+  const where: Record<string, unknown> = { year, ...(financialVisible ? {} : { type: { not: "REVENUE" } }) };
   if (period === "MONTHLY") {
     where.month = month;
     where.period = "MONTHLY";
@@ -168,6 +170,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { title, type, targetValue, period, month, year, customValue } = body;
+  if (type === "REVENUE" && !canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso a metas financeiras." }, { status: 403 });
 
   const goal = await prisma.goal.create({
     data: {

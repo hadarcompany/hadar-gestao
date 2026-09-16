@@ -1,0 +1,1 @@
+ALTER TYPE "VariableExpenseCategory" ADD VALUE IF NOT EXISTS 'TRAFEGO_PAGO';

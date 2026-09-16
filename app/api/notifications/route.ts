@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { dateKeyToUTCDate, getTodayKey } from "@/lib/dates";
 import { canView } from "@/lib/permissions";
 import type { AuthUser } from "@/types/auth";
+import type { NotificationType } from "@prisma/client";
 
 async function ensureOverdueTaskNotifications(userId: string) {
   const tasks = await prisma.task.findMany({
@@ -66,13 +67,20 @@ export async function GET(req: NextRequest) {
   await ensureOverdueTaskNotifications(auth.id);
   await ensureOverduePaymentNotifications(auth);
 
+  const hiddenTypes: NotificationType[] = canView(auth, "financeiro") ? [] : ["PAYMENT_RECEIVED", "PAYMENT_OVERDUE"];
+  const visibleWhere = {
+    userId: auth.id,
+    ...(unreadOnly ? { read: false } : {}),
+    ...(hiddenTypes.length ? { type: { notIn: hiddenTypes } } : {}),
+  };
+
   const notifications = await prisma.notification.findMany({
-    where: { userId: auth.id, ...(unreadOnly ? { read: false } : {}) },
+    where: visibleWhere,
     orderBy: { createdAt: "desc" },
     take: 50,
   });
 
-  const unreadCount = await prisma.notification.count({ where: { userId: auth.id, read: false } });
+  const unreadCount = await prisma.notification.count({ where: { ...visibleWhere, read: false } });
 
   return NextResponse.json({ notifications, unreadCount });
 }

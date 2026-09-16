@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { canEdit, canView } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso ao financeiro." }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month");
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
 
   const body = await req.json();
   const { name, category, amount, date, paidWithCash } = body;
@@ -58,6 +61,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
@@ -65,4 +69,25 @@ export async function DELETE(req: NextRequest) {
 
   await prisma.variableExpense.delete({ where: { id } });
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(req: NextRequest) {
+  const auth = await getServerAuth();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
+
+  const body = await req.json();
+  const id = String(body.id || "");
+  if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+  const expense = await prisma.variableExpense.update({
+    where: { id },
+    data: {
+      ...(body.name !== undefined ? { name: String(body.name) } : {}),
+      ...(body.category !== undefined ? { category: body.category } : {}),
+      ...(body.amount !== undefined ? { amount: parseFloat(body.amount) } : {}),
+      ...(body.date !== undefined ? { date: new Date(body.date) } : {}),
+      ...(body.paidWithCash !== undefined ? { paidWithCash: Boolean(body.paidWithCash) } : {}),
+    },
+  });
+  return NextResponse.json(expense);
 }

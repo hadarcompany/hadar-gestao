@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
+import { canView } from "@/lib/permissions";
 
 export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
@@ -31,6 +32,16 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   });
 
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canView(auth, "financeiro") && client.services) {
+    client.services = client.services.map((service) => ({
+      ...service,
+      monthlyValue: null,
+      totalValue: null,
+      paymentMethod: null,
+      installments: null,
+      dataPrimeiraParcela: null,
+    }));
+  }
   return NextResponse.json(await withMedia(client, "client"));
 }
 

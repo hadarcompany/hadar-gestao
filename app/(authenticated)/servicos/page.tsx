@@ -35,7 +35,7 @@ interface ServiceData {
   clientId: string;
   client: { id: string; name: string; logoUrl?: string | null };
   createdAt: string;
-  asaas: {
+  asaas: null | {
     billed: number;
     paid: number;
     pending: number;
@@ -101,6 +101,7 @@ function currency(value: number) {
 }
 
 function AsaasStatus({ service }: { service: ServiceData }) {
+  if (!service.asaas) return null;
   const status = asaasStatus[service.asaas.status];
   const hasDifference = service.type === "RECURRING" && service.status === "IN_PROGRESS" && Math.abs(service.asaas.difference) >= 0.01;
   return (
@@ -129,6 +130,7 @@ export default function ServicosPage() {
   const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
   const [period, setPeriod] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
   const [financial, setFinancial] = useState({ contracted: 0, billed: 0, paid: 0, pending: 0, overdue: 0, discrepancies: 0 });
+  const [financialVisible, setFinancialVisible] = useState(false);
 
   // Edit state
   const [showEdit, setShowEdit] = useState(false);
@@ -159,6 +161,7 @@ export default function ServicosPage() {
       const res = await fetch("/api/services", { cache: "no-store" });
       const data = await res.json();
       setServices(data.services || []);
+      setFinancialVisible(Boolean(data.financialVisible));
       if (data.asaasSummary) setFinancial(data.asaasSummary);
       if (data.period) setPeriod(data.period);
     } finally {
@@ -320,9 +323,9 @@ export default function ServicosPage() {
         {type === "RECURRING" ? (
           <>
             <Input label="Nome do Servico" value={fName} onChange={(e) => setFName(e.target.value)} placeholder="Ex: Gestao de Redes Sociais" />
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${financialVisible ? "grid-cols-3" : "grid-cols-2"}`}>
               <Input label="Duracao (meses)" type="number" value={fMonths} onChange={(e) => setFMonths(e.target.value)} placeholder="12" />
-              <Input label="Valor Mensal (R$)" type="number" value={fMonthlyValue} onChange={(e) => setFMonthlyValue(e.target.value)} placeholder="2500.00" />
+              {financialVisible && <Input label="Valor Mensal (R$)" type="number" value={fMonthlyValue} onChange={(e) => setFMonthlyValue(e.target.value)} placeholder="2500.00" />}
               <Input label="Inicio do Contrato" type="date" value={fStartDate} onChange={(e) => setFStartDate(e.target.value)} />
             </div>
             <div>
@@ -371,12 +374,12 @@ export default function ServicosPage() {
             {fFreelancerType === "OUTRO" && (
               <Input label="Especifique o tipo" value={fFreelancerCustom} onChange={(e) => setFFreelancerCustom(e.target.value)} placeholder="Descreva o servico" />
             )}
-            <div className="grid grid-cols-2 gap-4">
+            {financialVisible && <div className="grid grid-cols-2 gap-4">
               <Input label="Valor Total (R$)" type="number" value={fTotalValue} onChange={(e) => setFTotalValue(e.target.value)} placeholder="1500.00" />
               <SelectField label="Forma de Pagamento" value={fPaymentMethod} onChange={setFPaymentMethod}
                 options={[{ value: "A_VISTA", label: "A vista" }, { value: "PARCELADO", label: "Parcelado" }]} />
-            </div>
-            {fPaymentMethod === "PARCELADO" && (
+            </div>}
+            {financialVisible && fPaymentMethod === "PARCELADO" && (
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Numero de Parcelas" type="number" value={fInstallments} onChange={(e) => setFInstallments(e.target.value)} placeholder="3" />
                 <Input label="Data da 1a Parcela" type="date" value={fDataPrimeiraParcela} onChange={(e) => setFDataPrimeiraParcela(e.target.value)} />
@@ -392,9 +395,9 @@ export default function ServicosPage() {
   return (
     <div>
       <PageHeader title="Servicos" description="Gerenciamento de servicos recorrentes e avulsos.">
-        <Link href="/financeiro" className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-accent hover:text-accent">
+        {financialVisible && <Link href="/financeiro" className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-accent hover:text-accent">
           <ReceiptText size={16} /> Cobranças Asaas
-        </Link>
+        </Link>}
         <button onClick={() => { resetForm(); setShowCreate(true); }}
           className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors">
           <Plus size={16} /> Novo Servico
@@ -402,7 +405,7 @@ export default function ServicosPage() {
       </PageHeader>
 
       {/* Summary cards */}
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      {financialVisible && <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={16} className="text-emerald-600" />
@@ -437,7 +440,7 @@ export default function ServicosPage() {
           <p className="text-2xl font-bold text-red-600">{currency(financial.overdue)}</p>
           <p className="text-xs text-gray-400 mt-1">Cobranças vencidas</p>
         </div>
-      </div>
+      </div>}
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-50 border border-gray-200 rounded-xl p-1 w-fit">
@@ -467,10 +470,10 @@ export default function ServicosPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Servico</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Cliente</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Valor contratado</th>
+                {financialVisible && <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Valor contratado</th>}
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Duracao</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Status</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Asaas · mês</th>
+                {financialVisible && <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Asaas · mês</th>}
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Ads</th>
                 <th className="text-right text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider"></th>
               </tr>
@@ -480,16 +483,16 @@ export default function ServicosPage() {
                 <tr key={s.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="px-5 py-3.5 text-sm text-gray-700">{s.name}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-600"><ClientIdentity client={s.client} /></td>
-                  <td className="px-5 py-3.5 text-sm text-emerald-600">
+                  {financialVisible && <td className="px-5 py-3.5 text-sm text-emerald-600">
                     {s.monthlyValue ? `R$ ${s.monthlyValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "-"}
-                  </td>
+                  </td>}
                   <td className="px-5 py-3.5 text-sm text-gray-500">{s.contractMonths ? `${s.contractMonths} meses` : "-"}</td>
                   <td className="px-5 py-3.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[s.status] || ""}`}>
                       {statusLabels[s.status] || s.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5"><AsaasStatus service={s} /></td>
+                  {financialVisible && <td className="px-5 py-3.5"><AsaasStatus service={s} /></td>}
                   <td className="px-5 py-3.5">
                     <div className="flex gap-1.5">
                       {s.metaAds && <span className="text-[10px] text-blue-600/80 bg-blue-500/10 px-1.5 py-0.5 rounded">Meta</span>}
@@ -530,13 +533,13 @@ export default function ServicosPage() {
                   {statusLabels[s.status]}
                 </span>
               </div>
-              <p className="text-xl font-bold text-accent-dark mb-2">
+              {financialVisible && <p className="text-xl font-bold text-accent-dark mb-2">
                 {s.totalValue ? `R$ ${s.totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "-"}
-              </p>
+              </p>}
               <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-400">
+                {financialVisible && <p className="text-xs text-gray-400">
                   {s.paymentMethod === "A_VISTA" ? "A vista" : `Parcelado ${s.installments || "?"}x`}
-                </p>
+                </p>}
                 <div className="flex items-center gap-1">
                   <button onClick={() => openEdit(s)}
                     className="p-1.5 rounded-lg hover:bg-accent-dark/10 text-gray-400 hover:text-accent transition-colors">
@@ -548,10 +551,10 @@ export default function ServicosPage() {
                   </button>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+              {financialVisible && <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
                 <AsaasStatus service={s} />
-                {s.asaas.invoiceUrl && <a href={s.asaas.invoiceUrl} target="_blank" rel="noreferrer" title="Abrir cobrança no Asaas" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-accent"><ExternalLink size={14} /></a>}
-              </div>
+                {s.asaas?.invoiceUrl && <a href={s.asaas.invoiceUrl} target="_blank" rel="noreferrer" title="Abrir cobrança no Asaas" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-accent"><ExternalLink size={14} /></a>}
+              </div>}
             </div>
           ))}
         </div>

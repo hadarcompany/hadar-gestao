@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
+import { canEdit } from "@/lib/permissions";
 
 const OWNER_SELECT = { select: { id: true, name: true } };
 const CLOSED_STAGES = ["FECHADO", "PERDIDO"];
@@ -20,7 +21,7 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   for (const field of ["name", "company", "email", "phone", "origin", "product", "notes", "lostReason", "ownerId"]) {
     if (body[field] !== undefined) data[field] = body[field] || null;
   }
-  if (body.value !== undefined) data.value = body.value === "" || body.value === null ? null : Number(body.value);
+  if (canEdit(auth, "financeiro") && body.value !== undefined) data.value = body.value === "" || body.value === null ? null : Number(body.value);
 
   // Mudar de etapa reinicia o relógio do funil e define/limpa a data de encerramento.
   if (body.stage !== undefined && body.stage !== current.stage) {

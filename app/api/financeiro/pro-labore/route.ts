@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { dateKeyToUTCDate } from "@/lib/dates";
+import { canView } from "@/lib/permissions";
 
 interface MonthlyProLabore {
   month: number;
@@ -19,6 +20,7 @@ interface MonthlyProLabore {
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso ao financeiro." }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));

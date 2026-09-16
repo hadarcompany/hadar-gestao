@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { LEAD_STAGES, FUNNEL_STAGES } from "@/lib/leads";
+import { canView } from "@/lib/permissions";
 
 /**
  * Painel comercial do mês. Vendas e ticket médio consideram leads FECHADO pela
@@ -14,6 +15,7 @@ import { LEAD_STAGES, FUNNEL_STAGES } from "@/lib/leads";
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const financialVisible = canView(auth, "financeiro");
 
   const { searchParams } = new URL(req.url);
   const now = new Date();
@@ -32,11 +34,11 @@ export async function GET(req: NextRequest) {
     }),
     prisma.lead.count({ where: { stage: "PERDIDO", closedAt: inMonth } }),
     prisma.lead.findMany({ select: { stage: true, value: true, origin: true, createdAt: true } }),
-    prisma.service.findMany({
+    financialVisible ? prisma.service.findMany({
       where: { type: "RECURRING", status: "IN_PROGRESS" },
       select: { monthlyValue: true },
-    }),
-    prisma.goal.findFirst({ where: { type: "REVENUE", month, year } }),
+    }) : Promise.resolve([]),
+    financialVisible ? prisma.goal.findFirst({ where: { type: "REVENUE", month, year } }) : Promise.resolve(null),
   ]);
 
   const closedDeals = closedInMonth.length;
@@ -63,12 +65,18 @@ export async function GET(req: NextRequest) {
   );
 
   return NextResponse.json({
-    month, year,
+    month, year, financialVisible,
     leadsInMonth: createdInMonth,
     closedDeals, lostDeals: lostInMonth,
-    conversionRate, totalSales, avgTicket, mrr,
+    conversionRate,
+    totalSales: financialVisible ? totalSales : null,
+    avgTicket: financialVisible ? avgTicket : null,
+    mrr: financialVisible ? mrr : null,
     goal: goal ? { title: goal.title, target: goal.targetValue } : null,
-    funnel, topProducts, salesByOrigin, leadsByOrigin,
+    funnel: funnel.map((item) => ({ ...item, value: financialVisible ? item.value : 0 })),
+    topProducts: topProducts.map((item) => ({ ...item, value: financialVisible ? item.value : 0 })),
+    salesByOrigin: financialVisible ? salesByOrigin : [],
+    leadsByOrigin: leadsByOrigin.map((item) => ({ ...item, value: 0 })),
   });
 }
 

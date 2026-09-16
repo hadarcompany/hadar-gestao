@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
+import { canEdit } from "@/lib/permissions";
 
 export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const canManageFinance = canEdit(auth, "financeiro");
 
   const body = await req.json();
   const data: Record<string, unknown> = {};
@@ -19,12 +21,13 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
     if (body[f] !== undefined) data[f] = body[f];
   }
   if (body.contractMonths !== undefined) data.contractMonths = parseInt(body.contractMonths);
-  if (body.monthlyValue !== undefined) data.monthlyValue = parseFloat(body.monthlyValue);
-  if (body.totalValue !== undefined) data.totalValue = parseFloat(body.totalValue);
+  if (canManageFinance && body.monthlyValue !== undefined) data.monthlyValue = parseFloat(body.monthlyValue);
+  if (canManageFinance && body.totalValue !== undefined) data.totalValue = parseFloat(body.totalValue);
   if (body.deliveriesPerWeek !== undefined) data.deliveriesPerWeek = parseInt(body.deliveriesPerWeek);
-  if (body.installments !== undefined) data.installments = parseInt(body.installments);
+  if (canManageFinance && body.installments !== undefined) data.installments = parseInt(body.installments);
   if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
-  if (body.dataPrimeiraParcela !== undefined) data.dataPrimeiraParcela = body.dataPrimeiraParcela ? new Date(body.dataPrimeiraParcela) : null;
+  if (canManageFinance && body.dataPrimeiraParcela !== undefined) data.dataPrimeiraParcela = body.dataPrimeiraParcela ? new Date(body.dataPrimeiraParcela) : null;
+  if (!canManageFinance) delete data.paymentMethod;
 
   if (body.startDate && body.contractMonths) {
     const start = new Date(body.startDate);
