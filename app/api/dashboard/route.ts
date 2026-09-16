@@ -6,6 +6,8 @@ import { TASK_INCLUDE } from "@/lib/task-transfer";
 import { applyMedia, loadMediaIndex } from "@/lib/media";
 import { canView } from "@/lib/permissions";
 
+export const dynamic = "force-dynamic";
+
 /**
  * period = intervalo [from, to] em chaves YYYY-MM-DD. Se ausente, usa a semana
  * atual (segunda a domingo). "Previstas" usa dueDate; "concluídas no período"
@@ -123,5 +125,5 @@ export async function GET(req: NextRequest) {
       ...financialSummary,
       overdueClients: applyMedia(financialSummary.overdueClients, media, "client"),
     } : null,
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }

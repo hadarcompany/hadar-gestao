@@ -1,6 +1,7 @@
 "use client";
 
 import { ClientIdentity } from "@/components/clients/client-identity";
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Modal } from "@/components/ui/modal";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import {
   Plus, Loader2, Repeat, Briefcase, Trash2, Calendar,
-  CheckSquare, Square, DollarSign, Users, Pencil,
+  CheckSquare, Square, DollarSign, Pencil, ReceiptText, CircleCheckBig, Clock3, TriangleAlert, ExternalLink,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -34,6 +35,17 @@ interface ServiceData {
   clientId: string;
   client: { id: string; name: string; logoUrl?: string | null };
   createdAt: string;
+  asaas: {
+    billed: number;
+    paid: number;
+    pending: number;
+    overdue: number;
+    chargeCount: number;
+    invoiceUrl: string | null;
+    status: "PAID" | "PENDING" | "OVERDUE" | "NOT_FOUND";
+    contracted: number;
+    difference: number;
+  };
 }
 
 interface ClientOption {
@@ -77,6 +89,35 @@ const STATUS_OPTIONS_FREELANCER = [
 
 const DELIVERY_TYPE_OPTIONS = ["Reels", "Carrossel", "Post", "Stories", "Video", "Foto"];
 
+const asaasStatus = {
+  PAID: { label: "Pago", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  PENDING: { label: "Aguardando", className: "bg-amber-50 text-amber-700 border-amber-200" },
+  OVERDUE: { label: "Vencido", className: "bg-red-50 text-red-700 border-red-200" },
+  NOT_FOUND: { label: "Sem cobrança", className: "bg-gray-50 text-gray-500 border-gray-200" },
+};
+
+function currency(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function AsaasStatus({ service }: { service: ServiceData }) {
+  const status = asaasStatus[service.asaas.status];
+  const hasDifference = service.type === "RECURRING" && service.status === "IN_PROGRESS" && Math.abs(service.asaas.difference) >= 0.01;
+  return (
+    <div className="min-w-[145px]">
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${status.className}`}>{status.label}</span>
+        {service.asaas.billed > 0 && <span className="text-xs font-semibold text-gray-700">{currency(service.asaas.billed)}</span>}
+      </div>
+      {hasDifference && (
+        <p className="mt-1 text-[10px] font-medium text-orange-600">
+          {service.asaas.billed === 0 ? "Serviço ativo sem cobrança neste mês" : `Diferença de ${currency(Math.abs(service.asaas.difference))}`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ServicosPage() {
   const [services, setServices] = useState<ServiceData[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -86,6 +127,8 @@ export default function ServicosPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
+  const [period, setPeriod] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
+  const [financial, setFinancial] = useState({ contracted: 0, billed: 0, paid: 0, pending: 0, overdue: 0, discrepancies: 0 });
 
   // Edit state
   const [showEdit, setShowEdit] = useState(false);
@@ -110,13 +153,16 @@ export default function ServicosPage() {
   const [fStatus, setFStatus] = useState("IN_PROGRESS");
   const [fDataPrimeiraParcela, setFDataPrimeiraParcela] = useState("");
 
-  const fetchServices = useCallback(async () => {
-    setLoading(true);
+  const fetchServices = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
-      const res = await fetch("/api/services");
-      setServices(await res.json());
+      const res = await fetch("/api/services", { cache: "no-store" });
+      const data = await res.json();
+      setServices(data.services || []);
+      if (data.asaasSummary) setFinancial(data.asaasSummary);
+      if (data.period) setPeriod(data.period);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
 
@@ -130,6 +176,8 @@ export default function ServicosPage() {
   useEffect(() => {
     fetchServices();
     fetchClients();
+    const timer = window.setInterval(() => fetchServices(true), 30_000);
+    return () => window.clearInterval(timer);
   }, [fetchServices, fetchClients]);
 
   function resetForm() {
@@ -256,10 +304,7 @@ export default function ServicosPage() {
 
   const filtered = services.filter((s) => s.type === activeTab);
 
-  const recurringServices = services.filter((s) => s.type === "RECURRING");
-  const totalMRR = recurringServices.reduce((sum, s) => sum + (s.monthlyValue || 0), 0);
-  const freelancerServices = services.filter((s) => s.type === "FREELANCER");
-  const totalFreelancer = freelancerServices.reduce((sum, s) => sum + (s.totalValue || 0), 0);
+  const recurringServices = services.filter((s) => s.type === "RECURRING" && s.status === "IN_PROGRESS");
 
   // Shared form component
   function renderServiceForm(type: "RECURRING" | "FREELANCER", isEdit: boolean) {
@@ -347,6 +392,9 @@ export default function ServicosPage() {
   return (
     <div>
       <PageHeader title="Servicos" description="Gerenciamento de servicos recorrentes e avulsos.">
+        <Link href="/financeiro" className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-accent hover:text-accent">
+          <ReceiptText size={16} /> Cobranças Asaas
+        </Link>
         <button onClick={() => { resetForm(); setShowCreate(true); }}
           className="flex items-center gap-2 px-4 py-2 text-sm bg-accent hover:bg-accent-dark text-white rounded-lg transition-colors">
           <Plus size={16} /> Novo Servico
@@ -354,30 +402,40 @@ export default function ServicosPage() {
       </PageHeader>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={16} className="text-emerald-600" />
-            <span className="text-xs text-gray-500">Receita Mensal Recorrente</span>
+            <span className="text-xs text-gray-500">MRR contratado</span>
           </div>
-          <p className="text-2xl font-bold text-emerald-600">R$ {totalMRR.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+          <p className="text-2xl font-bold text-gray-800">{currency(financial.contracted)}</p>
           <p className="text-xs text-gray-400 mt-1">{recurringServices.length} contratos ativos</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Briefcase size={16} className="text-blue-600" />
-            <span className="text-xs text-gray-500">Servicos Avulsos</span>
+            <ReceiptText size={16} className="text-blue-600" />
+            <span className="text-xs text-gray-500">Cobrado no Asaas</span>
           </div>
-          <p className="text-2xl font-bold text-blue-600">R$ {totalFreelancer.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-          <p className="text-xs text-gray-400 mt-1">{freelancerServices.length} servicos</p>
+          <p className="text-2xl font-bold text-blue-600">{currency(financial.billed)}</p>
+          <p className={`text-xs mt-1 ${financial.discrepancies ? "text-orange-600" : "text-gray-400"}`}>{financial.discrepancies ? `${financial.discrepancies} cliente(s) com divergência` : `Competência ${String(period.month).padStart(2, "0")}/${period.year}`}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Users size={16} className="text-accent-dark" />
-            <span className="text-xs text-gray-500">Total de Servicos</span>
+            <CircleCheckBig size={16} className="text-emerald-600" />
+            <span className="text-xs text-gray-500">Recebido no Asaas</span>
           </div>
-          <p className="text-2xl font-bold text-accent-dark">{services.length}</p>
-          <p className="text-xs text-gray-400 mt-1">{clients.length} clientes atendidos</p>
+          <p className="text-2xl font-bold text-emerald-600">{currency(financial.paid)}</p>
+          <p className="text-xs text-gray-400 mt-1">Pagamento confirmado</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2"><Clock3 size={16} className="text-amber-600" /><span className="text-xs text-gray-500">A receber</span></div>
+          <p className="text-2xl font-bold text-amber-600">{currency(financial.pending)}</p>
+          <p className="text-xs text-gray-400 mt-1">Aguardando pagamento</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-2"><TriangleAlert size={16} className="text-red-600" /><span className="text-xs text-gray-500">Inadimplente</span></div>
+          <p className="text-2xl font-bold text-red-600">{currency(financial.overdue)}</p>
+          <p className="text-xs text-gray-400 mt-1">Cobranças vencidas</p>
         </div>
       </div>
 
@@ -409,9 +467,10 @@ export default function ServicosPage() {
               <tr className="border-b border-gray-200">
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Servico</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Cliente</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Valor Mensal</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Valor contratado</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Duracao</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Status</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Asaas · mês</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider">Ads</th>
                 <th className="text-right text-xs text-gray-400 font-medium px-5 py-3 uppercase tracking-wider"></th>
               </tr>
@@ -430,6 +489,7 @@ export default function ServicosPage() {
                       {statusLabels[s.status] || s.status}
                     </span>
                   </td>
+                  <td className="px-5 py-3.5"><AsaasStatus service={s} /></td>
                   <td className="px-5 py-3.5">
                     <div className="flex gap-1.5">
                       {s.metaAds && <span className="text-[10px] text-blue-600/80 bg-blue-500/10 px-1.5 py-0.5 rounded">Meta</span>}
@@ -487,6 +547,10 @@ export default function ServicosPage() {
                     <Trash2 size={14} />
                   </button>
                 </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                <AsaasStatus service={s} />
+                {s.asaas.invoiceUrl && <a href={s.asaas.invoiceUrl} target="_blank" rel="noreferrer" title="Abrir cobrança no Asaas" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-accent"><ExternalLink size={14} /></a>}
               </div>
             </div>
           ))}

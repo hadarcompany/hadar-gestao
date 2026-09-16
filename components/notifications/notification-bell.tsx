@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { type TaskData, type UserSummary } from "@/lib/types";
-import { Bell, AtSign, ArrowLeftRight, Banknote, CheckCheck, Check, CircleAlert, ExternalLink, ListTodo, Loader2, Volume2, VolumeX } from "lucide-react";
+import { Bell, BellRing, AtSign, ArrowLeftRight, Banknote, CheckCheck, Check, CircleAlert, ExternalLink, ListTodo, Loader2, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NotificationItem {
@@ -50,6 +50,7 @@ export function NotificationBell() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const ref = useRef<HTMLDivElement>(null);
   const knownIdsRef = useRef<Set<string> | null>(null);
@@ -80,7 +81,7 @@ export function NotificationBell() {
 
   const showDesktopAlerts = useCallback((notifications: NotificationItem[]) => {
     if (!alertsEnabled || permission !== "granted" || notifications.length === 0) return;
-    playSound();
+    if (soundEnabled) playSound();
     notifications.slice(0, 3).forEach((item) => {
       const desktop = new window.Notification(item.title, { body: item.body || undefined, tag: item.id, icon: "/favicon.ico" });
       desktop.onclick = () => {
@@ -89,7 +90,7 @@ export function NotificationBell() {
         desktop.close();
       };
     });
-  }, [alertsEnabled, permission, playSound]);
+  }, [alertsEnabled, permission, playSound, soundEnabled]);
 
   const load = useCallback(async () => {
     try {
@@ -116,6 +117,7 @@ export function NotificationBell() {
     }
     setPermission(window.Notification.permission);
     setAlertsEnabled(localStorage.getItem("hadar-desktop-alerts") === "enabled" && window.Notification.permission === "granted");
+    setSoundEnabled(localStorage.getItem("hadar-notification-sound") !== "muted");
   }, []);
 
   useEffect(() => {
@@ -146,6 +148,15 @@ export function NotificationBell() {
       playSound();
       new window.Notification("Alertas da Hadar ativados", { body: "Pagamentos, cobranças vencidas e tarefas atrasadas aparecerão aqui." });
     }
+  }
+
+  function toggleSound() {
+    setSoundEnabled((current) => {
+      const next = !current;
+      localStorage.setItem("hadar-notification-sound", next ? "enabled" : "muted");
+      if (next) playSound();
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -246,9 +257,16 @@ export function NotificationBell() {
             <p className="text-sm font-semibold text-gray-800">Notificações</p>
             <div className="flex items-center gap-2">
               {permission !== "unsupported" && (
-                <button onClick={toggleDesktopAlerts} disabled={permission === "denied"} title={permission === "denied" ? "Permissão bloqueada no navegador" : undefined} className={cn("flex items-center gap-1 text-[11px] font-medium", alertsEnabled ? "text-emerald-600" : "text-gray-400 hover:text-accent", permission === "denied" && "cursor-not-allowed opacity-50")}>
-                  {alertsEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}{permission === "denied" ? "Bloqueado" : alertsEnabled ? "Som ativo" : "Ativar alertas"}
-                </button>
+                <>
+                  <button onClick={toggleDesktopAlerts} disabled={permission === "denied"} title={permission === "denied" ? "Permissão bloqueada no navegador" : alertsEnabled ? "Desativar avisos do Windows" : "Ativar avisos do Windows"} className={cn("flex items-center gap-1 text-[11px] font-medium", alertsEnabled ? "text-emerald-600" : "text-gray-400 hover:text-accent", permission === "denied" && "cursor-not-allowed opacity-50")}>
+                    <BellRing size={13} />{permission === "denied" ? "Windows bloqueado" : alertsEnabled ? "Windows ativo" : "Ativar no Windows"}
+                  </button>
+                  {alertsEnabled && (
+                    <button onClick={toggleSound} title={soundEnabled ? "Desativar somente o som" : "Ativar o som"} className={cn("flex items-center gap-1 text-[11px] font-medium", soundEnabled ? "text-emerald-600" : "text-gray-400 hover:text-accent")}>
+                      {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}{soundEnabled ? "Som ativo" : "Sem som"}
+                    </button>
+                  )}
+                </>
               )}
               {unread > 0 && (
                 <button onClick={markAllRead} title="Marcar todas como lidas" className="flex items-center gap-1 text-[11px] font-medium text-accent hover:text-accent-dark">
