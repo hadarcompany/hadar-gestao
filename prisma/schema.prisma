@@ -546,13 +546,36 @@ model Receivable {
   asaasNetValue     Float?
   asaasSyncedAt     DateTime?
   asaasSyncError    String?
+  revenueCompetenceMonth Int?
+  revenueCompetenceYear  Int?
+  competenceNote         String?
+  competenceAdjustedAt   DateTime?
+  competenceAdjustedById String?
 
   clientId  String
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  competenceAdjustments RevenueCompetenceAdjustment[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("receivables")
+}
+
+model RevenueCompetenceAdjustment {
+  id             String   @id @default(cuid())
+  receivableId   String
+  receivable     Receivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
+  fromMonth      Int?
+  fromYear       Int?
+  toMonth        Int
+  toYear         Int
+  reason         String
+  adjustedById   String
+  adjustedByName String
+  createdAt      DateTime @default(now())
+
+  @@index([receivableId, createdAt])
+  @@map("revenue_competence_adjustments")
 }
 
 model AsaasWebhookEvent {

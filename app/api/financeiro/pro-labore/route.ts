@@ -30,10 +30,17 @@ export async function GET(req: NextRequest) {
       where: {
         asaasPaymentId: { not: null },
         status: "PAID",
-        paidDate: {
-          gte: dateKeyToUTCDate(`${year}-${String(month).padStart(2, "0")}-01`),
-          lt: dateKeyToUTCDate(`${month === 12 ? year + 1 : year}-${String(month === 12 ? 1 : month + 1).padStart(2, "0")}-01`),
-        },
+        OR: [
+          { revenueCompetenceMonth: month, revenueCompetenceYear: year },
+          {
+            revenueCompetenceMonth: null,
+            revenueCompetenceYear: null,
+            paidDate: {
+              gte: dateKeyToUTCDate(`${year}-${String(month).padStart(2, "0")}-01`),
+              lt: dateKeyToUTCDate(`${month === 12 ? year + 1 : year}-${String(month === 12 ? 1 : month + 1).padStart(2, "0")}-01`),
+            },
+          },
+        ],
       },
     });
     const receivedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);

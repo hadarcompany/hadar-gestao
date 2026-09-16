@@ -4,6 +4,7 @@ import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { dateKeyToUTCDate, getTodayKey } from "@/lib/dates";
 import { canEdit, canView } from "@/lib/permissions";
+import { withMedia } from "@/lib/media";
 import {
   AsaasApiError,
   createAsaasCustomer,
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
     return acc;
   }, { total: 0, paid: 0, pending: 0, overdue: 0 });
 
-  return NextResponse.json({ charges, summary, integration: getAsaasConfig() });
+  return NextResponse.json({ charges: await withMedia(charges), summary, integration: getAsaasConfig() });
 }
 
 export async function POST(req: NextRequest) {

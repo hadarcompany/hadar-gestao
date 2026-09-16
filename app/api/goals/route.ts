@@ -22,16 +22,31 @@ async function calculateCurrentValue(
 
   switch (type) {
     case "REVENUE": {
+      const revenueMonths: { month: number; year: number }[] = [];
+      let currentMonth = startMonth;
+      let currentYear = startYear;
+      while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
+        revenueMonths.push({ month: currentMonth, year: currentYear });
+        currentMonth++;
+        if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+      }
       const nextMonth = endMonth === 12 ? 1 : endMonth + 1;
       const nextYear = endMonth === 12 ? endYear + 1 : endYear;
       const receivables = await prisma.receivable.findMany({
         where: {
           asaasPaymentId: { not: null },
           status: "PAID",
-          paidDate: {
-            gte: dateKeyToUTCDate(`${startYear}-${String(startMonth).padStart(2, "0")}-01`),
-            lt: dateKeyToUTCDate(`${nextYear}-${String(nextMonth).padStart(2, "0")}-01`),
-          },
+          OR: [
+            ...revenueMonths.map((item) => ({ revenueCompetenceMonth: item.month, revenueCompetenceYear: item.year })),
+            {
+              revenueCompetenceMonth: null,
+              revenueCompetenceYear: null,
+              paidDate: {
+                gte: dateKeyToUTCDate(`${startYear}-${String(startMonth).padStart(2, "0")}-01`),
+                lt: dateKeyToUTCDate(`${nextYear}-${String(nextMonth).padStart(2, "0")}-01`),
+              },
+            },
+          ],
         },
       });
       return receivables.reduce((sum, r) => sum + r.amount, 0);

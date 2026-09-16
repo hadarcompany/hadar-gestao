@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle, CheckCircle2, Clock3, ExternalLink, Loader2, Plus,
+  AlertCircle, CalendarClock, CheckCircle2, Clock3, ExternalLink, Loader2, Plus,
   Link2, ReceiptText, RefreshCw, Search, TriangleAlert, WalletCards,
 } from "lucide-react";
 import { ClientIdentity } from "@/components/clients/client-identity";
@@ -28,6 +28,10 @@ type Charge = {
   asaasInvoiceUrl: string | null;
   asaasBankSlipUrl: string | null;
   asaasSyncError: string | null;
+  revenueCompetenceMonth: number | null;
+  revenueCompetenceYear: number | null;
+  competenceNote: string | null;
+  competenceAdjustedAt: string | null;
   client: { id: string; name: string; cpfCnpj?: string | null; logoUrl?: string | null };
 };
 
@@ -99,6 +103,10 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
   const [unmatchedCustomers, setUnmatchedCustomers] = useState<UnmatchedCustomer[]>([]);
   const [linkSelections, setLinkSelections] = useState<Record<string, string>>({});
   const [linking, setLinking] = useState(false);
+  const [competenceCharge, setCompetenceCharge] = useState<Charge | null>(null);
+  const [competenceMonth, setCompetenceMonth] = useState("");
+  const [competenceReason, setCompetenceReason] = useState("");
+  const [savingCompetence, setSavingCompetence] = useState(false);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -237,6 +245,39 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
     }
   }
 
+  function openCompetence(charge: Charge) {
+    const paymentDate = charge.paidDate ? new Date(charge.paidDate) : new Date();
+    const month = charge.revenueCompetenceMonth || paymentDate.getUTCMonth() + 1;
+    const year = charge.revenueCompetenceYear || paymentDate.getUTCFullYear();
+    setCompetenceCharge(charge);
+    setCompetenceMonth(`${year}-${String(month).padStart(2, "0")}`);
+    setCompetenceReason("");
+  }
+
+  async function saveCompetence() {
+    if (!competenceCharge || !competenceMonth) return;
+    const [targetYear, targetMonth] = competenceMonth.split("-").map(Number);
+    setSavingCompetence(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/asaas/charges/${competenceCharge.id}/competence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month: targetMonth, year: targetYear, reason: competenceReason }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Não foi possível ajustar a competência.");
+      setCompetenceCharge(null);
+      setCompetenceReason("");
+      setSyncMessage("Competência ajustada. Dashboard, metas e pró-labore já considerarão o mês escolhido.");
+      await fetchCharges(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível ajustar a competência.");
+    } finally {
+      setSavingCompetence(false);
+    }
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in">
       {environment === "sandbox" && (
@@ -302,9 +343,9 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
         ) : charges.length === 0 ? (
           <div className="py-20 text-center"><WalletCards className="mx-auto mb-3 text-gray-300" size={34} /><p className="text-sm text-gray-400">Nenhuma cobrança neste período.</p></div>
         ) : (
-          <table className="w-full min-w-[940px]">
+          <table className="w-full min-w-[1080px]">
             <thead><tr className="border-b border-gray-200 bg-gray-50/70 text-left text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              <th className="px-5 py-3">Cliente</th><th className="px-5 py-3">Cobrança</th><th className="px-5 py-3">Vencimento</th><th className="px-5 py-3">Pagamento</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th>
+              <th className="px-5 py-3">Cliente</th><th className="px-5 py-3">Cobrança</th><th className="px-5 py-3">Vencimento</th><th className="px-5 py-3">Pagamento</th><th className="px-5 py-3">Competência</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th>
             </tr></thead>
             <tbody>{charges.map((charge) => (
               <tr key={charge.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">
@@ -312,8 +353,17 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
                 <td className="px-5 py-4"><p className="font-bold text-gray-800">{currency(charge.amount)}</p><p className="text-xs text-gray-400 mt-0.5">{charge.description || BILLING_LABELS[charge.billingType || ""] || "Cobrança"}</p></td>
                 <td className="px-5 py-4 text-sm text-gray-600">{formatDateBR(charge.dueDate)}</td>
                 <td className="px-5 py-4 text-sm text-gray-600">{charge.paidDate ? formatDateBR(charge.paidDate) : BILLING_LABELS[charge.billingType || ""] || "—"}</td>
+                <td className="px-5 py-4 text-sm text-gray-600">
+                  {charge.paidDate ? (
+                    <div title={charge.competenceNote || undefined}>
+                      <span className={charge.revenueCompetenceMonth ? "font-bold text-blue-700" : ""}>{String(charge.revenueCompetenceMonth || new Date(charge.paidDate).getUTCMonth() + 1).padStart(2, "0")}/{charge.revenueCompetenceYear || new Date(charge.paidDate).getUTCFullYear()}</span>
+                      {charge.revenueCompetenceMonth && <span className="block text-[10px] font-bold uppercase text-blue-500">Ajustada</span>}
+                    </div>
+                  ) : "—"}
+                </td>
                 <td className="px-5 py-4"><StatusBadge status={charge.status} />{charge.asaasSyncError && <p className="mt-1 max-w-48 truncate text-xs text-red-600" title={charge.asaasSyncError}>Falha ao sincronizar</p>}</td>
                 <td className="px-5 py-4"><div className="flex justify-end gap-2">
+                  {charge.status === "PAID" && <button onClick={() => openCompetence(charge)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-600 hover:border-blue-300 hover:text-blue-700"><CalendarClock size={13} /> Competência</button>}
                   {charge.asaasSyncError && <button onClick={() => retrySync(charge.id)} disabled={syncingId === charge.id} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50">{syncingId === charge.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Tentar novamente</button>}
                   {charge.asaasInvoiceUrl && <a href={charge.asaasInvoiceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-600 hover:border-accent hover:text-accent"><ExternalLink size={13} /> Abrir fatura</a>}
                 </div></td>
@@ -370,6 +420,28 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
                 {linking ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />} Vincular selecionados
               </button>
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={Boolean(competenceCharge)} onClose={() => !savingCompetence && setCompetenceCharge(null)} title="Ajustar competência da receita" size="sm">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+            A data real do pagamento continuará igual à registrada no Asaas. Apenas o mês usado no Dashboard, metas e pró-labore será alterado.
+          </div>
+          {competenceCharge && <div className="text-sm text-gray-600"><strong>{competenceCharge.client.name}</strong> · {currency(competenceCharge.amount)} · pago em {formatDateBR(competenceCharge.paidDate)}</div>}
+          <Input label="Mês de competência" type="month" value={competenceMonth} onChange={(event) => setCompetenceMonth(event.target.value)} />
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium uppercase tracking-wider text-gray-500">Motivo do ajuste</label>
+            <textarea value={competenceReason} onChange={(event) => setCompetenceReason(event.target.value)} placeholder="Ex.: Receita referente à prestação de contas de agosto"
+              className="min-h-24 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent-dark/50 focus:ring-1 focus:ring-accent-dark/20" />
+          </div>
+          <p className="text-xs text-gray-400">Cada alteração fica registrada com mês anterior, novo mês, motivo, usuário e data.</p>
+          <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+            <button onClick={() => setCompetenceCharge(null)} disabled={savingCompetence} className="rounded-xl px-5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100">Cancelar</button>
+            <button onClick={saveCompetence} disabled={savingCompetence || !competenceMonth || competenceReason.trim().length < 5} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2 text-sm font-bold text-white disabled:opacity-40">
+              {savingCompetence && <Loader2 size={15} className="animate-spin" />} Salvar competência
+            </button>
           </div>
         </div>
       </Modal>

@@ -46,7 +46,14 @@ export async function GET(req: NextRequest) {
     where: {
       asaasPaymentId: { not: null },
       status: "PAID",
-      paidDate: { gte: paymentRange.start, lt: paymentRange.endExclusive },
+      OR: [
+        ...months.map((m) => ({ revenueCompetenceMonth: m.month, revenueCompetenceYear: m.year })),
+        {
+          revenueCompetenceMonth: null,
+          revenueCompetenceYear: null,
+          paidDate: { gte: paymentRange.start, lt: paymentRange.endExclusive },
+        },
+      ],
     },
     include: { client: { select: { id: true, name: true } } },
   });
@@ -114,7 +121,11 @@ export async function GET(req: NextRequest) {
 
   const chartData = months.map((m) => {
     const mReceived = paidReceivables
-      .filter((r) => r.paidDate?.getUTCMonth() === m.month - 1 && r.paidDate?.getUTCFullYear() === m.year)
+      .filter((r) => {
+        const revenueMonth = r.revenueCompetenceMonth || (r.paidDate ? r.paidDate.getUTCMonth() + 1 : null);
+        const revenueYear = r.revenueCompetenceYear || r.paidDate?.getUTCFullYear();
+        return revenueMonth === m.month && revenueYear === m.year;
+      })
       .reduce((sum, r) => sum + r.amount, 0);
     const mFixed = fixedExpenses
       .filter((e) => e.month === m.month && e.year === m.year)
