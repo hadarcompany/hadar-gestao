@@ -70,58 +70,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  try {
-    if (body.type === "RECURRING" && data.monthlyValue && data.contractMonths) {
-      const months = data.contractMonths as number;
-      const value = data.monthlyValue as number;
-      const start = data.startDate ? new Date(data.startDate as Date) : new Date();
-      const receivables = [];
-
-      for (let i = 0; i < months; i++) {
-        const dueDate = new Date(start);
-        dueDate.setMonth(dueDate.getMonth() + i);
-        receivables.push({
-          amount: value,
-          dueDate,
-          month: dueDate.getMonth() + 1,
-          year: dueDate.getFullYear(),
-          clientId: body.clientId,
-          status: "PENDING" as const,
-        });
-      }
-
-      if (receivables.length > 0) {
-        await prisma.receivable.createMany({ data: receivables });
-      }
-    } else if (body.type === "FREELANCER" && data.totalValue) {
-      const total = data.totalValue as number;
-      const installments = (data.installments as number) || 1;
-      const perInstallment = total / installments;
-      const firstDate = data.dataPrimeiraParcela
-        ? new Date(data.dataPrimeiraParcela as Date)
-        : new Date();
-      const receivables = [];
-
-      for (let i = 0; i < installments; i++) {
-        const dueDate = new Date(firstDate);
-        dueDate.setMonth(dueDate.getMonth() + i);
-        receivables.push({
-          amount: Math.round(perInstallment * 100) / 100,
-          dueDate,
-          month: dueDate.getMonth() + 1,
-          year: dueDate.getFullYear(),
-          clientId: body.clientId,
-          status: "PENDING" as const,
-        });
-      }
-
-      if (receivables.length > 0) {
-        await prisma.receivable.createMany({ data: receivables });
-      }
-    }
-  } catch (e) {
-    console.error("Error auto-generating receivables:", e);
-  }
-
   return NextResponse.json(await withMedia(service), { status: 201 });
 }

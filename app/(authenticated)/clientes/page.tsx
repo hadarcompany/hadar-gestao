@@ -297,6 +297,7 @@ export default function ClientesPage() {
     const diff = new Date(c.renewalDate).getTime() - Date.now();
     return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000;
   });
+  const activeClientsWithoutEmail = clients.filter((c) => c.status === "ACTIVE" && !c.email);
 
   return (
     <div className="min-h-screen bg-transparent w-full pb-10">
@@ -331,6 +332,16 @@ export default function ClientesPage() {
                 </span>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeClientsWithoutEmail.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
+          <AlertCircle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+          <div>
+            <p className="text-sm text-amber-800 font-bold">{activeClientsWithoutEmail.length} cliente(s) ativo(s) sem e-mail</p>
+            <p className="mt-1 text-xs text-amber-700">Abra o cliente, clique em Editar Cliente e informe o mesmo e-mail cadastrado no Asaas para permitir o vínculo automático.</p>
           </div>
         </div>
       )}
@@ -912,7 +923,10 @@ function ClientTable({
               <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 overflow-hidden">
                 {client.logoUrl ? <img src={client.logoUrl} alt={client.name} className="w-full h-full object-cover" /> : client.name.charAt(0).toUpperCase()}
               </div>
-              <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate">{client.name}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-gray-800 truncate">{client.name}</span>
+                <span className={`block text-[11px] truncate ${client.email ? "text-gray-400" : "text-amber-600"}`}>{client.email || "E-mail não cadastrado"}</span>
+              </span>
               <span className={`text-[10px] uppercase tracking-wide font-bold px-2 py-0.5 rounded shrink-0 ${statusColors[client.status]}`}>
                 {statusLabels[client.status]}
               </span>

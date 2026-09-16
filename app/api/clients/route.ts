@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const client = await prisma.client.create({
     data: {
       name: body.name,
-      email: body.email || null,
+      email: body.email ? String(body.email).trim().toLowerCase() : null,
       phone: body.phone || null,
       cpfCnpj: body.cpfCnpj ? String(body.cpfCnpj).replace(/\D/g, "") : null,
       driveLink: body.driveLink || null,

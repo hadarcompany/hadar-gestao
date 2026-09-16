@@ -8,7 +8,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FilterDialog } from "@/components/ui/filter-dialog";
 import {
-  BarChart3, Receipt, CreditCard, ShoppingBag, PiggyBank, Users2,
+  BarChart3, CreditCard, ShoppingBag, PiggyBank, Users2,
   Wallet, Plus, Loader2, AlertTriangle, CheckCircle2, Clock, TrendingUp,
   TrendingDown, DollarSign, Settings, Trash2, WalletCards,
 } from "lucide-react";
@@ -27,12 +27,11 @@ const now = new Date();
 const CURRENT_MONTH = now.getMonth() + 1;
 const CURRENT_YEAR = now.getFullYear();
 
-type Tab = "dashboard" | "charges" | "receivables" | "fixed" | "variable" | "investments" | "prolabore" | "cash";
+type Tab = "dashboard" | "charges" | "fixed" | "variable" | "investments" | "prolabore" | "cash";
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "dashboard", label: "Dashboard", icon: <BarChart3 size={16} /> },
   { key: "charges", label: "Cobranças", icon: <WalletCards size={16} /> },
-  { key: "receivables", label: "Lançamentos manuais", icon: <Receipt size={16} /> },
   { key: "fixed", label: "Fixas", icon: <CreditCard size={16} /> },
   { key: "variable", label: "Avulsas", icon: <ShoppingBag size={16} /> },
   { key: "investments", label: "Investimentos", icon: <PiggyBank size={16} /> },
@@ -109,7 +108,6 @@ export default function FinanceiroPage() {
 
       {activeTab === "dashboard" && <DashboardTab />}
       {activeTab === "charges" && <AsaasChargesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
-      {activeTab === "receivables" && <ReceivablesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "fixed" && <FixedExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "variable" && <VariableExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "investments" && <InvestmentsTab />}

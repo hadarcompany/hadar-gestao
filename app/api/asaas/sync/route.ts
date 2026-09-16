@@ -13,6 +13,17 @@ function monthRange(month: number, year: number) {
   };
 }
 
+function normalizeName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(ltda|limitada|eireli|mei|me|sa|s a)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,6 +40,22 @@ export async function POST(req: NextRequest) {
     const range = monthRange(month, year);
     const payments = await listAsaasPayments({ dueDateFrom: range.from, dueDateTo: range.to });
     const customerCache = new Map<string, Awaited<ReturnType<typeof getAsaasCustomer>>>();
+    const localClients = await prisma.client.findMany({
+      select: { id: true, name: true, email: true, cpfCnpj: true, asaasCustomerId: true },
+    });
+    const clientsByNormalizedName = new Map<string, typeof localClients>();
+    for (const client of localClients) {
+      const key = normalizeName(client.name);
+      if (!key) continue;
+      clientsByNormalizedName.set(key, [...(clientsByNormalizedName.get(key) || []), client]);
+    }
+    const unmatchedCustomers = new Map<string, {
+      asaasCustomerId: string;
+      name: string;
+      email: string | null;
+      cpfCnpj: string | null;
+      chargeCount: number;
+    }>();
     let imported = 0;
     let updated = 0;
     let unmatched = 0;
@@ -52,7 +79,7 @@ export async function POST(req: NextRequest) {
           customerCache.set(payment.customer, customer);
         }
         const document = customer.cpfCnpj?.replace(/\D/g, "");
-        const matchedClient = await prisma.client.findFirst({
+        let matchedClient = await prisma.client.findFirst({
           where: {
             OR: [
               ...(customer.externalReference ? [{ id: customer.externalReference }] : []),
@@ -62,6 +89,11 @@ export async function POST(req: NextRequest) {
           },
           select: { id: true, asaasCustomerId: true, cpfCnpj: true },
         });
+        if (!matchedClient) {
+          const nameMatches = (clientsByNormalizedName.get(normalizeName(customer.name)) || [])
+            .filter((candidate) => !candidate.asaasCustomerId || candidate.asaasCustomerId === payment.customer);
+          if (nameMatches.length === 1) matchedClient = nameMatches[0];
+        }
         if (matchedClient) {
           clientId = matchedClient.id;
           if (!matchedClient.asaasCustomerId) {
@@ -75,6 +107,17 @@ export async function POST(req: NextRequest) {
 
       if (!clientId) {
         unmatched++;
+        const customer = customerCache.get(payment.customer);
+        if (customer) {
+          const existing = unmatchedCustomers.get(payment.customer);
+          unmatchedCustomers.set(payment.customer, {
+            asaasCustomerId: payment.customer,
+            name: customer.name,
+            email: customer.email || null,
+            cpfCnpj: customer.cpfCnpj || null,
+            chargeCount: (existing?.chargeCount || 0) + 1,
+          });
+        }
         continue;
       }
 
@@ -107,7 +150,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ total: payments.length, imported, updated, unmatched });
+    return NextResponse.json({
+      total: payments.length,
+      imported,
+      updated,
+      unmatched,
+      unmatchedCustomers: Array.from(unmatchedCustomers.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    });
   } catch (error) {
     if (error instanceof AsaasApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status >= 500 ? 502 : error.status });

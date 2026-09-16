@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, CheckCircle2, Clock3, ExternalLink, Loader2, Plus,
-  ReceiptText, RefreshCw, Search, TriangleAlert, WalletCards,
+  Link2, ReceiptText, RefreshCw, Search, TriangleAlert, WalletCards,
 } from "lucide-react";
 import { ClientIdentity } from "@/components/clients/client-identity";
 import { FilterDialog } from "@/components/ui/filter-dialog";
@@ -31,7 +31,14 @@ type Charge = {
   client: { id: string; name: string; cpfCnpj?: string | null; logoUrl?: string | null };
 };
 
-type ClientOption = { id: string; name: string; cpfCnpj?: string | null };
+type ClientOption = { id: string; name: string; cpfCnpj?: string | null; status: string };
+type UnmatchedCustomer = {
+  asaasCustomerId: string;
+  name: string;
+  email: string | null;
+  cpfCnpj: string | null;
+  chargeCount: number;
+};
 
 const BILLING_OPTIONS = [
   { value: "UNDEFINED", label: "Cliente escolhe na fatura" },
@@ -88,6 +95,10 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [unmatchedCustomers, setUnmatchedCustomers] = useState<UnmatchedCustomer[]>([]);
+  const [linkSelections, setLinkSelections] = useState<Record<string, string>>({});
+  const [linking, setLinking] = useState(false);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -126,7 +137,7 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
     fetch("/api/clients").then(async (response) => {
       if (!response.ok) return;
       const data = await response.json();
-      setClients(data.filter((client: { status: string }) => client.status === "ACTIVE"));
+      setClients(data);
     });
   }, []);
 
@@ -187,13 +198,42 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Não foi possível sincronizar o Asaas.");
-      const unmatched = data.unmatched ? ` ${data.unmatched} cobrança(s) não foram vinculadas; confira CPF/CNPJ ou e-mail dos clientes.` : "";
+      const pendingLinks = (data.unmatchedCustomers || []) as UnmatchedCustomer[];
+      setUnmatchedCustomers(pendingLinks);
+      const unmatched = data.unmatched ? ` ${data.unmatched} cobrança(s) aguardam vínculo com ${pendingLinks.length} cliente(s) do Asaas.` : "";
       setSyncMessage(`${data.imported} cobrança(s) importada(s) e ${data.updated} atualizada(s).${unmatched}`);
+      if (pendingLinks.length > 0) setShowLinkModal(true);
       await fetchCharges(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível sincronizar o Asaas.");
     } finally {
       setSyncingAll(false);
+    }
+  }
+
+  async function linkCustomers() {
+    const mappings = unmatchedCustomers
+      .map((customer) => ({ asaasCustomerId: customer.asaasCustomerId, clientId: linkSelections[customer.asaasCustomerId] }))
+      .filter((mapping) => Boolean(mapping.clientId));
+    if (mappings.length === 0) return;
+    setLinking(true);
+    setError("");
+    try {
+      const response = await fetch("/api/asaas/customers/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mappings }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Não foi possível vincular os clientes.");
+      setShowLinkModal(false);
+      setLinkSelections({});
+      setSyncMessage(`${data.linked} cliente(s) vinculado(s). Sincronizando as cobranças...`);
+      await syncFromAsaas();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível vincular os clientes.");
+    } finally {
+      setLinking(false);
     }
   }
 
@@ -218,7 +258,11 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
       )}
       {syncMessage && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          <span>{syncMessage}</span><button onClick={() => setSyncMessage("")} className="font-bold">Fechar</button>
+          <span>{syncMessage}</span>
+          <div className="flex items-center gap-3">
+            {unmatchedCustomers.length > 0 && <button onClick={() => setShowLinkModal(true)} className="inline-flex items-center gap-1.5 font-bold"><Link2 size={15} /> Vincular clientes</button>}
+            <button onClick={() => setSyncMessage("")} className="font-bold">Fechar</button>
+          </div>
         </div>
       )}
 
@@ -281,7 +325,7 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
 
       <Modal open={showModal} onClose={() => !saving && setShowModal(false)} title="Gerar cobrança no Asaas">
         <div className="space-y-4">
-          <SelectField label="Cliente" value={form.clientId} onChange={chooseClient} options={clients.map((client) => ({ value: client.id, label: client.name }))} placeholder="Selecione um cliente" />
+          <SelectField label="Cliente" value={form.clientId} onChange={chooseClient} options={clients.filter((client) => client.status === "ACTIVE").map((client) => ({ value: client.id, label: client.name }))} placeholder="Selecione um cliente" />
           <Input label="CPF ou CNPJ" value={form.cpfCnpj} onChange={(event) => setForm({ ...form, cpfCnpj: event.target.value })} placeholder="Obrigatório no primeiro vínculo" disabled={Boolean(selectedClient?.cpfCnpj)} />
           <div className="grid grid-cols-2 gap-4">
             <Input label="Valor (R$)" type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
@@ -295,6 +339,37 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
             <button onClick={createCharge} disabled={saving || !form.clientId || !form.cpfCnpj || !form.amount || !form.dueDate} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2 text-sm font-bold text-white disabled:opacity-40">
               {saving && <Loader2 size={15} className="animate-spin" />}{saving ? "Gerando..." : "Gerar cobrança"}
             </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={showLinkModal} onClose={() => !linking && setShowLinkModal(false)} title="Vincular clientes do Asaas" size="xl">
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-gray-600">Selecione qual cliente já cadastrado no Hadar corresponde a cada cadastro do Asaas. O vínculo é salvo uma única vez e as cobranças passam a entrar automaticamente.</p>
+          <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200">
+            {unmatchedCustomers.map((customer) => (
+              <div key={customer.asaasCustomerId} className="grid gap-3 p-4 md:grid-cols-[1fr_1.2fr] md:items-center">
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900">{customer.name}</p>
+                  <p className="mt-1 truncate text-xs text-gray-500">{customer.email || customer.cpfCnpj || "Sem e-mail/CPF cadastrado"} · {customer.chargeCount} cobrança(s)</p>
+                </div>
+                <SelectField
+                  value={linkSelections[customer.asaasCustomerId] || ""}
+                  onChange={(clientId) => setLinkSelections((current) => ({ ...current, [customer.asaasCustomerId]: clientId }))}
+                  options={clients.map((client) => ({ value: client.id, label: client.name }))}
+                  placeholder="Selecione o cliente correspondente"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-4">
+            <p className="text-xs text-gray-400">Você pode vincular apenas os que reconhecer agora e voltar depois para os demais.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowLinkModal(false)} disabled={linking} className="rounded-xl px-5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100">Cancelar</button>
+              <button onClick={linkCustomers} disabled={linking || !Object.values(linkSelections).some(Boolean)} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-2 text-sm font-bold text-white disabled:opacity-40">
+                {linking ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />} Vincular selecionados
+              </button>
+            </div>
           </div>
         </div>
       </Modal>

@@ -42,6 +42,7 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const body = await req.json();
   if (body.contractStartDate) body.contractStartDate = new Date(body.contractStartDate);
   if (body.renewalDate) body.renewalDate = new Date(body.renewalDate);
+  if (body.email !== undefined) body.email = body.email ? String(body.email).trim().toLowerCase() : null;
   if (body.cpfCnpj !== undefined) body.cpfCnpj = body.cpfCnpj ? String(body.cpfCnpj).replace(/\D/g, "") : null;
 
   // O logo só muda por /api/clients/[id]/logo; aqui ele chegaria como link e sobrescreveria a imagem.
