@@ -42,9 +42,11 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const body = await req.json();
   if (body.contractStartDate) body.contractStartDate = new Date(body.contractStartDate);
   if (body.renewalDate) body.renewalDate = new Date(body.renewalDate);
+  if (body.cpfCnpj !== undefined) body.cpfCnpj = body.cpfCnpj ? String(body.cpfCnpj).replace(/\D/g, "") : null;
 
   // O logo só muda por /api/clients/[id]/logo; aqui ele chegaria como link e sobrescreveria a imagem.
   delete body.logoUrl;
+  delete body.asaasCustomerId;
   const before = await prisma.client.findUnique({ where: { id: params.id }, select: { status: true } });
   const client = await prisma.client.update({
     where: { id: params.id },

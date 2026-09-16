@@ -10,12 +10,13 @@ import { FilterDialog } from "@/components/ui/filter-dialog";
 import {
   BarChart3, Receipt, CreditCard, ShoppingBag, PiggyBank, Users2,
   Wallet, Plus, Loader2, AlertTriangle, CheckCircle2, Clock, TrendingUp,
-  TrendingDown, DollarSign, Settings, Trash2,
+  TrendingDown, DollarSign, Settings, Trash2, WalletCards,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { formatDateBR } from "@/lib/dates";
+import { AsaasChargesTab } from "@/components/financeiro/asaas-charges-tab";
 
 // ── helpers ──────────────────────────────────────────────────────
 function R$(v: number) {
@@ -26,11 +27,12 @@ const now = new Date();
 const CURRENT_MONTH = now.getMonth() + 1;
 const CURRENT_YEAR = now.getFullYear();
 
-type Tab = "dashboard" | "receivables" | "fixed" | "variable" | "investments" | "prolabore" | "cash";
+type Tab = "dashboard" | "charges" | "receivables" | "fixed" | "variable" | "investments" | "prolabore" | "cash";
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "dashboard", label: "Dashboard", icon: <BarChart3 size={16} /> },
-  { key: "receivables", label: "A Receber", icon: <Receipt size={16} /> },
+  { key: "charges", label: "Cobranças", icon: <WalletCards size={16} /> },
+  { key: "receivables", label: "Lançamentos manuais", icon: <Receipt size={16} /> },
   { key: "fixed", label: "Fixas", icon: <CreditCard size={16} /> },
   { key: "variable", label: "Avulsas", icon: <ShoppingBag size={16} /> },
   { key: "investments", label: "Investimentos", icon: <PiggyBank size={16} /> },
@@ -106,6 +108,7 @@ export default function FinanceiroPage() {
       </div>
 
       {activeTab === "dashboard" && <DashboardTab />}
+      {activeTab === "charges" && <AsaasChargesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "receivables" && <ReceivablesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "fixed" && <FixedExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "variable" && <VariableExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
@@ -169,6 +172,10 @@ function DashboardTab() {
 
   return (
     <div className="space-y-6 animate-in fade-in">
+      <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+        <span>Faturamento previsto e recebido calculados pelas cobranças sincronizadas do Asaas. O recebido considera a data real do pagamento.</span>
+      </div>
       {/* Period filter */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
         {PERIOD_PRESETS.map((p) => (
@@ -399,6 +406,10 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
 
   return (
     <div className="animate-in fade-in">
+      <div className="mb-4 flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+        <AlertTriangle size={17} className="mt-0.5 shrink-0 text-gray-400" />
+        <span>Área legada para lançamentos manuais. Estes valores não entram mais no faturamento, nas metas ou no pró-labore, que agora usam exclusivamente o Asaas.</span>
+      </div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <FilterDialog month={month} year={year} onApply={(m, y) => { setMonth(m); setYear(y); }} />
         <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">

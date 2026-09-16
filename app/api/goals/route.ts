@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { dateKeyToUTCDate } from "@/lib/dates";
 
 async function calculateCurrentValue(
   type: string,
@@ -21,15 +22,17 @@ async function calculateCurrentValue(
 
   switch (type) {
     case "REVENUE": {
-      const months: { month: number; year: number }[] = [];
-      let cY = startYear, cM = startMonth;
-      while (cY < endYear || (cY === endYear && cM <= endMonth)) {
-        months.push({ month: cM, year: cY });
-        cM++;
-        if (cM > 12) { cM = 1; cY++; }
-      }
+      const nextMonth = endMonth === 12 ? 1 : endMonth + 1;
+      const nextYear = endMonth === 12 ? endYear + 1 : endYear;
       const receivables = await prisma.receivable.findMany({
-        where: { status: "PAID", OR: months.map((m) => ({ month: m.month, year: m.year })) },
+        where: {
+          asaasPaymentId: { not: null },
+          status: "PAID",
+          paidDate: {
+            gte: dateKeyToUTCDate(`${startYear}-${String(startMonth).padStart(2, "0")}-01`),
+            lt: dateKeyToUTCDate(`${nextYear}-${String(nextMonth).padStart(2, "0")}-01`),
+          },
+        },
       });
       return receivables.reduce((sum, r) => sum + r.amount, 0);
     }

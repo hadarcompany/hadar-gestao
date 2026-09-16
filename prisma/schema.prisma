@@ -72,6 +72,13 @@ enum ReceivableStatus {
   OVERDUE
 }
 
+enum AsaasBillingType {
+  UNDEFINED
+  BOLETO
+  CREDIT_CARD
+  PIX
+}
+
 enum FixedExpenseCategory {
   IMPOSTOS
   MARKETING
@@ -168,6 +175,8 @@ model Client {
   name               String
   email              String?
   phone              String?
+  cpfCnpj            String?
+  asaasCustomerId    String?               @unique
   driveLink          String?
   contractLink       String?
   briefing           String?
@@ -528,12 +537,33 @@ model Receivable {
   month    Int
   year     Int
 
+  description       String?
+  billingType       AsaasBillingType?
+  asaasPaymentId    String?           @unique
+  asaasStatus       String?
+  asaasInvoiceUrl   String?
+  asaasBankSlipUrl  String?
+  asaasNetValue     Float?
+  asaasSyncedAt     DateTime?
+  asaasSyncError    String?
+
   clientId  String
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("receivables")
+}
+
+model AsaasWebhookEvent {
+  id          String   @id
+  event       String
+  paymentId   String?
+  payload     Json
+  processedAt DateTime @default(now())
+
+  @@index([paymentId])
+  @@map("asaas_webhook_events")
 }
 
 model FixedExpense {

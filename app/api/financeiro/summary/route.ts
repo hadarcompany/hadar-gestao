@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { loadMediaIndex } from "@/lib/media";
+import { dateKeyToUTCDate } from "@/lib/dates";
+
+function periodDateRange(startMonth: number, startYear: number, endMonth: number, endYear: number) {
+  const start = dateKeyToUTCDate(`${startYear}-${String(startMonth).padStart(2, "0")}-01`);
+  const nextMonth = endMonth === 12 ? 1 : endMonth + 1;
+  const nextYear = endMonth === 12 ? endYear + 1 : endYear;
+  const endExclusive = dateKeyToUTCDate(`${nextYear}-${String(nextMonth).padStart(2, "0")}-01`);
+  return { start, endExclusive };
+}
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -24,33 +33,51 @@ export async function GET(req: NextRequest) {
     if (cMonth > 12) { cMonth = 1; cYear++; }
   }
 
-  const receivables = await prisma.receivable.findMany({
+  const dueReceivables = await prisma.receivable.findMany({
     where: {
+      asaasPaymentId: { not: null },
       OR: months.map((m) => ({ month: m.month, year: m.year })),
     },
     include: { client: { select: { id: true, name: true } } },
   });
 
-  const expectedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);
-  const receivedRevenue = receivables
-    .filter((r) => r.status === "PAID")
-    .reduce((sum, r) => sum + r.amount, 0);
+  const paymentRange = periodDateRange(startMonth, startYear, endMonth, endYear);
+  const paidReceivables = await prisma.receivable.findMany({
+    where: {
+      asaasPaymentId: { not: null },
+      status: "PAID",
+      paidDate: { gte: paymentRange.start, lt: paymentRange.endExclusive },
+    },
+    include: { client: { select: { id: true, name: true } } },
+  });
+
+  const expectedRevenue = dueReceivables.reduce((sum, r) => sum + r.amount, 0);
+  const receivedRevenue = paidReceivables.reduce((sum, r) => sum + r.amount, 0);
 
   const media = await loadMediaIndex();
   const clientRevenue = new Map<string, { name: string; logoUrl: string | null; expected: number; received: number }>();
-  receivables.forEach((r) => {
+  dueReceivables.forEach((r) => {
     const existing = clientRevenue.get(r.clientId);
     if (existing) {
       existing.expected += r.amount;
-      if (r.status === "PAID") existing.received += r.amount;
     } else {
       clientRevenue.set(r.clientId, {
         name: r.client.name,
         logoUrl: media.logo(r.clientId),
         expected: r.amount,
-        received: r.status === "PAID" ? r.amount : 0,
+        received: 0,
       });
     }
+  });
+  paidReceivables.forEach((r) => {
+    const existing = clientRevenue.get(r.clientId);
+    if (existing) existing.received += r.amount;
+    else clientRevenue.set(r.clientId, {
+      name: r.client.name,
+      logoUrl: media.logo(r.clientId),
+      expected: 0,
+      received: r.amount,
+    });
   });
 
   const fixedExpenses = await prisma.fixedExpense.findMany({
@@ -86,8 +113,8 @@ export async function GET(req: NextRequest) {
   const grossProfit = receivedRevenue - totalExpenses;
 
   const chartData = months.map((m) => {
-    const mReceived = receivables
-      .filter((r) => r.month === m.month && r.year === m.year && r.status === "PAID")
+    const mReceived = paidReceivables
+      .filter((r) => r.paidDate?.getUTCMonth() === m.month - 1 && r.paidDate?.getUTCFullYear() === m.year)
       .reduce((sum, r) => sum + r.amount, 0);
     const mFixed = fixedExpenses
       .filter((e) => e.month === m.month && e.year === m.year)

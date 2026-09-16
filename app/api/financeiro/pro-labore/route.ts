@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { dateKeyToUTCDate } from "@/lib/dates";
 
 interface MonthlyProLabore {
   month: number;
@@ -26,7 +27,14 @@ export async function GET(req: NextRequest) {
 
   for (let month = 1; month <= 12; month++) {
     const receivables = await prisma.receivable.findMany({
-      where: { month, year, status: "PAID" },
+      where: {
+        asaasPaymentId: { not: null },
+        status: "PAID",
+        paidDate: {
+          gte: dateKeyToUTCDate(`${year}-${String(month).padStart(2, "0")}-01`),
+          lt: dateKeyToUTCDate(`${month === 12 ? year + 1 : year}-${String(month === 12 ? 1 : month + 1).padStart(2, "0")}-01`),
+        },
+      },
     });
     const receivedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);
 

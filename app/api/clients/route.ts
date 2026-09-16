@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       name: body.name,
       email: body.email || null,
       phone: body.phone || null,
+      cpfCnpj: body.cpfCnpj ? String(body.cpfCnpj).replace(/\D/g, "") : null,
       driveLink: body.driveLink || null,
       contractLink: body.contractLink || null,
       briefing: body.briefing || null,
