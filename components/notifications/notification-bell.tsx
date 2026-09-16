@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { type TaskData, type UserSummary } from "@/lib/types";
-import { Bell, AtSign, ArrowLeftRight, CheckCheck, Check, ExternalLink, Loader2 } from "lucide-react";
+import { Bell, AtSign, ArrowLeftRight, Banknote, CheckCheck, Check, CircleAlert, ExternalLink, ListTodo, Loader2, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NotificationItem {
@@ -19,7 +19,7 @@ interface NotificationItem {
   createdAt: string;
 }
 
-const POLL_MS = 60_000;
+const POLL_MS = 30_000;
 
 function timeAgo(iso: string): string {
   const min = Math.floor(Math.max(0, Date.now() - new Date(iso).getTime()) / 60000);
@@ -35,6 +35,9 @@ function timeAgo(iso: string): string {
 function TypeIcon({ type }: { type: string }) {
   if (type === "MENTION") return <AtSign size={14} className="text-blue-600" />;
   if (type === "TRANSFER") return <ArrowLeftRight size={14} className="text-accent-dark" />;
+  if (type === "PAYMENT_RECEIVED") return <Banknote size={14} className="text-emerald-600" />;
+  if (type === "PAYMENT_OVERDUE") return <CircleAlert size={14} className="text-red-600" />;
+  if (type === "TASK_OVERDUE") return <ListTodo size={14} className="text-amber-600" />;
   return <Bell size={14} className="text-gray-400" />;
 }
 
@@ -46,19 +49,104 @@ export function NotificationBell() {
   const [task, setTask] = useState<TaskData | null>(null);
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const ref = useRef<HTMLDivElement>(null);
+  const knownIdsRef = useRef<Set<string> | null>(null);
+  const audioRef = useRef<AudioContext | null>(null);
+
+  const playSound = useCallback(() => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const context = audioRef.current || new AudioContextClass();
+      audioRef.current = context;
+      if (context.state === "suspended") context.resume().catch(() => {});
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(740, context.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(1040, context.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.3);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.32);
+    } catch {
+      // O navegador pode bloquear áudio antes da primeira interação do usuário.
+    }
+  }, []);
+
+  const showDesktopAlerts = useCallback((notifications: NotificationItem[]) => {
+    if (!alertsEnabled || permission !== "granted" || notifications.length === 0) return;
+    playSound();
+    notifications.slice(0, 3).forEach((item) => {
+      const desktop = new window.Notification(item.title, { body: item.body || undefined, tag: item.id, icon: "/favicon.ico" });
+      desktop.onclick = () => {
+        window.focus();
+        window.location.href = item.taskId ? "/meu-trabalho" : "/financeiro";
+        desktop.close();
+      };
+    });
+  }, [alertsEnabled, permission, playSound]);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications");
       if (!res.ok) return;
       const d = await res.json();
-      setItems(d.notifications ?? []);
+      const nextItems = (d.notifications ?? []) as NotificationItem[];
+      if (knownIdsRef.current) {
+        const fresh = nextItems.filter((item) => !item.read && !knownIdsRef.current!.has(item.id));
+        showDesktopAlerts(fresh);
+      }
+      knownIdsRef.current = new Set(nextItems.map((item) => item.id));
+      setItems(nextItems);
       setUnread(d.unreadCount ?? 0);
     } catch {
       // mantém a lista anterior; tenta de novo no próximo ciclo
     }
+  }, [showDesktopAlerts]);
+
+  useEffect(() => {
+    if (!("Notification" in window)) {
+      setPermission("unsupported");
+      return;
+    }
+    setPermission(window.Notification.permission);
+    setAlertsEnabled(localStorage.getItem("hadar-desktop-alerts") === "enabled" && window.Notification.permission === "granted");
   }, []);
+
+  useEffect(() => {
+    if (!alertsEnabled) return;
+    const unlockAudio = () => {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass && !audioRef.current) audioRef.current = new AudioContextClass();
+      audioRef.current?.resume().catch(() => {});
+    };
+    document.addEventListener("pointerdown", unlockAudio, { once: true });
+    return () => document.removeEventListener("pointerdown", unlockAudio);
+  }, [alertsEnabled]);
+
+  async function toggleDesktopAlerts() {
+    if (!("Notification" in window)) return;
+    if (alertsEnabled) {
+      localStorage.removeItem("hadar-desktop-alerts");
+      setAlertsEnabled(false);
+      return;
+    }
+    const nextPermission = window.Notification.permission === "granted"
+      ? "granted"
+      : await window.Notification.requestPermission();
+    setPermission(nextPermission);
+    if (nextPermission === "granted") {
+      localStorage.setItem("hadar-desktop-alerts", "enabled");
+      setAlertsEnabled(true);
+      playSound();
+      new window.Notification("Alertas da Hadar ativados", { body: "Pagamentos, cobranças vencidas e tarefas atrasadas aparecerão aqui." });
+    }
+  }
 
   useEffect(() => {
     load();
@@ -96,7 +184,10 @@ export function NotificationBell() {
 
   async function openItem(n: NotificationItem) {
     markRead(n);
-    if (!n.taskId) return;
+    if (!n.taskId) {
+      if (n.type === "PAYMENT_RECEIVED" || n.type === "PAYMENT_OVERDUE") window.location.href = "/financeiro";
+      return;
+    }
 
     setOpeningId(n.id);
     try {
@@ -153,11 +244,18 @@ export function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-800">Notificações</p>
-            {unread > 0 && (
-              <button onClick={markAllRead} className="flex items-center gap-1 text-[11px] font-medium text-accent hover:text-accent-dark">
-                <CheckCheck size={13} /> Marcar todas como lidas
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {permission !== "unsupported" && (
+                <button onClick={toggleDesktopAlerts} disabled={permission === "denied"} title={permission === "denied" ? "Permissão bloqueada no navegador" : undefined} className={cn("flex items-center gap-1 text-[11px] font-medium", alertsEnabled ? "text-emerald-600" : "text-gray-400 hover:text-accent", permission === "denied" && "cursor-not-allowed opacity-50")}>
+                  {alertsEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}{permission === "denied" ? "Bloqueado" : alertsEnabled ? "Som ativo" : "Ativar alertas"}
+                </button>
+              )}
+              {unread > 0 && (
+                <button onClick={markAllRead} title="Marcar todas como lidas" className="flex items-center gap-1 text-[11px] font-medium text-accent hover:text-accent-dark">
+                  <CheckCheck size={13} /><span className="hidden sm:inline">Ler todas</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="max-h-[60vh] overflow-y-auto">

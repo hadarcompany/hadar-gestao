@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, CalendarClock, CheckCircle2, Clock3, ExternalLink, Loader2, Plus,
-  Link2, ReceiptText, RefreshCw, Search, TriangleAlert, WalletCards,
+  ArrowDown, ArrowUp, ArrowUpDown, Link2, ReceiptText, RefreshCw, Search, TriangleAlert, WalletCards,
 } from "lucide-react";
 import { ClientIdentity } from "@/components/clients/client-identity";
 import { FilterDialog } from "@/components/ui/filter-dialog";
@@ -14,6 +14,8 @@ import { formatDateBR } from "@/lib/dates";
 
 type ChargeStatus = "PENDING" | "PAID" | "OVERDUE";
 type BillingType = "UNDEFINED" | "BOLETO" | "PIX" | "CREDIT_CARD";
+type SortKey = "client" | "amount" | "dueDate" | "paidDate" | "competence" | "status";
+type SortState = { key: SortKey; direction: "asc" | "desc" };
 
 type Charge = {
   id: string;
@@ -83,6 +85,18 @@ function SummaryCard({ label, value, icon, color }: { label: string; value: numb
   );
 }
 
+function SortableHeader({ label, sortKey, sort, onSort }: { label: string; sortKey: SortKey; sort: SortState; onSort: (key: SortKey) => void }) {
+  const active = sort.key === sortKey;
+  const Icon = active ? (sort.direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <th className="px-5 py-3">
+      <button type="button" onClick={() => onSort(sortKey)} className={`inline-flex items-center gap-1.5 transition-colors hover:text-gray-700 ${active ? "text-gray-700" : ""}`}>
+        {label}<Icon size={12} aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
 export function AsaasChargesTab({ month, year, setMonth, setYear }: {
   month: number;
   year: number;
@@ -111,6 +125,7 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [syncMessage, setSyncMessage] = useState("");
+  const [sort, setSort] = useState<SortState>({ key: "dueDate", direction: "desc" });
   const [form, setForm] = useState({
     clientId: "", cpfCnpj: "", amount: "", dueDate: "", billingType: "UNDEFINED" as BillingType, description: "",
   });
@@ -150,6 +165,33 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
   }, []);
 
   const selectedClient = useMemo(() => clients.find((client) => client.id === form.clientId), [clients, form.clientId]);
+  const sortedCharges = useMemo(() => {
+    const valueFor = (charge: Charge): string | number | null => {
+      if (sort.key === "client") return charge.client.name;
+      if (sort.key === "amount") return charge.amount;
+      if (sort.key === "dueDate") return charge.dueDate;
+      if (sort.key === "paidDate") return charge.paidDate;
+      if (sort.key === "status") return ({ OVERDUE: 0, PENDING: 1, PAID: 2 } as const)[charge.status];
+      if (!charge.paidDate) return null;
+      const date = new Date(charge.paidDate);
+      return (charge.revenueCompetenceYear || date.getUTCFullYear()) * 100 + (charge.revenueCompetenceMonth || date.getUTCMonth() + 1);
+    };
+    const direction = sort.direction === "asc" ? 1 : -1;
+    return [...charges].sort((a, b) => {
+      const left = valueFor(a);
+      const right = valueFor(b);
+      if (left === null) return right === null ? 0 : 1;
+      if (right === null) return -1;
+      if (typeof left === "number" && typeof right === "number") return (left - right) * direction;
+      return String(left).localeCompare(String(right), "pt-BR", { sensitivity: "base", numeric: true }) * direction;
+    });
+  }, [charges, sort]);
+
+  function changeSort(key: SortKey) {
+    setSort((current) => current.key === key
+      ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+      : { key, direction: key === "client" ? "asc" : "desc" });
+  }
 
   function chooseClient(clientId: string) {
     const client = clients.find((item) => item.id === clientId);
@@ -345,9 +387,15 @@ export function AsaasChargesTab({ month, year, setMonth, setYear }: {
         ) : (
           <table className="w-full min-w-[1080px]">
             <thead><tr className="border-b border-gray-200 bg-gray-50/70 text-left text-[11px] font-bold uppercase tracking-wider text-gray-400">
-              <th className="px-5 py-3">Cliente</th><th className="px-5 py-3">Cobrança</th><th className="px-5 py-3">Vencimento</th><th className="px-5 py-3">Pagamento</th><th className="px-5 py-3">Competência</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th>
+              <SortableHeader label="Cliente" sortKey="client" sort={sort} onSort={changeSort} />
+              <SortableHeader label="Cobrança" sortKey="amount" sort={sort} onSort={changeSort} />
+              <SortableHeader label="Vencimento" sortKey="dueDate" sort={sort} onSort={changeSort} />
+              <SortableHeader label="Pagamento" sortKey="paidDate" sort={sort} onSort={changeSort} />
+              <SortableHeader label="Competência" sortKey="competence" sort={sort} onSort={changeSort} />
+              <SortableHeader label="Status" sortKey="status" sort={sort} onSort={changeSort} />
+              <th className="px-5 py-3 text-right">Ações</th>
             </tr></thead>
-            <tbody>{charges.map((charge) => (
+            <tbody>{sortedCharges.map((charge) => (
               <tr key={charge.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">
                 <td className="px-5 py-4"><ClientIdentity client={charge.client} /></td>
                 <td className="px-5 py-4"><p className="font-bold text-gray-800">{currency(charge.amount)}</p><p className="text-xs text-gray-400 mt-0.5">{charge.description || BILLING_LABELS[charge.billingType || ""] || "Cobrança"}</p></td>

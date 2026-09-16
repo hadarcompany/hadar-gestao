@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { dateKeyToUTCDate, dateKeyToUTCEndOfDay, getCurrentWeekRange, getTodayKey, toDateKey } from "@/lib/dates";
 import { TASK_INCLUDE } from "@/lib/task-transfer";
 import { applyMedia, loadMediaIndex } from "@/lib/media";
+import { canView } from "@/lib/permissions";
 
 /**
  * period = intervalo [from, to] em chaves YYYY-MM-DD. Se ausente, usa a semana
@@ -25,6 +26,11 @@ export async function GET(req: NextRequest) {
   const rangeStart = dateKeyToUTCDate(fromKey);
   const rangeEnd = dateKeyToUTCEndOfDay(toKey);
   const todayStart = dateKeyToUTCDate(getTodayKey());
+  const [currentYear, currentMonth] = getTodayKey().split("-").map(Number);
+  const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+  const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+  const monthStart = dateKeyToUTCDate(`${currentYear}-${String(currentMonth).padStart(2, "0")}-01`);
+  const monthEnd = dateKeyToUTCDate(`${nextYear}-${String(nextMonth).padStart(2, "0")}-01`);
 
   const [pending, inProgress, overdue, completedInRange, upcomingRenewals] = await Promise.all([
     prisma.task.count({ where: { status: "PENDING" } }),
@@ -52,11 +58,70 @@ export async function GET(req: NextRequest) {
     take: 12,
   });
 
+  let financialSummary = null;
+  if (canView(auth, "financeiro")) {
+    await prisma.receivable.updateMany({
+      where: { asaasPaymentId: { not: null }, status: "PENDING", dueDate: { lt: todayStart } },
+      data: { status: "OVERDUE" },
+    });
+
+    const [paid, pendingReceivables, overdueReceivables, fixed, variableExpenses, investments] = await Promise.all([
+      prisma.receivable.findMany({
+        where: {
+          asaasPaymentId: { not: null },
+          status: "PAID",
+          OR: [
+            { revenueCompetenceMonth: currentMonth, revenueCompetenceYear: currentYear },
+            { revenueCompetenceMonth: null, revenueCompetenceYear: null, paidDate: { gte: monthStart, lt: monthEnd } },
+          ],
+        },
+        select: { amount: true },
+      }),
+      prisma.receivable.findMany({
+        where: { asaasPaymentId: { not: null }, status: "PENDING", month: currentMonth, year: currentYear },
+        select: { amount: true },
+      }),
+      prisma.receivable.findMany({
+        where: { asaasPaymentId: { not: null }, status: "OVERDUE" },
+        select: { amount: true, dueDate: true, clientId: true, client: { select: { id: true, name: true } } },
+        orderBy: { dueDate: "asc" },
+      }),
+      prisma.fixedExpense.findMany({ where: { month: currentMonth, year: currentYear }, select: { amount: true } }),
+      prisma.variableExpense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } }, select: { amount: true } }),
+      prisma.investment.findMany({ where: { date: { gte: monthStart, lt: monthEnd } }, select: { amount: true } }),
+    ]);
+
+    const received = paid.reduce((sum, item) => sum + item.amount, 0);
+    const pendingValue = pendingReceivables.reduce((sum, item) => sum + item.amount, 0);
+    const overdueValue = overdueReceivables.reduce((sum, item) => sum + item.amount, 0);
+    const expenses = [...fixed, ...variableExpenses, ...investments].reduce((sum, item) => sum + item.amount, 0);
+    const overdueByClient = new Map<string, { id: string; name: string; amount: number; dueDate: Date }>();
+    overdueReceivables.forEach((item) => {
+      const current = overdueByClient.get(item.clientId);
+      if (current) current.amount += item.amount;
+      else overdueByClient.set(item.clientId, { ...item.client, amount: item.amount, dueDate: item.dueDate });
+    });
+    financialSummary = {
+      month: currentMonth,
+      year: currentYear,
+      received,
+      pending: pendingValue,
+      overdue: overdueValue,
+      expenses,
+      result: received - expenses,
+      overdueClients: Array.from(overdueByClient.values()).slice(0, 5),
+    };
+  }
+
   const media = await loadMediaIndex();
   return NextResponse.json({
     range: { from: fromKey, to: toKey },
     stats: { pending, inProgress, overdue, completedInRange },
     nextDeliveries: applyMedia(nextDeliveries.map((t) => ({ ...t, dueDateKey: toDateKey(t.dueDate) })), media),
     upcomingRenewals: applyMedia(upcomingRenewals, media, "client"),
+    financialSummary: financialSummary ? {
+      ...financialSummary,
+      overdueClients: applyMedia(financialSummary.overdueClients, media, "client"),
+    } : null,
   });
 }

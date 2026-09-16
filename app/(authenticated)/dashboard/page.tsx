@@ -1,6 +1,7 @@
 "use client";
 
 import { ClientIdentity } from "@/components/clients/client-identity";
+import Link from "next/link";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { TaskRow } from "@/components/tasks/task-row";
@@ -9,13 +10,27 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { CommercialPanel } from "@/components/dashboard/commercial-panel";
 import { getCurrentWeekRange, formatDayMonthBR } from "@/lib/dates";
 import { type TaskData } from "@/lib/types";
-import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowUpRight } from "lucide-react";
+import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowUpRight, CircleDollarSign, Wallet, TrendingUp } from "lucide-react";
 
 interface DashboardData {
   range: { from: string; to: string };
   stats: { pending: number; inProgress: number; overdue: number; completedInRange: number };
   nextDeliveries: TaskData[];
   upcomingRenewals: Array<{ id: string; name: string; logoUrl?: string | null; renewalDate: string }>;
+  financialSummary: null | {
+    month: number;
+    year: number;
+    received: number;
+    pending: number;
+    overdue: number;
+    expenses: number;
+    result: number;
+    overdueClients: Array<{ id: string; name: string; logoUrl?: string | null; amount: number; dueDate: string }>;
+  };
+}
+
+function currency(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function currentWeekAsRange() {
@@ -97,6 +112,45 @@ export default function DashboardPage() {
       </h1>
 
       <CommercialPanel />
+
+      {data?.financialSummary && (
+        <section className="mb-5 rounded-xl border border-gray-200 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Resumo financeiro</h2>
+              <p className="text-[11px] text-gray-400">Mês atual · dados do Asaas e competência ajustada</p>
+            </div>
+            <Link href="/financeiro" className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-dark">Ver financeiro <ArrowUpRight size={13} /></Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+            {[
+              { label: "Recebido", value: data.financialSummary.received, icon: CircleDollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
+              { label: "A receber", value: data.financialSummary.pending, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
+              { label: "Inadimplente", value: data.financialSummary.overdue, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50" },
+              { label: "Despesas", value: data.financialSummary.expenses, icon: Wallet, color: "text-gray-600", bg: "bg-gray-100" },
+              { label: "Resultado", value: data.financialSummary.result, icon: TrendingUp, color: data.financialSummary.result >= 0 ? "text-blue-600" : "text-red-600", bg: data.financialSummary.result >= 0 ? "bg-blue-50" : "bg-red-50" },
+            ].map((card) => (
+              <div key={card.label} className="flex min-w-0 items-center gap-3 rounded-xl border border-gray-100 px-3 py-3">
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${card.bg}`}><card.icon size={16} className={card.color} /></span>
+                <span className="min-w-0"><span className={`block truncate text-base font-bold ${card.color}`}>{currency(card.value)}</span><span className="block text-[11px] text-gray-400">{card.label}</span></span>
+              </div>
+            ))}
+          </div>
+          {data.financialSummary.overdueClients.length > 0 && (
+            <div className="mt-4 border-t border-gray-100 pt-3">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-red-500">Clientes com cobrança vencida</p>
+              <div className="flex flex-wrap gap-2">
+                {data.financialSummary.overdueClients.map((client) => (
+                  <Link key={client.id} href="/financeiro" className="flex min-w-[210px] items-center justify-between gap-3 rounded-lg border border-red-100 bg-red-50/50 px-3 py-2 text-xs hover:border-red-200">
+                    <ClientIdentity client={client} />
+                    <span className="shrink-0 font-bold text-red-600">{currency(client.amount)}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 className="text-sm font-semibold text-gray-800">Operação</h2>

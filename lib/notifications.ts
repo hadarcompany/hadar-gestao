@@ -8,6 +8,7 @@ export async function createNotification(params: {
   body?: string | null;
   taskId?: string | null;
   clientId?: string | null;
+  dedupeKey?: string | null;
 }) {
   return prisma.notification.create({
     data: {
@@ -17,6 +18,7 @@ export async function createNotification(params: {
       body: params.body ?? null,
       taskId: params.taskId ?? null,
       clientId: params.clientId ?? null,
+      dedupeKey: params.dedupeKey ?? null,
     },
   });
 }

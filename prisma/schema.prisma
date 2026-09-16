@@ -130,6 +130,9 @@ enum NotificationType {
   MENTION
   TRANSFER
   TASK_UPDATE
+  TASK_OVERDUE
+  PAYMENT_RECEIVED
+  PAYMENT_OVERDUE
 }
 
 enum LeadStage {
@@ -259,7 +262,7 @@ model Task {
   transferEvents TaskTransferEvent[]
   chatMessages   ClientChatMessage[]
   attachments    TaskAttachment[]
-  project        Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project        Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
   updates        TaskUpdate[]
 
   @@index([projectId])
@@ -403,6 +406,7 @@ model Notification {
   body      String?
   taskId    String?
   clientId  String?
+  dedupeKey String?          @unique
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
 
@@ -537,32 +541,32 @@ model Receivable {
   month    Int
   year     Int
 
-  description       String?
-  billingType       AsaasBillingType?
-  asaasPaymentId    String?           @unique
-  asaasStatus       String?
-  asaasInvoiceUrl   String?
-  asaasBankSlipUrl  String?
-  asaasNetValue     Float?
-  asaasSyncedAt     DateTime?
-  asaasSyncError    String?
+  description            String?
+  billingType            AsaasBillingType?
+  asaasPaymentId         String?           @unique
+  asaasStatus            String?
+  asaasInvoiceUrl        String?
+  asaasBankSlipUrl       String?
+  asaasNetValue          Float?
+  asaasSyncedAt          DateTime?
+  asaasSyncError         String?
   revenueCompetenceMonth Int?
   revenueCompetenceYear  Int?
   competenceNote         String?
   competenceAdjustedAt   DateTime?
   competenceAdjustedById String?
 
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId              String
+  client                Client                        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   competenceAdjustments RevenueCompetenceAdjustment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
 
   @@map("receivables")
 }
 
 model RevenueCompetenceAdjustment {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   receivableId   String
   receivable     Receivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
   fromMonth      Int?
@@ -572,7 +576,7 @@ model RevenueCompetenceAdjustment {
   reason         String
   adjustedById   String
   adjustedByName String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime   @default(now())
 
   @@index([receivableId, createdAt])
   @@map("revenue_competence_adjustments")
