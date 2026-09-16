@@ -16,14 +16,13 @@ import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { TaskLabels } from "@/components/tasks/label-picker";
 import { TaskUpdates } from "@/components/tasks/task-updates";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task-templates";
-import { AREAS, areaInfo } from "@/lib/areas";
+import { useAreas } from "@/contexts/areas-context";
 import { formatDateBR } from "@/lib/dates";
 import { type TaskData, type UserSummary, type TaskAttachmentData } from "@/lib/types";
 import {
   CheckSquare, Square, Clock, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip,
   Upload, Download, Loader2, X, ChevronLeft, ChevronRight, FolderKanban,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 /** Tipos exibidos inline (SVG fica de fora: pode carregar script). */
 const PREVIEWABLE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -80,6 +79,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
   const [transferSaving, setTransferSaving] = useState(false);
 
   const { user } = useAuth();
+  const { areas, byId: areaById } = useAreas();
   const [deletingAttachment, setDeletingAttachment] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<TaskAttachmentData[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
@@ -309,7 +309,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
   }
 
   const statusOpt = STATUS_OPTIONS.find((s) => s.value === task.status);
-  const taskArea = areaInfo(task.area);
+  const taskArea = task.area ? areaById.get(task.area) : undefined;
   const statusVariant = ({ PENDING: "default", IN_PROGRESS: "info", IN_REVIEW: "purple", COMPLETED: "success", CANCELLED: "danger" } as const)[task.status] || "default";
 
   return (
@@ -383,7 +383,14 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                 <Badge variant={statusVariant}>{statusOpt?.label ?? ""}</Badge>
                 <PriorityBadge priority={priority} onChange={changePriority} />
                 {task.type && <Badge>{task.type.replace(/_/g, " ")}</Badge>}
-                {taskArea && <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", taskArea.color)}>{taskArea.label}</span>}
+                {taskArea && (
+                  <span
+                    className="text-xs font-medium px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: `${taskArea.color}1a`, color: taskArea.color }}
+                  >
+                    {taskArea.name}
+                  </span>
+                )}
                 {task.project && (
                   <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                     <FolderKanban size={11} /> {task.project.name}
@@ -502,7 +509,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
               <SelectField label="Status" value={status} onChange={setStatus}
                 options={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))} />
               <SelectField label="Área" value={area} onChange={setArea} placeholder="Sem área"
-                options={AREAS.map((a) => ({ value: a.value, label: a.label }))} />
+                options={areas.map((a) => ({ value: a.id, label: a.name }))} />
               <SelectField label="Projeto" value={projectId} onChange={setProjectId} placeholder="Sem projeto"
                 options={projects
                   .filter((p) => p.status !== "CONCLUIDO" || p.id === projectId)

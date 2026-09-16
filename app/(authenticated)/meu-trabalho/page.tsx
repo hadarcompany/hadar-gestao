@@ -5,9 +5,11 @@ import { useAuth } from "@/contexts/auth-context";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { CreateTaskModal } from "@/components/tasks/create-task-modal";
 import { TaskRow } from "@/components/tasks/task-row";
+import { TaskListHeader } from "@/components/tasks/task-list-header";
 import { Avatar } from "@/components/ui/avatar";
 import { type TaskData } from "@/lib/types";
 import { getTaskBucket } from "@/lib/dates";
+import { sortTasks, type SortKey, type SortState } from "@/lib/task-sort";
 import {
   Loader2, Plus, Bell, CheckSquare, AtSign, ArrowLeftRight, ExternalLink, Check, CheckCheck,
   ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown,
@@ -58,7 +60,8 @@ export default function MeuTrabalhoPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [tab, setTab] = useState<TabKey>("ALL");
   const [clientFilter, setClientFilter] = useState("");
-  // Clientes nascem fechados: as tarefas aparecem ao clicar no cliente.
+  const [sort, setSort] = useState<SortState>({ key: "dueDate", dir: "asc" });
+  // Clientes nascem fechados na aba Concluídas: as tarefas aparecem ao clicar no cliente.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -113,17 +116,6 @@ export default function MeuTrabalhoPage() {
       else if (bucket === "OVERDUE") groups.OVERDUE.push(task);
       else groups.UPCOMING.push(task);
     });
-    const byDueAsc = (a: TaskData, b: TaskData) => {
-      if (!a.dueDate && !b.dueDate) return 0;
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-    };
-    groups.ALL.sort(byDueAsc);
-    groups.TODAY.sort(byDueAsc);
-    groups.OVERDUE.sort(byDueAsc);
-    groups.UPCOMING.sort(byDueAsc);
-    groups.COMPLETED.sort((a, b) => new Date(b.completedAt ?? b.updatedAt).getTime() - new Date(a.completedAt ?? a.updatedAt).getTime());
     return groups;
   }, [scopedTasks]);
 
@@ -131,9 +123,13 @@ export default function MeuTrabalhoPage() {
   const totalDone = buckets.COMPLETED.filter((t) => t.status === "COMPLETED").length;
   const completionRate = totalActive + totalDone > 0 ? Math.round((totalDone / (totalActive + totalDone)) * 100) : 0;
 
-  const displayedTasks = buckets[tab];
+  const displayedTasks = useMemo(() => sortTasks(buckets[tab], sort), [buckets, tab, sort]);
 
-  // Mesma organização do histórico: por cliente, ativos em cima e inativos embaixo.
+  function handleSort(key: SortKey) {
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  }
+
+  // Só a aba Concluídas, que acumula, fica agrupada por cliente.
   const { activeGroups, inactiveGroups } = useMemo(() => {
     const statusById = new Map(clients.map((c) => [c.id, c.status]));
     const groups = new Map<string, ClientGroup>();
@@ -235,6 +231,7 @@ export default function MeuTrabalhoPage() {
               </button>
               {open && (
                 <div className="border-t border-gray-100">
+                  <TaskListHeader sort={sort} onSort={handleSort} showClient={false} />
                   {g.tasks.map((task) => (
                     <TaskRow
                       key={task.id}
@@ -367,6 +364,7 @@ export default function MeuTrabalhoPage() {
           ) : tab !== "COMPLETED" ? (
             // Abas do dia a dia: lista direta. Só as concluídas, que acumulam, ficam por cliente.
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <TaskListHeader sort={sort} onSort={handleSort} />
               {displayedTasks.map((task) => (
                 <TaskRow
                   key={task.id}

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { LabelsProvider } from "@/contexts/labels-context";
+import { AreasProvider } from "@/contexts/areas-context";
 
 export default function AuthenticatedLayout({
   children,
@@ -33,6 +34,7 @@ export default function AuthenticatedLayout({
 
   return (
     <LabelsProvider>
+      <AreasProvider>
       <div className="flex min-h-screen">
         <Sidebar />
         <main className="flex-1 ml-60 px-8 pb-8">
@@ -42,6 +44,7 @@ export default function AuthenticatedLayout({
           {children}
         </main>
       </div>
+      </AreasProvider>
     </LabelsProvider>
   );
 }

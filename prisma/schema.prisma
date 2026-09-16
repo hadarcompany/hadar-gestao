@@ -257,6 +257,18 @@ model Task {
   @@map("tasks")
 }
 
+/// Área de trabalho com nome editável. O id é o código gravado em `Task.area`
+/// (EDICAO, CAPTACAO, DESIGN, OPERACAO), então renomear não mexe nas tarefas.
+model TaskArea {
+  id        String   @id
+  name      String
+  color     String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("task_areas")
+}
+
 /// Etiqueta personalizável (nome + cor). As tarefas guardam os ids em `Task.labelIds`,
 /// então renomear ou trocar a cor reflete em todas de uma vez.
 model TaskLabel {

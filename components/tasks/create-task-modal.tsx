@@ -15,7 +15,8 @@ import {
   type TaskType,
   type ChecklistItem,
 } from "@/lib/task-templates";
-import { AREAS, areaForType, defaultAssigneeFor } from "@/lib/areas";
+import { areaForType, defaultAssigneeFor } from "@/lib/areas";
+import { useAreas } from "@/contexts/areas-context";
 import { Plus, Trash2, GripVertical } from "lucide-react";
 
 interface User { id: string; name: string; email?: string | null; }
@@ -34,6 +35,7 @@ interface CreateTaskModalProps {
 }
 
 export function CreateTaskModal({ open, onClose, onCreated, users, clients, initialClientId, initialPublishDate, initialProjectId }: CreateTaskModalProps) {
+  const { areas } = useAreas();
   const [loading, setLoading] = useState(false);
   const [taskType, setTaskType] = useState<string>("");
   const [title, setTitle] = useState("");
@@ -181,7 +183,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
             value={area}
             onChange={setArea}
             placeholder="Sem área"
-            options={AREAS.map((a) => ({ value: a.value, label: a.label }))}
+            options={areas.map((a) => ({ value: a.id, label: a.name }))}
           />
           <SelectField
             label="Projeto"
