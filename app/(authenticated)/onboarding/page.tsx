@@ -78,6 +78,7 @@ export default function OnboardingPage() {
   );
 
   function updateTask(updated: TaskData) {
+    setSelectedTask((current) => current?.id === updated.id ? updated : current);
     setProjects((prev) => prev.map((p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === updated.id ? updated : t)) })));
   }
 

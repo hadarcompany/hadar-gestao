@@ -113,6 +113,7 @@ export default function TarefasConcluidasPage() {
   }
 
   function handleTaskChanged(updated: TaskData) {
+    setSelectedTask((current) => current?.id === updated.id ? updated : current);
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
 

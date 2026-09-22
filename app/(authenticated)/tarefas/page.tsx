@@ -96,6 +96,7 @@ export default function TarefasPage() {
   const hasFilters = filterStatus || filterClient || filterPriority || filterAssignee;
 
   function handleRowUpdated(updated: TaskData) {
+    setSelectedTask((current) => current?.id === updated.id ? updated : current);
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
 

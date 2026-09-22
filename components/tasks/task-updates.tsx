@@ -40,11 +40,19 @@ export function TaskUpdates({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [descriptionMeta, setDescriptionMeta] = useState(() => ({
+    author: task.descriptionUpdatedBy ?? task.createdBy,
+    at: task.descriptionUpdatedAt ?? task.createdAt,
+  }));
 
   useEffect(() => {
     setDescription(task.description ?? "");
+    setDescriptionMeta({
+      author: task.descriptionUpdatedBy ?? task.createdBy,
+      at: task.descriptionUpdatedAt ?? task.createdAt,
+    });
     setEditingDesc(false);
-  }, [task.id, task.description]);
+  }, [task.id, task.description, task.descriptionUpdatedAt, task.descriptionUpdatedBy, task.createdAt, task.createdBy]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -60,7 +68,7 @@ export function TaskUpdates({
 
   const hasDescription = description.trim().length > 0;
   const isEmpty = !hasDescription && items.length === 0;
-  const descriptionAuthor = task.descriptionUpdatedBy ?? task.createdBy;
+  const descriptionAuthor = descriptionMeta.author;
   const descriptionAuthorProfile = users.find((u) => u.id === descriptionAuthor?.id);
 
   async function patchDescription(next: string) {
@@ -72,6 +80,10 @@ export function TaskUpdates({
     if (!res.ok) throw new Error("Não foi possível salvar a descrição");
     const updated: TaskData = await res.json();
     setDescription(updated.description ?? "");
+    setDescriptionMeta({
+      author: updated.descriptionUpdatedBy ?? updated.createdBy,
+      at: updated.descriptionUpdatedAt ?? updated.createdAt,
+    });
     onTaskChanged?.(updated);
   }
 
@@ -139,7 +151,7 @@ export function TaskUpdates({
                 <Avatar name={descriptionAuthor?.name} image={descriptionAuthorProfile?.image} size={24} className="text-[10px]" />
                 <span className="text-xs font-semibold text-gray-800">{descriptionAuthor?.name ?? "Usuário"}</span>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded">Descrição</span>
-                <span className="text-[10px] text-gray-400">{formatWhen(task.descriptionUpdatedAt ?? task.createdAt)}</span>
+                <span className="text-[10px] text-gray-400">{formatWhen(descriptionMeta.at)}</span>
                 {!editingDesc && (
                   <button
                     type="button"

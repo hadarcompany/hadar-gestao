@@ -95,6 +95,7 @@ export default function DashboardPage() {
   }
 
   function handleRowUpdated(updated: TaskData) {
+    setSelectedTask((current) => current?.id === updated.id ? updated : current);
     setData((prev) => (prev ? { ...prev, nextDeliveries: prev.nextDeliveries.map((t) => (t.id === updated.id ? updated : t)) } : prev));
   }
 

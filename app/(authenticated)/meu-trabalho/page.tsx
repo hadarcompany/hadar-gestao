@@ -164,6 +164,7 @@ export default function MeuTrabalhoPage() {
   }
 
   function handleRowUpdated(updated: TaskData) {
+    setSelectedTask((current) => current?.id === updated.id ? updated : current);
     setTasks((prev) => {
       if (user?.id && !updated.assignees.some((assignee) => assignee.user.id === user.id)) {
         return prev.filter((task) => task.id !== updated.id);
