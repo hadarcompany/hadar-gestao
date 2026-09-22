@@ -5,6 +5,7 @@ import { withMedia } from "@/lib/media";
 import { canEdit } from "@/lib/permissions";
 
 const OWNER_SELECT = { select: { id: true, name: true } };
+const LEAD_INCLUDE = { owner: OWNER_SELECT, whatsappConversations: { select: { id: true }, take: 1 } };
 const CLOSED_STAGES = ["FECHADO", "PERDIDO"];
 
 export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
@@ -34,7 +35,7 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const lead = await prisma.lead.update({
     where: { id: params.id },
     data,
-    include: { owner: OWNER_SELECT },
+    include: LEAD_INCLUDE,
   });
 
   return NextResponse.json(await withMedia(lead));

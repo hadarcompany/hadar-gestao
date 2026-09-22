@@ -51,6 +51,11 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
     updateData.completedAt = data.status === "COMPLETED" ? new Date() : null;
   }
 
+  if (data.description !== undefined && data.description !== before?.description) {
+    updateData.descriptionUpdatedById = auth.id;
+    updateData.descriptionUpdatedAt = new Date();
+  }
+
   if (assigneeIds) {
     await prisma.taskAssignee.deleteMany({ where: { taskId: params.id } });
     updateData.assignees = {

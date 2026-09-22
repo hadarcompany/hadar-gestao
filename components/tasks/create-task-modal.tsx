@@ -17,7 +17,7 @@ import {
 } from "@/lib/task-templates";
 import { areaForType, defaultAssigneeFor } from "@/lib/areas";
 import { useAreas } from "@/contexts/areas-context";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2, GripVertical, ImagePlus, X } from "lucide-react";
 
 interface User { id: string; name: string; email?: string | null; }
 interface Client { id: string; name: string; }
@@ -58,6 +58,8 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [extraFields, setExtraFields] = useState<Record<string, string | string[]>>({});
   const [newChecklistItem, setNewChecklistItem] = useState("");
+  const [images, setImages] = useState<File[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Reset on open
   useEffect(() => {
@@ -67,7 +69,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
       setStatus("PENDING"); setPriority("MEDIUM"); setStartDate(""); setDueDate("");
       setPublishDate(initialPublishDate || ""); setIsExtra(false);
       setDescription(""); setTags([]); setEstimatedTime(""); setChecklist([]);
-      setExtraFields({}); setNewChecklistItem("");
+      setExtraFields({}); setNewChecklistItem(""); setImages([]); setUploadError(null);
     }
   }, [open, initialClientId, initialPublishDate, initialProjectId]);
 
@@ -140,13 +142,35 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
         }),
       });
 
-      if (res.ok) {
-        onCreated();
-        onClose();
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Não foi possível criar a tarefa");
+      const created = await res.json();
+      for (const image of images) {
+        const fd = new FormData();
+        fd.append("file", image);
+        const upload = await fetch(`/api/tasks/${created.id}/attachments`, { method: "POST", body: fd });
+        if (!upload.ok) throw new Error(`A tarefa foi criada, mas não foi possível anexar ${image.name}.`);
       }
+      onCreated();
+      onClose();
+    } catch (e) {
+      setUploadError((e as Error).message);
     } finally {
       setLoading(false);
     }
+  }
+
+  function selectImages(files: FileList | null) {
+    if (!files) return;
+    setUploadError(null);
+    const valid = Array.from(files).filter((file) => {
+      if (!file.type.startsWith("image/")) return false;
+      if (file.size === 0 || file.size > 8 * 1024 * 1024) {
+        setUploadError("Cada imagem deve ter no máximo 8 MB.");
+        return false;
+      }
+      return true;
+    });
+    setImages((current) => [...current, ...valid].slice(0, 10));
   }
 
   const currentTemplate = taskType ? TASK_TEMPLATES[taskType as TaskType] : null;
@@ -175,6 +199,32 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
             placeholder="Selecione..."
             options={clients.map((c) => ({ value: c.id, label: c.name }))}
           />
+        </div>
+
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Imagens da tarefa</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Até 10 imagens, com no máximo 8 MB cada.</p>
+            </div>
+            <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 rounded-lg cursor-pointer">
+              <ImagePlus size={14} /> Selecionar imagens
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { selectImages(e.target.files); e.target.value = ""; }} />
+            </label>
+          </div>
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {images.map((image, index) => (
+                <span key={`${image.name}-${index}`} className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg">
+                  <span className="truncate max-w-[180px]">{image.name}</span>
+                  <button type="button" onClick={() => setImages((current) => current.filter((_, i) => i !== index))} className="text-gray-400 hover:text-red-600" title="Remover imagem">
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {uploadError && <p className="text-xs text-red-600 mt-2">{uploadError}</p>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

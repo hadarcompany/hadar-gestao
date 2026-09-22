@@ -28,12 +28,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // A foto não vem no token (ver get-server-auth): é carregada à parte e
     // preenchida depois, para o cookie de sessão não crescer com base64.
-    async function loadPhoto() {
+    async function loadProfile() {
       try {
         const res = await fetch("/api/users/me");
         if (!res.ok) return;
         const me = await res.json();
-        setUser((prev) => (prev ? { ...prev, image: me.image ?? null } : prev));
+        setUser((prev) => (prev ? {
+          ...prev,
+          id: me.id,
+          name: me.name,
+          email: me.email,
+          role: me.role,
+          permissions: me.permissions,
+          image: me.image ?? null,
+        } : prev));
       } catch {
         // avatar cai para as iniciais do nome
       }
@@ -42,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ? parseUser(session.user) : null);
       setIsLoading(false);
-      if (session?.user) loadPhoto();
+      if (session?.user) loadProfile();
     });
 
     const {
@@ -50,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ? parseUser(session.user) : null);
       setIsLoading(false);
-      if (session?.user) loadPhoto();
+      if (session?.user) loadProfile();
     });
 
     return () => subscription.unsubscribe();

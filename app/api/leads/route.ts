@@ -5,6 +5,7 @@ import { withMedia } from "@/lib/media";
 import { canEdit, canView } from "@/lib/permissions";
 
 const OWNER_SELECT = { select: { id: true, name: true } };
+const LEAD_INCLUDE = { owner: OWNER_SELECT, whatsappConversations: { select: { id: true }, take: 1 } };
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   const leads = await prisma.lead.findMany({
     where,
-    include: { owner: OWNER_SELECT },
+    include: LEAD_INCLUDE,
     orderBy: [{ stageChangedAt: "desc" }],
   });
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
       ownerId: body.ownerId || auth.id,
       closedAt: closed ? new Date() : null,
     },
-    include: { owner: OWNER_SELECT },
+    include: LEAD_INCLUDE,
   });
 
   return NextResponse.json(await withMedia(lead), { status: 201 });

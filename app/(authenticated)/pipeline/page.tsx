@@ -9,7 +9,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LEAD_STAGES, LEAD_ORIGINS, OPEN_STAGES, type LeadData, type LeadStage } from "@/lib/leads";
 import { formatDateBR } from "@/lib/dates";
-import { Plus, Loader2, Trash2, Mail, Phone, Building2, GripVertical } from "lucide-react";
+import { Plus, Loader2, Trash2, Mail, Phone, Building2, GripVertical, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const BRL = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -239,6 +240,15 @@ export default function PipelinePage() {
                           ) : <span />}
                           {lead.owner && <Avatar name={lead.owner.name} image={lead.owner.image} size={18} className="text-[8px] shrink-0" />}
                         </div>
+                        {lead.whatsappConversations?.[0] && (
+                          <Link
+                            href={`/whatsapp?conversation=${lead.whatsappConversations[0].id}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-emerald-600 hover:text-emerald-700"
+                          >
+                            <MessageCircle size={11} /> Abrir conversa
+                          </Link>
+                        )}
                       </div>
                     ))
                   )}

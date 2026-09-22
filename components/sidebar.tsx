@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { Logo } from "@/components/logo";
@@ -63,6 +64,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: "Clientes",
     items: [
       { href: "/pipeline", label: "Pipeline", icon: Filter, permKey: "pipeline" },
+      { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle, permKey: "pipeline" },
       { href: "/onboarding", label: "Onboarding", icon: Rocket, permKey: "clientes" },
       { href: "/clientes", label: "Clientes", icon: Users, permKey: "clientes" },
       { href: "/servicos", label: "Serviços", icon: Wrench, permKey: "servicos" },

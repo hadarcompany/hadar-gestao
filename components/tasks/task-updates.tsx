@@ -60,7 +60,8 @@ export function TaskUpdates({
 
   const hasDescription = description.trim().length > 0;
   const isEmpty = !hasDescription && items.length === 0;
-  const creator = users.find((u) => u.id === task.createdBy?.id);
+  const descriptionAuthor = task.descriptionUpdatedBy ?? task.createdBy;
+  const descriptionAuthorProfile = users.find((u) => u.id === descriptionAuthor?.id);
 
   async function patchDescription(next: string) {
     const res = await fetch(`/api/tasks/${task.id}`, {
@@ -135,10 +136,10 @@ export function TaskUpdates({
           {(hasDescription || editingDesc) && (
             <li className="group bg-white border border-gray-200 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
-                <Avatar name={task.createdBy?.name} image={creator?.image} size={24} className="text-[10px]" />
-                <span className="text-xs font-semibold text-gray-800">{task.createdBy?.name ?? "Criador"}</span>
+                <Avatar name={descriptionAuthor?.name} image={descriptionAuthorProfile?.image} size={24} className="text-[10px]" />
+                <span className="text-xs font-semibold text-gray-800">{descriptionAuthor?.name ?? "Usuário"}</span>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded">Descrição</span>
-                <span className="text-[10px] text-gray-400">{formatWhen(task.createdAt)}</span>
+                <span className="text-[10px] text-gray-400">{formatWhen(task.descriptionUpdatedAt ?? task.createdAt)}</span>
                 {!editingDesc && (
                   <button
                     type="button"

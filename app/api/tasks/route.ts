@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
       tags: tags || [],
       clientId: clientId || null,
       createdById: auth.id,
+      descriptionUpdatedById: description ? auth.id : null,
+      descriptionUpdatedAt: description ? new Date() : null,
       assignees: {
         create: (assigneeIds || []).map((userId: string) => ({ userId })),
       },

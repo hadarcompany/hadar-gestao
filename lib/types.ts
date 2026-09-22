@@ -48,6 +48,8 @@ export interface TaskData {
   labelIds: string[];
   _count?: { updates: number };
   createdBy: { id: string; name: string };
+  descriptionUpdatedBy?: { id: string; name: string } | null;
+  descriptionUpdatedAt?: string | null;
   assignees: Array<{ user: UserSummary }>;
   attachments?: TaskAttachmentData[];
 }

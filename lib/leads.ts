@@ -62,4 +62,5 @@ export interface LeadData {
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  whatsappConversations?: Array<{ id: string }>;
 }

@@ -21,7 +21,7 @@ import { formatDateBR } from "@/lib/dates";
 import { type TaskData, type UserSummary, type TaskAttachmentData } from "@/lib/types";
 import {
   CheckSquare, Square, Clock, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip,
-  Upload, Download, Loader2, X, ChevronLeft, ChevronRight, FolderKanban,
+  Upload, Download, Loader2, X, ChevronLeft, ChevronRight, FolderKanban, ImagePlus,
 } from "lucide-react";
 
 /** Tipos exibidos inline (SVG fica de fora: pode carregar script). */
@@ -202,24 +202,25 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
     }
   }
 
-  async function handleUploadAttachment(file: File) {
+  async function handleUploadAttachments(selected: File[]) {
     if (!task) return;
     setAttachmentError(null);
-    if (file.size === 0 || file.size > 8 * 1024 * 1024) {
-      setAttachmentError("Selecione um arquivo não vazio de até 8 MB.");
-      return;
-    }
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch(`/api/tasks/${task.id}/attachments`, { method: "POST", body: fd });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || "Não foi possível enviar o arquivo");
+      for (const file of selected) {
+        if (file.size === 0 || file.size > 8 * 1024 * 1024) {
+          throw new Error(`${file.name}: o arquivo deve ter no máximo 8 MB.`);
+        }
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch(`/api/tasks/${task.id}/attachments`, { method: "POST", body: fd });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || `Não foi possível enviar ${file.name}`);
+        }
+        const created: TaskAttachmentData = await res.json();
+        setAttachments((prev) => [...prev, created]);
       }
-      const created: TaskAttachmentData = await res.json();
-      setAttachments((prev) => [...prev, created]);
       onAttachmentsChanged?.();
     } catch (e) {
       setAttachmentError((e as Error).message);
@@ -399,6 +400,18 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                   </span>
                 )}
                 <div className="ml-auto flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer transition-colors">
+                    {uploading ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+                    Adicionar imagens
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => { const selected = Array.from(e.target.files ?? []); e.target.value = ""; if (selected.length) void handleUploadAttachments(selected); }}
+                    />
+                  </label>
                   <button
                     onClick={() => { setTransferError(null); setTransferMode(true); }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors"
@@ -562,9 +575,10 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                   Anexar arquivo
                   <input
                     type="file"
+                    multiple
                     className="hidden"
                     disabled={uploading || loadingAttachments || deletingAttachment !== null}
-                    onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleUploadAttachment(f); }}
+                    onChange={(e) => { const selected = Array.from(e.target.files ?? []); e.target.value = ""; if (selected.length) void handleUploadAttachments(selected); }}
                   />
                 </label>
               </div>
