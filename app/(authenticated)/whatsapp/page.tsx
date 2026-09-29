@@ -76,12 +76,21 @@ export default function WhatsAppPage() {
 
   async function start() {
     setStarting(true); setError(null); setQrElapsed(0);
-    const response = await fetch("/api/whatsapp/session", { method: "POST" });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) setError(data.error || "Não foi possível iniciar a conexão.");
-    setQrLoading(true); setQrError(false); setQrNonce(Date.now());
-    await loadSession();
-    setStarting(false);
+    try {
+      const response = await fetch("/api/whatsapp/session", { method: "POST", signal: AbortSignal.timeout(70_000) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const step = typeof data.detail === "string" ? data.detail.split(":", 1)[0] : null;
+        setError(step ? `A VPS não conseguiu iniciar a sessão (${step}). Tente novamente; se persistir, precisamos verificar o container WAHA.` : data.error || "Não foi possível iniciar a conexão.");
+        return;
+      }
+      setQrLoading(true); setQrError(false); setQrNonce(Date.now());
+    } catch {
+      setError("A VPS demorou mais de 70 segundos para responder. Verifique se o container WAHA está ativo e tente novamente.");
+    } finally {
+      await loadSession();
+      setStarting(false);
+    }
   }
 
   async function disconnect() {

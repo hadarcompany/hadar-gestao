@@ -18,6 +18,17 @@ async function request(path: string, init: RequestInit = {}, timeoutMs = 15_000)
   });
 }
 
+async function wahaError(prefix: string, response: Response) {
+  const body = await response.text().catch(() => "");
+  const compact = body.replace(/\s+/g, " ").trim().slice(0, 240);
+  return new Error(`${prefix}_${response.status}${compact ? `: ${compact}` : ""}`);
+}
+
+const sessionConfig = {
+  ignore: { status: true, groups: true, channels: true },
+  noweb: { store: { enabled: true, fullSync: false } },
+};
+
 export async function getWhatsAppSession() {
   const name = whatsappSessionName();
   const response = await request(`/api/sessions/${encodeURIComponent(name)}`);
@@ -29,23 +40,53 @@ export async function getWhatsAppSession() {
 export async function startWhatsAppSession() {
   const name = whatsappSessionName();
   let session = await getWhatsAppSession();
-  // Uma sessão FAILED não volta ao pareamento com /start. Remove apenas as
-  // credenciais quebradas do WAHA e recria a sessão; as conversas da Hadar
-  // continuam preservadas no banco da aplicação.
+  if (["WORKING", "STARTING", "SCAN_QR_CODE", "SCAN_QR"].includes(session?.status ?? "")) return session;
+
+  // Primeiro tenta recuperar o processo do engine sem apagar a sessão.
   if (session?.status === "FAILED") {
-    const removed = await request(`/api/sessions/${encodeURIComponent(name)}`, { method: "DELETE" });
-    if (!removed.ok && removed.status !== 404) throw new Error(`WAHA_RESET_${removed.status}`);
+    const restarted = await request(`/api/sessions/${encodeURIComponent(name)}/restart`, { method: "POST", body: "{}" }, 35_000);
+    if (restarted.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      session = await getWhatsAppSession();
+      if (session && session.status !== "FAILED") return session;
+    }
+
+    // Se o engine continuar quebrado, remove apenas a sessão do WAHA. As
+    // conversas importadas continuam preservadas no banco da aplicação.
+    const removed = await request(`/api/sessions/${encodeURIComponent(name)}`, { method: "DELETE" }, 35_000);
+    if (!removed.ok && removed.status !== 404) {
+      const legacyRemoved = await request("/api/sessions/logout", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }, 35_000);
+      if (!legacyRemoved.ok && ![404, 422].includes(legacyRemoved.status)) throw await wahaError("WAHA_RESET", legacyRemoved);
+    }
     session = null;
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
+
   if (!session) {
+    // O endpoint atômico evita a corrida entre criar a sessão e iniciar o
+    // engine, especialmente logo depois de recuperar uma sessão FAILED.
+    const upserted = await request("/api/sessions/start", {
+      method: "POST",
+      body: JSON.stringify({ name, config: sessionConfig }),
+    }, 35_000);
+    if (upserted.ok || upserted.status === 422) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return getWhatsAppSession();
+    }
+    if (upserted.status !== 404) throw await wahaError("WAHA_UPSERT_START", upserted);
+
     const created = await request("/api/sessions", {
       method: "POST",
-      body: JSON.stringify({ name, start: false, config: { ignore: { status: true, groups: true, channels: true } } }),
-    });
-    if (!created.ok && created.status !== 422) throw new Error(`WAHA_CREATE_${created.status}`);
+      body: JSON.stringify({ name, start: false, config: sessionConfig }),
+    }, 35_000);
+    if (!created.ok && created.status !== 422) throw await wahaError("WAHA_CREATE", created);
   }
-  const started = await request(`/api/sessions/${encodeURIComponent(name)}/start`, { method: "POST", body: "{}" });
-  if (!started.ok && started.status !== 422) throw new Error(`WAHA_START_${started.status}`);
+
+  const started = await request(`/api/sessions/${encodeURIComponent(name)}/start`, { method: "POST", body: "{}" }, 35_000);
+  if (!started.ok && started.status !== 422) throw await wahaError("WAHA_START", started);
   session = await getWhatsAppSession();
   return session;
 }
