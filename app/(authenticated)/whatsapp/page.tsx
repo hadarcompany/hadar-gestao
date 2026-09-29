@@ -30,6 +30,7 @@ export default function WhatsAppPage() {
   const [qrNonce, setQrNonce] = useState(() => Date.now());
   const [qrLoading, setQrLoading] = useState(true);
   const [qrError, setQrError] = useState(false);
+  const [qrElapsed, setQrElapsed] = useState(0);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const selected = useMemo(() => conversations.find((item) => item.id === selectedId) ?? null, [conversations, selectedId]);
@@ -61,6 +62,12 @@ export default function WhatsAppPage() {
     return () => window.clearInterval(timer);
   }, [loadConversations, loadSession]);
   useEffect(() => {
+    const waitingForQr = starting || (qrLoading && Boolean(session?.configured) && Boolean(session?.status) && !connected(session!.status));
+    if (!waitingForQr) return;
+    const timer = window.setInterval(() => setQrElapsed((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [qrLoading, session?.configured, session?.status, starting]);
+  useEffect(() => {
     if (!selectedId) { setMessages([]); return; }
     void loadMessages(selectedId);
     const timer = window.setInterval(() => void loadMessages(selectedId), 4000);
@@ -68,7 +75,7 @@ export default function WhatsAppPage() {
   }, [loadMessages, selectedId]);
 
   async function start() {
-    setStarting(true); setError(null);
+    setStarting(true); setError(null); setQrElapsed(0);
     const response = await fetch("/api/whatsapp/session", { method: "POST" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) setError(data.error || "Não foi possível iniciar a conexão.");
@@ -86,8 +93,10 @@ export default function WhatsAppPage() {
   }
 
   function refreshQr() {
-    setQrLoading(true); setQrError(false); setQrNonce(Date.now());
+    setQrLoading(true); setQrError(false); setQrElapsed(0); setQrNonce(Date.now());
   }
+
+  const qrProgress = Math.min(94, 8 + qrElapsed * 2.5);
 
   async function send() {
     if (!selectedId || !text.trim() || sending) return;
@@ -118,16 +127,19 @@ export default function WhatsAppPage() {
         <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-2xl">
           <div className="flex items-center gap-2 mb-4"><QrCode className="text-accent" /><h2 className="font-bold">Conectar número pelo QR Code</h2></div>
           {["NOT_STARTED", "STOPPED", "UNAVAILABLE", "FAILED"].includes(session.status) ? (
-            <button onClick={start} disabled={starting} className="px-4 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-dark rounded-lg disabled:opacity-50">
-              {starting ? "Iniciando…" : "Gerar QR Code"}
-            </button>
+            <div className="max-w-md">
+              <button onClick={start} disabled={starting} className="px-4 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-dark rounded-lg disabled:opacity-70">
+                {starting ? "Preparando QR Code…" : "Gerar QR Code"}
+              </button>
+              {starting && <div className="mt-4"><div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5"><span>Iniciando uma sessão segura do WhatsApp</span><span>{qrElapsed}s</span></div><div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${qrProgress}%` }} /></div><p className="text-[10px] text-gray-400 mt-2">Normalmente leva entre 5 e 35 segundos. Não feche esta tela.</p></div>}
+            </div>
           ) : (
             <div className="flex flex-col sm:flex-row gap-5 items-center">
               <div className="relative w-64 h-64 border border-gray-200 rounded-xl bg-white flex items-center justify-center overflow-hidden">
-                {qrLoading && <Loader2 className="absolute animate-spin text-accent" />}
+                {qrLoading && <div className="absolute inset-0 flex flex-col items-center justify-center p-5"><Loader2 className="animate-spin text-accent mb-3" /><p className="text-xs font-semibold text-gray-600">Preparando QR Code…</p><div className="w-44 h-2 bg-gray-100 rounded-full overflow-hidden mt-3"><div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${qrProgress}%` }} /></div><p className="text-[10px] text-gray-400 mt-2">{qrElapsed}s · pode levar até 35 segundos</p></div>}
                 {qrError && <div className="absolute inset-0 bg-white flex flex-col items-center justify-center text-center p-5"><QrCode className="text-gray-300 mb-2" /><p className="text-xs text-gray-500">O QR ainda está sendo preparado.</p><button onClick={refreshQr} className="mt-3 text-xs font-semibold text-accent">Tentar novamente</button></div>}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/whatsapp/qr?v=${qrNonce}`} alt="QR Code do WhatsApp" className={`w-full h-full object-contain ${qrLoading || qrError ? "opacity-0" : "opacity-100"}`} onLoad={() => { setQrLoading(false); setQrError(false); }} onError={() => { setQrLoading(false); setQrError(true); window.setTimeout(() => setQrNonce(Date.now()), 7000); }} />
+                <img src={`/api/whatsapp/qr?v=${qrNonce}`} alt="QR Code do WhatsApp" className={`w-full h-full object-contain ${qrLoading || qrError ? "opacity-0" : "opacity-100"}`} onLoad={() => { setQrLoading(false); setQrError(false); setQrElapsed(0); }} onError={() => { setQrLoading(false); setQrError(true); window.setTimeout(() => { setQrLoading(true); setQrElapsed(0); setQrNonce(Date.now()); }, 7000); }} />
               </div>
               <div className="text-sm text-gray-500"><p className="font-semibold text-gray-700 mb-2">No celular:</p><p>WhatsApp → Aparelhos conectados → Conectar aparelho.</p><p className="mt-3 text-xs">Status: {session.status}</p><button onClick={refreshQr} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-accent"><RefreshCw size={12} /> Atualizar QR Code</button></div>
             </div>
