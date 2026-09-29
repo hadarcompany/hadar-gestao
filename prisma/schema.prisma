@@ -151,6 +151,13 @@ enum WhatsAppDirection {
   OUTBOUND
 }
 
+enum WhatsAppContactKind {
+  CLIENT
+  EXISTING_LEAD
+  NEW_LEAD
+  UNKNOWN
+}
+
 model User {
   id          String   @id @default(cuid())
   name        String
@@ -201,17 +208,19 @@ model Client {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
-  tasks            Task[]
-  interactions     Interaction[]
-  accesses         Access[]
-  services         Service[]
-  receivables      Receivable[]
-  healthScores     ClientHealthScore[]
-  contentCalendars ContentCalendar[]
-  weeklyDemands    ClientWeeklyDemand[]
-  chatMessages     ClientChatMessage[]
-  chatReads        ClientChatRead[]
-  projects         Project[]
+  tasks                 Task[]
+  interactions          Interaction[]
+  accesses              Access[]
+  services              Service[]
+  receivables           Receivable[]
+  healthScores          ClientHealthScore[]
+  contentCalendars      ContentCalendar[]
+  weeklyDemands         ClientWeeklyDemand[]
+  chatMessages          ClientChatMessage[]
+  chatReads             ClientChatRead[]
+  projects              Project[]
+  metaAdAccounts        MetaAdAccount[]
+  whatsappConversations WhatsAppConversation[]
 
   @@map("clients")
 }
@@ -458,21 +467,25 @@ model Lead {
 }
 
 model WhatsAppConversation {
-  id            String    @id @default(cuid())
-  chatId        String    @unique
+  id            String              @id @default(cuid())
+  chatId        String              @unique
   phone         String
   name          String?
   leadId        String?
-  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lead          Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  clientId      String?
+  client        Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  contactKind   WhatsAppContactKind @default(UNKNOWN)
   lastMessage   String?
   lastMessageAt DateTime?
-  unreadCount   Int       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  unreadCount   Int                 @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   messages WhatsAppMessage[]
 
   @@index([leadId])
+  @@index([clientId])
   @@index([lastMessageAt])
   @@map("whatsapp_conversations")
 }
@@ -490,6 +503,40 @@ model WhatsAppMessage {
 
   @@index([conversationId, sentAt])
   @@map("whatsapp_messages")
+}
+
+/// Conexão OAuth usada para consultar as contas de anúncios administradas pela agência.
+/// O token nunca é persistido em texto puro: `accessTokenEncrypted` usa AES-256-GCM.
+model MetaConnection {
+  id                   String    @id @default("primary")
+  metaUserId           String
+  metaUserName         String?
+  accessTokenEncrypted String
+  tokenExpiresAt       DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("meta_connections")
+}
+
+/// Conta de anúncios descoberta pela Marketing API e opcionalmente vinculada a um cliente.
+model MetaAdAccount {
+  id            String    @id @default(cuid())
+  externalId    String    @unique
+  accountId     String?
+  name          String
+  currency      String?
+  accountStatus Int?
+  businessId    String?
+  businessName  String?
+  clientId      String?
+  client        Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([clientId])
+  @@map("meta_ad_accounts")
 }
 
 model TaskAssignee {

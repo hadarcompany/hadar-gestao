@@ -10,7 +10,10 @@ export async function GET() {
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canView(auth, "pipeline")) return NextResponse.json({ error: "Sem acesso ao pipeline." }, { status: 403 });
   const conversations = await prisma.whatsAppConversation.findMany({
-    include: { lead: { select: { id: true, name: true, stage: true } } },
+    include: {
+      lead: { select: { id: true, name: true, stage: true } },
+      client: { select: { id: true, name: true } },
+    },
     orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
     take: 200,
   });

@@ -24,6 +24,7 @@ import {
   ChevronRight,
   ChevronDown,
   MessageCircle,
+  Megaphone,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { Logo } from "@/components/logo";
@@ -65,6 +66,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       { href: "/pipeline", label: "Pipeline", icon: Filter, permKey: "pipeline" },
       { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle, permKey: "pipeline" },
+      { href: "/meta-ads", label: "Meta Ads", icon: Megaphone, permKey: "meta-ads" },
       { href: "/onboarding", label: "Onboarding", icon: Rocket, permKey: "clientes" },
       { href: "/clientes", label: "Clientes", icon: Users, permKey: "clientes" },
       { href: "/servicos", label: "Serviços", icon: Wrench, permKey: "servicos" },
@@ -93,6 +95,7 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
   "minha-semana": "none",
   metas: "none",
   pipeline: "none",
+  "meta-ads": "none",
 };
 
 export function Sidebar() {

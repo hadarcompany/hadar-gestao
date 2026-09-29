@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { canEdit, canView } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppText, wahaMessageId } from "@/lib/whatsapp/waha";
+import { sendWhatsAppProviderText } from "@/lib/whatsapp/provider";
 
 export const dynamic = "force-dynamic";
 
@@ -29,10 +29,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const text = typeof body.text === "string" ? body.text.trim() : "";
   if (!text) return NextResponse.json({ error: "Escreva uma mensagem." }, { status: 400 });
   try {
-    const sent = await sendWhatsAppText(conversation.chatId, text);
+    const sent = await sendWhatsAppProviderText(conversation.chatId, text);
     const sentAt = new Date();
     const message = await prisma.whatsAppMessage.create({
-      data: { conversationId: id, externalId: wahaMessageId(sent), direction: "OUTBOUND", body: text, status: "SENT", sentAt },
+      data: { conversationId: id, externalId: sent.externalId, direction: "OUTBOUND", body: text, status: "SENT", sentAt },
     });
     await prisma.whatsAppConversation.update({ where: { id }, data: { lastMessage: text, lastMessageAt: sentAt } });
     return NextResponse.json(message, { status: 201 });

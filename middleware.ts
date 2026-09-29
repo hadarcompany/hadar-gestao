@@ -34,7 +34,8 @@ export async function middleware(request: NextRequest) {
   const isApiAuth = pathname.startsWith("/api/auth");
   const isPublicWebhook =
     pathname === "/api/webhooks/asaas" ||
-    pathname === "/api/webhooks/whatsapp";
+    pathname === "/api/webhooks/whatsapp" ||
+    pathname === "/api/webhooks/meta/whatsapp";
 
   if (!isApiAuth && !isPublicWebhook) {
     if (!user && !isLoginPage) {

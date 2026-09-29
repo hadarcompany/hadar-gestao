@@ -55,6 +55,11 @@ export async function sendWhatsAppText(chatId: string, text: string) {
   return response.json() as Promise<Record<string, unknown>>;
 }
 
+export async function logoutWhatsAppSession() {
+  const response = await request(`/api/sessions/${encodeURIComponent(whatsappSessionName())}/logout`, { method: "POST", body: "{}" });
+  if (!response.ok && response.status !== 404 && response.status !== 422) throw new Error(`WAHA_LOGOUT_${response.status}`);
+}
+
 export function wahaMessageId(payload: Record<string, unknown>): string | null {
   const id = payload.id;
   if (typeof id === "string") return id;

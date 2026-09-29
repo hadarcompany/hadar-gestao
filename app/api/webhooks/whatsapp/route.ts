@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { normalizeWhatsAppPhone, wahaMessageId } from "@/lib/whatsapp/waha";
+import { storeWhatsAppMessage } from "@/lib/whatsapp/store";
+import { normalizeWhatsAppPhone } from "@/lib/whatsapp/phones";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,36 +37,10 @@ export async function POST(req: NextRequest) {
   const name = String(payload.notifyName ?? rawData.notifyName ?? "").trim() || null;
   const body = String(payload.body ?? payload.caption ?? "").trim() || "[mídia]";
   const sentAt = eventDate(payload.timestamp);
-  const externalId = wahaMessageId(payload);
-
-  const leads = await prisma.lead.findMany({ where: { phone: { not: null } }, select: { id: true, phone: true } });
-  let lead = leads.find((item) => normalizeWhatsAppPhone(item.phone ?? "").endsWith(phone.slice(-8)));
-  if (!lead && !fromMe) {
-    lead = await prisma.lead.create({
-      data: { name: name ?? `WhatsApp ${phone.slice(-4)}`, phone: `+${phone}`, origin: "WhatsApp", stage: "NOVO" },
-      select: { id: true, phone: true },
-    });
-  }
-
-  const conversation = await prisma.whatsAppConversation.upsert({
-    where: { chatId },
-    create: {
-      chatId, phone: `+${phone}`, name, leadId: lead?.id ?? null, lastMessage: body, lastMessageAt: sentAt,
-      unreadCount: fromMe ? 0 : 1,
-    },
-    update: {
-      ...(name ? { name } : {}), ...(lead?.id ? { leadId: lead.id } : {}), lastMessage: body, lastMessageAt: sentAt,
-      ...(fromMe ? {} : { unreadCount: { increment: 1 } }),
-    },
-  });
-
-  try {
-    await prisma.whatsAppMessage.create({
-      data: { externalId, conversationId: conversation.id, direction: fromMe ? "OUTBOUND" : "INBOUND", body, status: "RECEIVED", sentAt },
-    });
-  } catch (error) {
-    // Webhooks podem ser reenviados. O externalId único torna a ingestão idempotente.
-    if (!(error instanceof Error) || !error.message.includes("Unique constraint")) throw error;
-  }
+  const id = payload.id;
+  const externalId = typeof id === "string" ? id : id && typeof id === "object"
+    ? String((id as Record<string, unknown>)._serialized ?? (id as Record<string, unknown>).id ?? "") || null
+    : null;
+  await storeWhatsAppMessage({ chatId, phone, name, body, sentAt, externalId, fromMe });
   return NextResponse.json({ accepted: true });
 }

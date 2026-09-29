@@ -4,25 +4,40 @@ services:
     platform: linux/amd64
     container_name: hadar-waha
     restart: unless-stopped
-    ports:
-      - "3030:3000"
+    expose:
+      - "3000"
+    env_file:
+      - .env
     environment:
-      WAHA_API_KEY: ${WAHA_API_KEY_SHA512}
-      WHATSAPP_HOOK_URL: ${WHATSAPP_HOOK_URL}
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WHATSAPP_HOOK_URL: "https://gestao.agenciahadar.com.br/api/webhooks/whatsapp?token=${WAHA_WEBHOOK_TOKEN}"
       WHATSAPP_HOOK_EVENTS: "message.any,session.status,state.change"
       WHATSAPP_DEFAULT_ENGINE: NOWEB
-      WAHA_DASHBOARD_ENABLED: "true"
       WHATSAPP_RESTART_ALL_SESSIONS: "True"
+      WAHA_DASHBOARD_ENABLED: "true"
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
     volumes:
       - waha-data:/app/.sessions
       - waha-media:/app/.media
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+
+  caddy:
+    image: caddy:2
+    container_name: hadar-caddy
+    restart: unless-stopped
+    depends_on:
+      - waha
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   waha-data:
   waha-media:
+  caddy-data:
+  caddy-config:

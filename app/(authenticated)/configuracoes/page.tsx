@@ -1,24 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { Users2, Shield, UserCircle } from "lucide-react";
+import { Users2, Shield, UserCircle, Plug } from "lucide-react";
 import { cn } from "@/lib/utils";
 import EquipePage from "@/app/(authenticated)/equipe/page";
 import AcessosPage from "@/app/(authenticated)/acessos/page";
 import { MeuPerfilPanel } from "@/components/settings/meu-perfil-panel";
+import { IntegrationsPanel } from "@/components/settings/integrations-panel";
 
-type Tab = "perfil" | "equipe" | "acessos";
+type Tab = "perfil" | "equipe" | "acessos" | "integracoes";
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const [tab, setTab] = useState<Tab>("perfil");
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "integracoes") setTab("integracoes");
+  }, []);
+
   const tabs: { key: Tab; label: string; icon: typeof UserCircle; adminOnly?: boolean }[] = [
     { key: "perfil", label: "Meu Perfil", icon: UserCircle },
     { key: "equipe", label: "Equipe", icon: Users2, adminOnly: true },
     { key: "acessos", label: "Acessos", icon: Shield, adminOnly: true },
+    { key: "integracoes", label: "Integrações", icon: Plug, adminOnly: true },
   ];
 
   return (
@@ -46,6 +52,7 @@ export default function ConfiguracoesPage() {
           {tab === "perfil" && <MeuPerfilPanel />}
           {tab === "equipe" && isAdmin && <EquipePage />}
           {tab === "acessos" && isAdmin && <AcessosPage />}
+          {tab === "integracoes" && isAdmin && <IntegrationsPanel />}
         </div>
       </div>
     </div>
