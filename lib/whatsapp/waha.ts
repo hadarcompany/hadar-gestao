@@ -29,6 +29,14 @@ export async function getWhatsAppSession() {
 export async function startWhatsAppSession() {
   const name = whatsappSessionName();
   let session = await getWhatsAppSession();
+  // Uma sessão FAILED não volta ao pareamento com /start. Remove apenas as
+  // credenciais quebradas do WAHA e recria a sessão; as conversas da Hadar
+  // continuam preservadas no banco da aplicação.
+  if (session?.status === "FAILED") {
+    const removed = await request(`/api/sessions/${encodeURIComponent(name)}`, { method: "DELETE" });
+    if (!removed.ok && removed.status !== 404) throw new Error(`WAHA_RESET_${removed.status}`);
+    session = null;
+  }
   if (!session) {
     const created = await request("/api/sessions", {
       method: "POST",
