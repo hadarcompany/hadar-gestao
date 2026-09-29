@@ -127,7 +127,7 @@ export default function WhatsAppPage() {
                 {qrLoading && <Loader2 className="absolute animate-spin text-accent" />}
                 {qrError && <div className="absolute inset-0 bg-white flex flex-col items-center justify-center text-center p-5"><QrCode className="text-gray-300 mb-2" /><p className="text-xs text-gray-500">O QR ainda está sendo preparado.</p><button onClick={refreshQr} className="mt-3 text-xs font-semibold text-accent">Tentar novamente</button></div>}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/whatsapp/qr?v=${qrNonce}`} alt="QR Code do WhatsApp" className={`w-full h-full object-contain ${qrLoading || qrError ? "opacity-0" : "opacity-100"}`} onLoad={() => { setQrLoading(false); setQrError(false); }} onError={() => { setQrLoading(false); setQrError(true); window.setTimeout(() => setQrNonce(Date.now()), 3000); }} />
+                <img src={`/api/whatsapp/qr?v=${qrNonce}`} alt="QR Code do WhatsApp" className={`w-full h-full object-contain ${qrLoading || qrError ? "opacity-0" : "opacity-100"}`} onLoad={() => { setQrLoading(false); setQrError(false); }} onError={() => { setQrLoading(false); setQrError(true); window.setTimeout(() => setQrNonce(Date.now()), 7000); }} />
               </div>
               <div className="text-sm text-gray-500"><p className="font-semibold text-gray-700 mb-2">No celular:</p><p>WhatsApp → Aparelhos conectados → Conectar aparelho.</p><p className="mt-3 text-xs">Status: {session.status}</p><button onClick={refreshQr} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-accent"><RefreshCw size={12} /> Atualizar QR Code</button></div>
             </div>

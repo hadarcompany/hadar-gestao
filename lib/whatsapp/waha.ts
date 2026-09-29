@@ -4,12 +4,12 @@ const apiKey = () => process.env.WAHA_API_KEY ?? "";
 export const whatsappSessionName = () => process.env.WAHA_SESSION_NAME?.trim() || "hadar";
 export const whatsappConfigured = () => Boolean(baseUrl() && apiKey());
 
-async function request(path: string, init: RequestInit = {}) {
+async function request(path: string, init: RequestInit = {}, timeoutMs = 15_000) {
   if (!whatsappConfigured()) throw new Error("WAHA_NOT_CONFIGURED");
   return fetch(`${baseUrl()}${path}`, {
     ...init,
     cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
+    signal: init.signal ?? AbortSignal.timeout(timeoutMs),
     headers: {
       "X-Api-Key": apiKey(),
       ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -43,7 +43,13 @@ export async function startWhatsAppSession() {
 }
 
 export async function getWhatsAppQr() {
-  return request(`/api/${encodeURIComponent(whatsappSessionName())}/auth/qr?format=image`);
+  const session = encodeURIComponent(whatsappSessionName());
+  const qr = await request(`/api/${session}/auth/qr`, {}, 35_000);
+  if (qr.ok) return qr;
+  // Algumas versões do WAHA Core/NOWEB expõem o pareamento pela captura da
+  // sessão enquanto o QR ainda está sendo inicializado.
+  if ([404, 422, 500].includes(qr.status)) return request(`/api/screenshot?session=${session}`, {}, 35_000);
+  return qr;
 }
 
 export async function sendWhatsAppText(chatId: string, text: string) {
