@@ -25,6 +25,7 @@ import {
   ChevronDown,
   MessageCircle,
   Megaphone,
+  LayoutTemplate,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { Logo } from "@/components/logo";
@@ -54,6 +55,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     label: "Operação",
     items: [
       { href: "/tarefas", label: "Tarefas", icon: CheckSquare, permKey: "tarefas" },
+      { href: "/quadros", label: "Quadros", icon: LayoutTemplate, permKey: "tarefas" },
       { href: "/projetos", label: "Projetos", icon: FolderKanban, permKey: "tarefas" },
       { href: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, permKey: "meu-trabalho" },
       { href: "/calendario", label: "Calendário", icon: Calendar, permKey: "calendario" },

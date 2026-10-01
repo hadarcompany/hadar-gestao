@@ -111,6 +111,10 @@ export async function findAsaasPaymentByExternalReference(externalReference: str
   return result.data[0] ?? null;
 }
 
+export async function getAsaasPayment(id: string) {
+  return asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(id)}`);
+}
+
 export async function createAsaasPayment(input: {
   customer: string;
   billingType: AsaasBillingType;

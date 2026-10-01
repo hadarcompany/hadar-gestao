@@ -159,7 +159,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
     }
   }
 
-  function selectImages(files: FileList | null) {
+  function selectImages(files: FileList | File[] | null) {
     if (!files) return;
     setUploadError(null);
     const valid = Array.from(files).filter((file) => {
@@ -172,6 +172,21 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
     });
     setImages((current) => [...current, ...valid].slice(0, 10));
   }
+
+  useEffect(() => {
+    if (!open) return;
+    function onPaste(event: ClipboardEvent) {
+      if (event.defaultPrevented) return;
+      const files = Array.from(event.clipboardData?.items ?? [])
+        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+      if (files.length) { event.preventDefault(); selectImages(files); }
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const currentTemplate = taskType ? TASK_TEMPLATES[taskType as TaskType] : null;
   const slideCount = parseInt((extraFields.qtd_slides as string) || "0") || 0;
@@ -288,6 +303,14 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
               ariaLabel="Descrição da tarefa"
               placeholder="Detalhes da tarefa… use @ para marcar alguém"
               className="bg-gray-100"
+              onPasteImages={(files, cursor) => {
+                const valid = files.filter((file) => file.type.startsWith("image/") && file.size > 0 && file.size <= 8 * 1024 * 1024);
+                if (!valid.length) { setUploadError("Cada imagem deve ter no máximo 8 MB."); return; }
+                setImages((current) => [...current, ...valid].slice(0, 10));
+                const labels = valid.map((file) => `[Imagem anexada: ${file.name || "imagem colada"}]`).join("\n");
+                const insertion = `${cursor > 0 && !description.slice(0, cursor).endsWith("\n") ? "\n" : ""}${labels}\n`;
+                setDescription(description.slice(0, cursor) + insertion + description.slice(cursor));
+              }}
             />
           </div>
           <div className="space-y-4">

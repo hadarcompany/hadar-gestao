@@ -5,8 +5,32 @@ import { dateKeyToUTCDate, dateKeyToUTCEndOfDay, getCurrentWeekRange, getTodayKe
 import { TASK_INCLUDE } from "@/lib/task-transfer";
 import { applyMedia, loadMediaIndex } from "@/lib/media";
 import { canView } from "@/lib/permissions";
+import { getAsaasConfig, getAsaasPayment, paymentUpdateData } from "@/lib/asaas";
 
 export const dynamic = "force-dynamic";
+
+async function reconcileDashboardCharges() {
+  if (!getAsaasConfig().configured) return;
+  const staleBefore = new Date(Date.now() - 60_000);
+  const charges = await prisma.receivable.findMany({
+    where: {
+      asaasPaymentId: { not: null },
+      status: { in: ["PENDING", "OVERDUE"] },
+      OR: [{ asaasSyncedAt: null }, { asaasSyncedAt: { lt: staleBefore } }],
+    },
+    select: { id: true, asaasPaymentId: true },
+    orderBy: [{ dueDate: "asc" }],
+    take: 40,
+  });
+
+  // Lotes pequenos evitam estourar o limite da API e mantêm a dashboard rápida.
+  for (let index = 0; index < charges.length; index += 6) {
+    await Promise.allSettled(charges.slice(index, index + 6).map(async (charge) => {
+      const payment = await getAsaasPayment(charge.asaasPaymentId!);
+      await prisma.receivable.update({ where: { id: charge.id }, data: paymentUpdateData(payment) });
+    }));
+  }
+}
 
 /**
  * period = intervalo [from, to] em chaves YYYY-MM-DD. Se ausente, usa a semana
@@ -62,6 +86,7 @@ export async function GET(req: NextRequest) {
 
   let financialSummary = null;
   if (canView(auth, "financeiro")) {
+    await reconcileDashboardCharges().catch((error) => console.error("Falha ao conciliar dashboard com Asaas:", error));
     await prisma.receivable.updateMany({
       where: { asaasPaymentId: { not: null }, status: "PENDING", dueDate: { lt: todayStart } },
       data: { status: "OVERDUE" },

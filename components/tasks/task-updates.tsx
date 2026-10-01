@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { Avatar } from "@/components/ui/avatar";
 import { MentionTextarea, MentionText } from "@/components/tasks/mention-textarea";
-import { type TaskData, type UserSummary } from "@/lib/types";
+import { type TaskAttachmentData, type TaskData, type UserSummary } from "@/lib/types";
 import { Loader2, Send, Trash2, MessageSquare, Pencil } from "lucide-react";
 
 interface TaskUpdateItem {
@@ -24,11 +24,12 @@ function formatWhen(iso: string) {
  * e cada atualização entra embaixo. Sem descrição ainda, o primeiro texto vira a descrição.
  */
 export function TaskUpdates({
-  task, users, onTaskChanged,
+  task, users, onTaskChanged, onAttachmentsAdded,
 }: {
   task: TaskData;
   users: UserSummary[];
   onTaskChanged?: (task: TaskData) => void;
+  onAttachmentsAdded?: (attachments: TaskAttachmentData[]) => void;
 }) {
   const { user } = useAuth();
   const [items, setItems] = useState<TaskUpdateItem[]>([]);
@@ -40,6 +41,7 @@ export function TaskUpdates({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pastingImages, setPastingImages] = useState(false);
   const [descriptionMeta, setDescriptionMeta] = useState(() => ({
     author: task.descriptionUpdatedBy ?? task.createdBy,
     at: task.descriptionUpdatedAt ?? task.createdAt,
@@ -70,6 +72,41 @@ export function TaskUpdates({
   const isEmpty = !hasDescription && items.length === 0;
   const descriptionAuthor = descriptionMeta.author;
   const descriptionAuthorProfile = users.find((u) => u.id === descriptionAuthor?.id);
+
+  async function pasteImages(files: File[], cursor: number, value: string, setter: (next: string) => void) {
+    setPastingImages(true);
+    setError(null);
+    try {
+      const uploaded: TaskAttachmentData[] = [];
+      const tokens: string[] = [];
+      for (const [index, file] of files.entries()) {
+        if (!file.type.startsWith("image/") || file.size <= 0 || file.size > 8 * 1024 * 1024) throw new Error("Cada imagem deve ter no máximo 8 MB.");
+        const body = new FormData();
+        body.append("file", file, file.name || `imagem-colada-${Date.now()}-${index + 1}.png`);
+        const response = await fetch(`/api/tasks/${task.id}/attachments`, { method: "POST", body });
+        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Não foi possível colar a imagem.");
+        const attachment: TaskAttachmentData = await response.json();
+        uploaded.push(attachment);
+        tokens.push(`[[image:${attachment.id}]]`);
+      }
+      const insertion = `${cursor > 0 && !value.slice(0, cursor).endsWith("\n") ? "\n" : ""}${tokens.join("\n")}\n`;
+      setter(value.slice(0, cursor) + insertion + value.slice(cursor));
+      onAttachmentsAdded?.(uploaded);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setPastingImages(false);
+    }
+  }
+
+  function RichText({ content }: { content: string }) {
+    const parts = content.split(/(\[\[image:[^\]]+\]\])/g);
+    return <>{parts.map((part, index) => {
+      const match = /^\[\[image:([^\]]+)\]\]$/.exec(part);
+      if (match) return <button type="button" key={`${match[1]}-${index}`} onClick={() => window.open(`/api/tasks/${task.id}/attachments/${match[1]}?inline=1`, "_blank")} className="block my-2 max-w-full"><img src={`/api/tasks/${task.id}/attachments/${match[1]}?inline=1`} alt="Imagem colada" className="max-h-80 max-w-full rounded-lg border border-gray-200 object-contain" /></button>;
+      return <MentionText key={index} content={part} users={users} />;
+    })}</>;
+  }
 
   async function patchDescription(next: string) {
     const res = await fetch(`/api/tasks/${task.id}`, {
@@ -174,6 +211,7 @@ export function TaskUpdates({
                     rows={Math.min(12, Math.max(3, descDraft.split("\n").length + 1))}
                     autoFocus
                     ariaLabel="Descrição da tarefa"
+                    onPasteImages={(files, cursor) => void pasteImages(files, cursor, descDraft, setDescDraft)}
                   />
                   <div className="flex justify-end gap-2 mt-2">
                     <button type="button" onClick={() => setEditingDesc(false)} className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg">
@@ -191,7 +229,7 @@ export function TaskUpdates({
                 </div>
               ) : (
                 <p className="text-sm text-gray-700 whitespace-pre-wrap break-words pl-8">
-                  <MentionText content={description} users={users} />
+                  <RichText content={description} />
                 </p>
               )}
             </li>
@@ -215,7 +253,7 @@ export function TaskUpdates({
                 )}
               </div>
               <p className="text-sm text-gray-700 whitespace-pre-wrap break-words pl-8">
-                <MentionText content={it.content} users={users} />
+                <RichText content={it.content} />
               </p>
             </li>
           ))}
@@ -235,9 +273,10 @@ export function TaskUpdates({
         placeholder={isEmpty
           ? "Escreva a descrição da tarefa… use @ para marcar alguém"
           : "Escreva uma atualização… use @ para marcar alguém"}
+        onPasteImages={(files, cursor) => void pasteImages(files, cursor, text, setText)}
       />
       <div className="flex items-center justify-between gap-3 mt-2">
-        <span className="text-[11px] text-gray-400">Ctrl + Enter publica. Quem for marcado com @ recebe notificação.</span>
+        <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">{pastingImages && <Loader2 size={11} className="animate-spin" />} Ctrl+V cola imagens · Ctrl+Enter publica · @ menciona.</span>
         <button
           type="button"
           onClick={publish}

@@ -281,12 +281,25 @@ model Task {
   transferEvents TaskTransferEvent[]
   chatMessages   ClientChatMessage[]
   attachments    TaskAttachment[]
+  board          TaskBoard?
   project        Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
   updates        TaskUpdate[]
 
   @@index([projectId])
   @@index([descriptionUpdatedById])
   @@map("tasks")
+}
+
+/// Quadro livre vinculado a uma tarefa. Imagens continuam armazenadas como
+/// anexos e os elementos guardam apenas posição, tamanho, texto e attachmentId.
+model TaskBoard {
+  taskId    String   @id
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  elements  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("task_boards")
 }
 
 /// Área de trabalho com nome editável. O id é o código gravado em `Task.area`

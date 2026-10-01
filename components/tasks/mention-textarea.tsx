@@ -41,11 +41,12 @@ interface MentionTextareaProps {
   autoFocus?: boolean;
   ariaLabel?: string;
   className?: string;
+  onPasteImages?: (files: File[], cursor: number) => void;
 }
 
 /** Textarea em que digitar @ abre a lista da equipe (setas + Enter para escolher). */
 export function MentionTextarea({
-  value, onChange, users, excludeUserId, onSubmit, placeholder, rows = 3, autoFocus, ariaLabel, className,
+  value, onChange, users, excludeUserId, onSubmit, placeholder, rows = 3, autoFocus, ariaLabel, className, onPasteImages,
 }: MentionTextareaProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [query, setQuery] = useState<string | null>(null);
@@ -97,6 +98,16 @@ export function MentionTextarea({
         onKeyDown={onKeyDown}
         onClick={(e) => updateQuery(value, e.currentTarget.selectionStart ?? value.length)}
         onBlur={() => setQuery(null)}
+        onPaste={(e) => {
+          const files = Array.from(e.clipboardData.items)
+            .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => Boolean(file));
+          if (files.length && onPasteImages) {
+            e.preventDefault();
+            onPasteImages(files, e.currentTarget.selectionStart ?? value.length);
+          }
+        }}
         rows={rows}
         aria-label={ariaLabel}
         placeholder={placeholder}

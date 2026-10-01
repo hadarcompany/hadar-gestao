@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { ClientIdentity } from "@/components/clients/client-identity";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { SelectField } from "@/components/ui/select-field";
@@ -22,6 +23,7 @@ import { type TaskData, type UserSummary, type TaskAttachmentData } from "@/lib/
 import {
   CheckSquare, Square, Clock, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip,
   Upload, Download, Loader2, X, ChevronLeft, ChevronRight, FolderKanban, ImagePlus,
+  LayoutTemplate,
 } from "lucide-react";
 
 /** Tipos exibidos inline (SVG fica de fora: pode carregar script). */
@@ -137,6 +139,23 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
       .then(setProjects)
       .catch(() => setProjects([]));
   }, [open]);
+
+  // Colar uma imagem em qualquer área livre do modal adiciona diretamente aos anexos.
+  // Textareas de descrição tratam o paste antes e impedem duplicação aqui.
+  useEffect(() => {
+    if (!open || !task?.id) return;
+    function onPaste(event: ClipboardEvent) {
+      if (event.defaultPrevented) return;
+      const files = Array.from(event.clipboardData?.items ?? [])
+        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+      if (files.length) { event.preventDefault(); void handleUploadAttachments(files); }
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, task?.id]);
 
   // Setas navegam entre as imagens; Esc fecha só a prévia (captura antes do modal).
   useEffect(() => {
@@ -400,6 +419,9 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                   </span>
                 )}
                 <div className="ml-auto flex items-center gap-2">
+                  <Link href={`/quadros?task=${task.id}`} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors">
+                    <LayoutTemplate size={12} /> Abrir quadro
+                  </Link>
                   <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer transition-colors">
                     {uploading ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
                     Adicionar imagens
@@ -516,7 +538,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
           )}
 
           {/* Descrição e atualizações: uma linha do tempo só, com @menção */}
-          {!transferMode && <TaskUpdates task={task} users={users} onTaskChanged={onTaskChanged} />}
+          {!transferMode && <TaskUpdates task={task} users={users} onTaskChanged={onTaskChanged} onAttachmentsAdded={(created) => { setAttachments((current) => [...current, ...created]); onAttachmentsChanged?.(); }} />}
 
           {/* Status, área, projeto e tempo (sempre visíveis, fora da transferência) */}
           {!transferMode && (
