@@ -16,6 +16,7 @@ type BoardElement = {
 
 const CANVAS_WIDTH = 4000;
 const CANVAS_HEIGHT = 2400;
+const PAN_MARGIN = 1200;
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 4;
 
@@ -50,6 +51,17 @@ export function TaskBoard({ taskId }: { taskId: string }) {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, [taskId]);
+
+  useEffect(() => {
+    if (loading || !scrollRef.current) return;
+    const viewport = scrollRef.current;
+    requestAnimationFrame(() => {
+      viewport.scrollLeft = PAN_MARGIN * zoom;
+      viewport.scrollTop = PAN_MARGIN * zoom;
+    });
+  // Centraliza a origem apenas quando muda de tarefa; o zoom preserva o ponto do cursor.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, taskId]);
 
   useEffect(() => {
     if (!hydrated.current) return;
@@ -125,10 +137,14 @@ export function TaskBoard({ taskId }: { taskId: string }) {
   }
 
   function startPan(event: React.PointerEvent) {
-    if (event.button !== 0 || event.target !== event.currentTarget) return;
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-board-element]")) return;
     const viewport = scrollRef.current;
     if (!viewport) return;
     event.preventDefault();
+    event.stopPropagation();
+    viewport.setPointerCapture?.(event.pointerId);
     setSelectedId(null);
     setPanning(true);
     const origin = { clientX: event.clientX, clientY: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
@@ -138,13 +154,14 @@ export function TaskBoard({ taskId }: { taskId: string }) {
     };
     const stop = () => {
       setPanning(false);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
+      if (viewport.hasPointerCapture?.(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+      viewport.removeEventListener("pointermove", move);
+      viewport.removeEventListener("pointerup", stop);
+      viewport.removeEventListener("pointercancel", stop);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
+    viewport.addEventListener("pointermove", move);
+    viewport.addEventListener("pointerup", stop);
+    viewport.addEventListener("pointercancel", stop);
   }
 
   function removeSelected() {
@@ -195,10 +212,12 @@ export function TaskBoard({ taskId }: { taskId: string }) {
       </div>
       <div
         ref={scrollRef}
+        onPointerDown={startPan}
         onWheel={(event) => { event.preventDefault(); changeZoom(zoom * Math.exp(-event.deltaY * 0.0015), event.clientX, event.clientY); }}
-        className="h-[620px] overflow-auto bg-gray-50 overscroll-contain"
+        className={`h-[620px] overflow-auto bg-gray-50 overscroll-contain select-none ${panning ? "cursor-grabbing" : "cursor-grab"}`}
+        style={{ touchAction: "none" }}
       >
-        <div style={{ width: CANVAS_WIDTH * zoom, height: CANVAS_HEIGHT * zoom }}>
+        <div className="relative" style={{ width: (CANVAS_WIDTH + PAN_MARGIN * 2) * zoom, height: (CANVAS_HEIGHT + PAN_MARGIN * 2) * zoom }}>
           <div
             ref={canvasRef}
             tabIndex={0}
@@ -207,9 +226,9 @@ export function TaskBoard({ taskId }: { taskId: string }) {
               if (files.length) { event.preventDefault(); void uploadImages(files); }
             }}
             onDoubleClick={(event) => { if (event.target === event.currentTarget) addText(); }}
-            onPointerDown={startPan}
-            className={`relative outline-none select-none ${panning ? "cursor-grabbing" : "cursor-grab"}`}
+            className="absolute outline-none select-none"
             style={{
+              left: PAN_MARGIN * zoom, top: PAN_MARGIN * zoom,
               width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})`, transformOrigin: "top left",
               backgroundImage: "linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)",
               backgroundSize: "24px 24px",
@@ -218,6 +237,7 @@ export function TaskBoard({ taskId }: { taskId: string }) {
           {elements.map((element) => (
             <div
               key={element.id}
+              data-board-element
               onPointerDown={(event) => startMove(event, element)}
               onClick={() => setSelectedId(element.id)}
               className={`absolute group rounded-lg shadow-sm bg-white ${selectedId === element.id ? "ring-2 ring-accent" : "ring-1 ring-gray-200"}`}
