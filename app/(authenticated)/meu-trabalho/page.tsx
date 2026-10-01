@@ -6,6 +6,7 @@ import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { CreateTaskModal } from "@/components/tasks/create-task-modal";
 import { TaskRow } from "@/components/tasks/task-row";
 import { TaskListHeader } from "@/components/tasks/task-list-header";
+import { useTaskColumns } from "@/components/tasks/use-task-columns";
 import { Avatar } from "@/components/ui/avatar";
 import { type TaskData } from "@/lib/types";
 import { getTaskBucket } from "@/lib/dates";
@@ -50,6 +51,7 @@ interface ClientGroup {
 
 export default function MeuTrabalhoPage() {
   const { user } = useAuth();
+  const { visibleColumns, setVisibleColumns } = useTaskColumns();
   const [area, setArea] = useState<"tasks" | "notifications">("tasks");
 
   const [tasks, setTasks] = useState<TaskData[]>([]);
@@ -237,13 +239,20 @@ export default function MeuTrabalhoPage() {
               </button>
               {open && (
                 <div className="border-t border-gray-100">
-                  <TaskListHeader sort={sort} onSort={handleSort} showClient={false} />
+                  <TaskListHeader
+                    sort={sort}
+                    onSort={handleSort}
+                    showClient={false}
+                    visibleColumns={visibleColumns}
+                    onVisibleColumnsChange={setVisibleColumns}
+                  />
                   {g.tasks.map((task) => (
                     <TaskRow
                       key={task.id}
                       task={task}
                       users={users}
                       showClient={false}
+                      visibleColumns={visibleColumns}
                       onUpdated={handleRowUpdated}
                       onCloned={handleRowCloned}
                       onOpenDetail={setSelectedTask}
@@ -370,12 +379,13 @@ export default function MeuTrabalhoPage() {
           ) : tab !== "COMPLETED" ? (
             // Abas do dia a dia: lista direta. Só as concluídas, que acumulam, ficam por cliente.
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <TaskListHeader sort={sort} onSort={handleSort} />
+              <TaskListHeader sort={sort} onSort={handleSort} visibleColumns={visibleColumns} onVisibleColumnsChange={setVisibleColumns} />
               {displayedTasks.map((task) => (
                 <TaskRow
                   key={task.id}
                   task={task}
                   users={users}
+                  visibleColumns={visibleColumns}
                   onUpdated={handleRowUpdated}
                   onCloned={handleRowCloned}
                   onOpenDetail={setSelectedTask}

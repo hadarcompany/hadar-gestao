@@ -13,11 +13,13 @@ import {
   Loader2, Check, X as XIcon, Paperclip, CheckCircle2, Circle, MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEFAULT_TASK_COLUMNS, type TaskColumnKey } from "@/lib/task-columns";
 
 interface TaskRowProps {
   task: TaskData;
   users: UserSummary[];
   showClient?: boolean;
+  visibleColumns?: TaskColumnKey[];
   onUpdated: (task: TaskData) => void;
   onCloned?: (task: TaskData) => void;
   onOpenDetail: (task: TaskData) => void;
@@ -33,7 +35,10 @@ async function patchTask(id: string, body: Record<string, unknown>): Promise<Tas
   return res.json();
 }
 
-export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, onOpenDetail }: TaskRowProps) {
+export function TaskRow({
+  task, users, showClient = true, visibleColumns = DEFAULT_TASK_COLUMNS,
+  onUpdated, onCloned, onOpenDetail,
+}: TaskRowProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(task.title);
   const [editingDate, setEditingDate] = useState(false);
@@ -60,6 +65,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
   const extraAssignees = task.assignees.length - 1;
   const isDone = task.status === "COMPLETED";
   const updatesCount = task._count?.updates ?? 0;
+  const isVisible = (key: TaskColumnKey) => visibleColumns.includes(key);
 
   async function saveTitle() {
     const trimmed = titleValue.trim();
@@ -151,12 +157,12 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
           : isDone ? <CheckCircle2 size={17} /> : <Circle size={17} />}
       </button>
 
-      <StatusBadge status={task.status} onChange={(status) => quickUpdate({ status }, "Não foi possível alterar o status.")} />
+      {isVisible("status") && <StatusBadge status={task.status} onChange={(status) => quickUpdate({ status }, "Não foi possível alterar o status.")} />}
 
-      <PriorityBadge
+      {isVisible("priority") && <PriorityBadge
         priority={task.priority}
         onChange={(priority) => quickUpdate({ priority }, "Não foi possível alterar a prioridade.")}
-      />
+      />}
 
       {/* título: clique renomeia; o resto da linha abre a tarefa */}
       <div className="flex-1 min-w-0 flex items-center gap-1.5">
@@ -229,16 +235,16 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       </div>
 
       {/* etiquetas */}
-      <div className="hidden lg:flex shrink-0 max-w-[240px]">
+      {isVisible("labels") && <div className="hidden lg:flex shrink-0 max-w-[240px]">
         <TaskLabels
           compact
           labelIds={task.labelIds ?? []}
           onChange={(labelIds) => quickUpdate({ labelIds }, "Não foi possível salvar as etiquetas.")}
         />
-      </div>
+      </div>}
 
       {/* client */}
-      {showClient && (
+      {showClient && isVisible("client") && (
         <span className="hidden sm:flex items-center gap-1.5 w-28 shrink-0 truncate text-xs text-gray-400" title={task.client?.name ?? "Sem cliente"}>
           {task.client && <Avatar name={task.client.name} image={task.client.logoUrl} size={18} className="text-[8px] object-contain" />}
           <span className="truncate">{task.client?.name ?? "Sem cliente"}</span>
@@ -246,7 +252,7 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
       )}
 
       {/* responsável / transferir: o painel flutua fora da lista para não ser cortado */}
-      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+      {isVisible("assignee") && <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
           ref={assigneeRef}
           type="button"
@@ -267,10 +273,10 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             onTransferred={(t) => { onUpdated(t); setShowTransfer(false); }}
           />
         </Floating>
-      </div>
+      </div>}
 
       {/* due date */}
-      <div className="shrink-0 w-24 text-right" onClick={(e) => e.stopPropagation()}>
+      {isVisible("dueDate") && <div className="shrink-0 w-24 text-right" onClick={(e) => e.stopPropagation()}>
         {editingDate ? (
           <input
             ref={dateInputRef}
@@ -294,18 +300,19 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
             {task.dueDate ? formatDayMonthBR(task.dueDate) : "Sem data"}
           </button>
         )}
-      </div>
+      </div>}
 
       {/* publication date */}
-      <div className="shrink-0 w-24 text-right" title={task.publishDate ? "Data de publicação" : "Sem data de publicação"}>
-        <span className={cn(
-          "inline-flex items-center gap-1 text-xs",
-          task.publishDate ? "text-violet-600 font-medium" : "text-gray-300"
-        )}>
-          <CalendarIcon size={11} />
-          {task.publishDate ? formatDayMonthBR(task.publishDate) : "—"}
-        </span>
-      </div>
+      {isVisible("publishDate") && (
+        <div className="shrink-0 w-24 text-right" title={task.publishDate ? "Data de publicação" : undefined}>
+          {task.publishDate && (
+            <span className="inline-flex items-center gap-1 text-xs text-violet-600 font-medium">
+              <CalendarIcon size={11} />
+              {formatDayMonthBR(task.publishDate)}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* actions */}
       <div

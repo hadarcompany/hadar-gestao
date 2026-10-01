@@ -6,6 +6,7 @@ import { CreateTaskModal } from "@/components/tasks/create-task-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { TaskRow } from "@/components/tasks/task-row";
 import { TaskListHeader } from "@/components/tasks/task-list-header";
+import { useTaskColumns } from "@/components/tasks/use-task-columns";
 import { SelectField } from "@/components/ui/select-field";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from "@/lib/task-templates";
 import { useAreas } from "@/contexts/areas-context";
@@ -41,6 +42,7 @@ const LAST = 999;
 
 export default function TarefasPage() {
   const { byId: areaById, renameArea } = useAreas();
+  const { visibleColumns, setVisibleColumns } = useTaskColumns();
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string; email?: string | null; image?: string | null }[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string; image?: string | null }[]>([]);
@@ -265,12 +267,13 @@ export default function TarefasPage() {
         </div>
       ) : groupBy === "all" ? (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <TaskListHeader sort={sort} onSort={handleSort} />
+          <TaskListHeader sort={sort} onSort={handleSort} visibleColumns={visibleColumns} onVisibleColumnsChange={setVisibleColumns} />
           {flatTasks.map((task) => (
             <TaskRow
               key={task.id}
               task={task}
               users={users}
+              visibleColumns={visibleColumns}
               onUpdated={handleRowUpdated}
               onCloned={handleRowCloned}
               onOpenDetail={setSelectedTask}
@@ -334,13 +337,20 @@ export default function TarefasPage() {
                 </div>
                 {!isCollapsed && (
                   <div>
-                    <TaskListHeader sort={sort} onSort={handleSort} showClient={groupBy !== "client"} />
+                    <TaskListHeader
+                      sort={sort}
+                      onSort={handleSort}
+                      showClient={groupBy !== "client"}
+                      visibleColumns={visibleColumns}
+                      onVisibleColumnsChange={setVisibleColumns}
+                    />
                     {group.tasks.map((task) => (
                       <TaskRow
                         key={task.id}
                         task={task}
                         users={users}
                         showClient={groupBy !== "client"}
+                        visibleColumns={visibleColumns}
                         onUpdated={handleRowUpdated}
                         onCloned={handleRowCloned}
                         onOpenDetail={setSelectedTask}
