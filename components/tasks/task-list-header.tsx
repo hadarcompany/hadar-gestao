@@ -44,6 +44,7 @@ export function TaskListHeader({
       {showClient && <Col k="client" label="Cliente" className="hidden sm:flex w-28 shrink-0" />}
       <Col k="assignee" label="Responsável" className="w-[104px] shrink-0" />
       <Col k="dueDate" label="Prazo" className="w-24 shrink-0 justify-end" />
+      <Col k="publishDate" label="Publicação" className="w-24 shrink-0 justify-end" />
       <span className="w-[118px] shrink-0" />
     </div>
   );

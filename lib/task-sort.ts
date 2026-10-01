@@ -1,6 +1,6 @@
 import type { TaskData } from "@/lib/types";
 
-export type SortKey = "status" | "priority" | "title" | "client" | "assignee" | "dueDate";
+export type SortKey = "status" | "priority" | "title" | "client" | "assignee" | "dueDate" | "publishDate";
 export interface SortState { key: SortKey; dir: "asc" | "desc" }
 
 const PRIORITY_RANK: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
@@ -24,6 +24,11 @@ function compare(a: TaskData, b: TaskData, key: SortKey): number {
     case "dueDate": {
       const av = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
       const bv = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      return av === bv ? 0 : av - bv;
+    }
+    case "publishDate": {
+      const av = a.publishDate ? new Date(a.publishDate).getTime() : Number.POSITIVE_INFINITY;
+      const bv = b.publishDate ? new Date(b.publishDate).getTime() : Number.POSITIVE_INFINITY;
       return av === bv ? 0 : av - bv;
     }
   }

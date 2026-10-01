@@ -296,6 +296,17 @@ export function TaskRow({ task, users, showClient = true, onUpdated, onCloned, o
         )}
       </div>
 
+      {/* publication date */}
+      <div className="shrink-0 w-24 text-right" title={task.publishDate ? "Data de publicação" : "Sem data de publicação"}>
+        <span className={cn(
+          "inline-flex items-center gap-1 text-xs",
+          task.publishDate ? "text-violet-600 font-medium" : "text-gray-300"
+        )}>
+          <CalendarIcon size={11} />
+          {task.publishDate ? formatDayMonthBR(task.publishDate) : "—"}
+        </span>
+      </div>
+
       {/* actions */}
       <div
         className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
