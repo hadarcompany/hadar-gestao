@@ -30,6 +30,7 @@ export function TaskBoard({ taskId }: { taskId: string }) {
   const [uploading, setUploading] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [zoom, setZoom] = useState(1);
+  const [panning, setPanning] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const hydrated = useRef(false);
@@ -123,6 +124,29 @@ export function TaskBoard({ taskId }: { taskId: string }) {
     window.addEventListener("pointerup", stop);
   }
 
+  function startPan(event: React.PointerEvent) {
+    if (event.button !== 0 || event.target !== event.currentTarget) return;
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    event.preventDefault();
+    setSelectedId(null);
+    setPanning(true);
+    const origin = { clientX: event.clientX, clientY: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+    const move = (next: PointerEvent) => {
+      viewport.scrollLeft = origin.left - (next.clientX - origin.clientX);
+      viewport.scrollTop = origin.top - (next.clientY - origin.clientY);
+    };
+    const stop = () => {
+      setPanning(false);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  }
+
   function removeSelected() {
     if (!selectedId) return;
     setElements((current) => current.filter((item) => item.id !== selectedId));
@@ -167,7 +191,7 @@ export function TaskBoard({ taskId }: { taskId: string }) {
         </div>
       </div>
       <div className="px-4 py-2 text-[11px] text-gray-500 bg-amber-50 border-b border-amber-100">
-        Cole imagens com <strong>Ctrl+V</strong>. Use o <strong>scroll do mouse para zoom</strong> (15% a 400%), arraste livremente e redimensione pelo canto.
+        Cole imagens com <strong>Ctrl+V</strong>. Use o <strong>scroll para zoom</strong>, arraste o fundo com o <strong>botão esquerdo</strong> para navegar e redimensione elementos pelo canto.
       </div>
       <div
         ref={scrollRef}
@@ -183,8 +207,8 @@ export function TaskBoard({ taskId }: { taskId: string }) {
               if (files.length) { event.preventDefault(); void uploadImages(files); }
             }}
             onDoubleClick={(event) => { if (event.target === event.currentTarget) addText(); }}
-            onPointerDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}
-            className="relative outline-none"
+            onPointerDown={startPan}
+            className={`relative outline-none select-none ${panning ? "cursor-grabbing" : "cursor-grab"}`}
             style={{
               width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})`, transformOrigin: "top left",
               backgroundImage: "linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)",
