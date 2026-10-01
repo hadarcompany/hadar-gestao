@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/auth-context";
 import { ClientIdentity } from "@/components/clients/client-identity";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { SelectField } from "@/components/ui/select-field";
@@ -16,6 +15,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { TaskLabels } from "@/components/tasks/label-picker";
 import { TaskUpdates } from "@/components/tasks/task-updates";
+import { TaskBoard } from "@/components/tasks/task-board";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task-templates";
 import { useAreas } from "@/contexts/areas-context";
 import { formatDateBR } from "@/lib/dates";
@@ -64,6 +64,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
   const [transferMode, setTransferMode] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBoard, setShowBoard] = useState(false);
 
   // Edit mode fields
   const [editTitle, setEditTitle] = useState("");
@@ -105,6 +106,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
       setInlineError(null);
       setEditMode(false);
       setTransferMode(false);
+      setShowBoard(false);
       setPreviewIndex(null);
       setEditTitle(task.title);
       setEditClientId(task.clientId || "");
@@ -419,9 +421,9 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                   </span>
                 )}
                 <div className="ml-auto flex items-center gap-2">
-                  <Link href={`/quadros?task=${task.id}`} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors">
-                    <LayoutTemplate size={12} /> Abrir quadro
-                  </Link>
+                  <button type="button" onClick={() => setShowBoard((current) => !current)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors">
+                    <LayoutTemplate size={12} /> {showBoard ? "Fechar quadro" : "Quadro livre"}
+                  </button>
                   <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer transition-colors">
                     {uploading ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
                     Adicionar imagens
@@ -536,6 +538,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
               </div>
             </>
           )}
+
+          {!transferMode && showBoard && <TaskBoard key={task.id} taskId={task.id} />}
 
           {/* Descrição e atualizações: uma linha do tempo só, com @menção */}
           {!transferMode && <TaskUpdates task={task} users={users} onTaskChanged={onTaskChanged} onAttachmentsAdded={(created) => { setAttachments((current) => [...current, ...created]); onAttachmentsChanged?.(); }} />}
