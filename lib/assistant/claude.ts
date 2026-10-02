@@ -1,5 +1,6 @@
 import { AssistantError, type ToolDefinition, type AttachmentMediaType, type ChatMessage } from "./types";
 import type { AssistantRuntimeConfig } from "./integration-server";
+import { claudeProviderError } from "./provider-errors";
 
 export type TextBlock = { type: "text"; text: string };
 export type ToolUseBlock = { type: "tool_use"; id: string; name: string; input: unknown };
@@ -27,16 +28,13 @@ export async function callClaude(messages: ClaudeMessage[], system: string, tool
   try {
     response = await fetcher("https://api.anthropic.com/v1/messages", {
       method: "POST", cache: "no-store", signal: AbortSignal.timeout(35000),
-      headers: { "Content-Type": "application/json", "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
+      headers: { "Content-Type": "application/json", "x-api-key": config.apiKey, "anthropic-version": "2023-06-01", ...(config.workspaceId ? { "anthropic-workspace-id": config.workspaceId } : {}) },
       body: JSON.stringify({ model: config.model, max_tokens: maxTokens, system, messages, ...(tools.length ? { tools } : {}) }),
     });
   } catch { throw new AssistantError("Não foi possível conectar ao Claude. Confira o resultado das ações abaixo antes de tentar novamente.", 502); }
   if (!response.ok) {
-    // Não repassa corpo de erro nem chave, e não repete automaticamente comandos.
-    if (response.status === 401 || response.status === 403) throw new AssistantError("A chave do Claude não foi aceita. Confira-a em Configurações > Integrações.", 503);
-    if (response.status === 429) throw new AssistantError("O limite de uso do Claude foi atingido. Aguarde antes de enviar outro comando.", 429);
-    if (response.status === 400 || response.status === 404) throw new AssistantError("O Claude recusou a solicitação. Confira o modelo configurado; se enviou arquivos, use PDFs sem senha e menores, ou outra imagem válida.", 502);
-    throw new AssistantError("O Claude está indisponível no momento. Tente novamente mais tarde.", 502);
+    // Não repassa o erro bruto nem repete comandos. A mensagem distingue configuração de arquivos.
+    throw claudeProviderError(response.status, await response.json().catch(() => null));
   }
   const data = await response.json() as ClaudeResponse;
   if (!Array.isArray(data.content)) throw new AssistantError("O Claude retornou uma resposta inválida.", 502);

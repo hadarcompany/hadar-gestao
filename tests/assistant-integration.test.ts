@@ -45,11 +45,12 @@ test("chave é criptografada com nonce único, autenticação e origem estável"
 });
 
 test("configuração do aplicativo prevalece e desconectar bloqueia fallback do ambiente", (context) => {
-  const vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "INTEGRATIONS_ENCRYPTION_KEY"] as const;
+  const vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "ANTHROPIC_WORKSPACE_ID", "INTEGRATIONS_ENCRYPTION_KEY"] as const;
   const previous = Object.fromEntries(vars.map((key) => [key, process.env[key]]));
   context.after(() => { for (const key of vars) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key]; } });
   process.env.ANTHROPIC_API_KEY = "fake-legacy-server-key";
   process.env.ANTHROPIC_MODEL = DEFAULT_ASSISTANT_MODEL;
+  delete process.env.ANTHROPIC_WORKSPACE_ID;
   process.env.INTEGRATIONS_ENCRYPTION_KEY = "stable-integration-secret-for-tests-at-least-32";
   const record = { enabled: true, apiKeyEncrypted: encryptAssistantKey(fakeKey), model: "claude-test-model", updatedAt: new Date("2026-10-02T12:00:00Z") };
   assert.deepEqual(assistantRuntimeConfig(record), { apiKey: fakeKey, model: "claude-test-model" });
@@ -58,8 +59,30 @@ test("configuração do aplicativo prevalece e desconectar bloqueia fallback do 
   assert.ok(!JSON.stringify(status).includes(record.apiKeyEncrypted));
   assert.ok(!JSON.stringify(status).includes(fakeKey));
   assert.deepEqual(assistantRuntimeConfig(null), { apiKey: "fake-legacy-server-key", model: DEFAULT_ASSISTANT_MODEL });
+  process.env.ANTHROPIC_WORKSPACE_ID = "wrkspc_01TestEnvironment";
+  assert.equal(assistantRuntimeConfig(null).workspaceId, "wrkspc_01TestEnvironment");
+  assert.equal(assistantRuntimeConfig(record).workspaceId, undefined);
+  assert.equal(assistantRuntimeConfig({ ...record, workspaceId: "wrkspc_01TestSavedWorkspace" }).workspaceId, "wrkspc_01TestSavedWorkspace");
+  assert.equal(assistantIntegrationStatus({ ...record, workspaceId: null }).workspaceId, null);
   assert.equal(assistantIntegrationStatus({ ...record, enabled: false, apiKeyEncrypted: null }).configured, false);
   assert.throws(() => assistantRuntimeConfig({ ...record, enabled: false, apiKeyEncrypted: null }), AssistantError);
+});
+
+test("workspace usa ID real e permite remover o cabeçalho sem alterar a chave", () => {
+  assert.equal(parseAssistantIntegrationInput({ workspaceId: " wrkspc_01TestSavedWorkspace " }).workspaceId, "wrkspc_01TestSavedWorkspace");
+  assert.equal(parseAssistantIntegrationInput({ workspaceId: " " }).workspaceId, null);
+  assert.equal(Object.hasOwn(parseAssistantIntegrationInput({ model: DEFAULT_ASSISTANT_MODEL }), "workspaceId"), false);
+  for (const workspaceId of ["default", "wrkspc_short", "wrkspc_01Test\r\nInjected", null, 1]) assert.throws(() => parseAssistantIntegrationInput({ workspaceId }), AssistantError);
+});
+
+test("workspace vai só no cabeçalho e chaves de workspace dispensam esse cabeçalho", async () => {
+  for (const workspaceId of [undefined, "wrkspc_01TestSavedWorkspace"]) {
+    await callClaude([{ role: "user", content: "OK" }], "Teste", [], async (_url, options) => {
+      assert.equal((options?.headers as Record<string, string>)["anthropic-workspace-id"], workspaceId);
+      assert.ok(!String(options?.body).includes("wrkspc_"));
+      return Response.json({ content: [{ type: "text", text: "OK" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } });
+    }, { apiKey: fakeKey, model: DEFAULT_ASSISTANT_MODEL, workspaceId });
+  }
 });
 
 test("teste de conexão usa configuração recebida só no servidor, sem ferramentas", async () => {

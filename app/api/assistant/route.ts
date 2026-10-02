@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const message = error instanceof AssistantError ? error.message : error instanceof SyntaxError ? "Comando inválido." : "Não foi possível processar o comando. Confira a configuração e a migração do assistente.";
     const status = error instanceof AssistantError ? error.status : error instanceof SyntaxError ? 400 : 500;
-    if (runId) await prisma.assistantRun.update({ where: { id: runId }, data: { status: "FAILED", result: { error: message, status } } }).catch(() => {});
-    return NextResponse.json({ error: message }, { status });
+    const result = { error: message, status, ...(error instanceof AssistantError && error.code ? { code: error.code } : {}) };
+    if (runId) await prisma.assistantRun.update({ where: { id: runId }, data: { status: "FAILED", result } }).catch(() => {});
+    return NextResponse.json(result, { status });
   }
 }

@@ -17,5 +17,5 @@ export type ToolDefinition = {
   input_schema: { type: "object"; properties: Record<string, unknown>; required: string[]; additionalProperties: false };
 };
 export class AssistantError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
+  constructor(message: string, public status = 400, public code?: string) { super(message); }
 }

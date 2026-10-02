@@ -27,13 +27,17 @@ O reconhecimento depende do navegador, do microfone e de uma conexão segura (HT
 
 ## Configuração e publicação
 
-1. Revogue a chave compartilhada na conversa e crie uma nova no console da Anthropic. Ela não foi incluída no código nem usada em testes.
+1. Revogue a chave compartilhada na conversa e crie uma nova no console da Anthropic. Credenciais não são incluídas no código; os testes automatizados usam valores fictícios.
 2. Como administrador, acesse **Configurações > Integrações > Claude**, informe a chave e clique em **Testar conexão** e **Salvar**. Use Ctrl+V/Colar no campo ou o botão **Colar chave**; a leitura da área de transferência ocorre apenas ao clicar nesse botão. Se o navegador negar a leitura, use a colagem normal. **Mostrar/Ocultar chave** permite conferir o texto antes de salvar. O aviso **Chave preenchida** confirma que o campo recebeu o valor. O campo fica vazio depois de salvar e o status mostra **Configurado**; deixe-o vazio para manter a chave ao mudar o modelo. O teste usa uma chamada curta da API, sem ferramentas ou alterações no aplicativo. A conexão só é testada quando solicitada pelo botão.
-3. Aplique as migrações `20261002150000_add_assistant_actions` e `20261002180000_add_assistant_integration`. Elas criam tabelas com RLS ativado. A funcionalidade de cartões depende também de `20261002120000_add_credit_cards`.
+3. Aplique as migrações `20261002150000_add_assistant_actions`, `20261002180000_add_assistant_integration` e `20261002220000_add_assistant_workspace`. As duas primeiras criam tabelas com RLS ativado; a terceira adiciona o ID opcional do workspace. A funcionalidade de cartões depende também de `20261002120000_add_credit_cards`.
 4. Gere o cliente Prisma com `npx prisma generate` e publique a aplicação. O servidor precisa suportar a duração configurada de até 180 segundos para comandos de várias etapas.
 5. Abra o Assistente e teste primeiro um comando de consulta, depois uma tarefa de teste. O assistente mostra um aviso de configuração quando a chave está ausente.
 
 Use `prisma migrate deploy` somente se o histórico das migrações estiver sincronizado; em bancos mantidos por SQL manual, aplique somente os scripts necessários pelo procedimento do ambiente.
+
+Chaves pessoais ou de serviço que abrangem vários workspaces exigem o campo **Workspace da Anthropic**, com o ID real `wrkspc_...` obtido em Claude Console > Settings > Workspaces. O nome `Default` não é um ID; esse workspace também possui um identificador próprio. Outra opção é criar uma chave vinculada especificamente ao workspace Default e deixar o campo vazio. O servidor envia o ID no cabeçalho `anthropic-workspace-id` em todas as chamadas, inclusive nos testes e nas etapas com ferramentas. Depois de testar, clique em **Salvar** para aplicar o workspace e o modelo. Falhas de workspace, saldo, modelo, permissões e arquivos agora têm mensagens distintas; nenhuma falha dispara repetição automática.
+
+No fallback de ambiente, `ANTHROPIC_WORKSPACE_ID` é opcional. Ele não se aplica à chave salva pelo aplicativo: nessa configuração, o campo de Integrações controla o cabeçalho, inclusive quando deixado vazio para usar uma chave vinculada a um workspace específico.
 
 A integração é compartilhada pelos usuários desta instalação, como as outras integrações atuais. A chave cadastrada no aplicativo tem prioridade sobre `ANTHROPIC_API_KEY`; o modelo padrão é `claude-sonnet-4-6`. Remover a integração apaga a chave armazenada e desativa o Assistente, inclusive se houver uma chave legada no ambiente. Um novo cadastro reativa a integração sem redeploy. Instalações de clientes diferentes devem ter bancos/ambientes separados; esta alteração não implementa isolamento de empresas em um mesmo banco.
 
@@ -57,10 +61,10 @@ O texto do comando, anexos enviados pelo usuário e dados consultados são envia
 
 ## Verificação
 
-`npx tsx --test tests/assistant.test.ts tests/assistant-attachments.test.ts tests/assistant-integration.test.ts tests/expense-payments.test.ts tests/fixed-expenses.test.ts`
+`npx tsx --test tests/assistant.test.ts tests/assistant-attachments.test.ts tests/assistant-integration.test.ts tests/assistant-provider-errors.test.ts tests/expense-payments.test.ts tests/fixed-expenses.test.ts`
 
 `npx tsc --noEmit`
 
 `npm run build`
 
-Referências: [Messages API](https://platform.claude.com/docs/en/api/messages/create), [PDFs](https://platform.claude.com/docs/en/build-with-claude/pdf-support), [imagens](https://platform.claude.com/docs/en/build-with-claude/vision), [modelos do Claude](https://platform.claude.com/docs/en/about-claude/models/overview), [SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition).
+Referências: [Messages API](https://platform.claude.com/docs/en/api/messages/create), [workspaces](https://platform.claude.com/docs/en/manage-claude/workspaces), [PDFs](https://platform.claude.com/docs/en/build-with-claude/pdf-support), [imagens](https://platform.claude.com/docs/en/build-with-claude/vision), [modelos do Claude](https://platform.claude.com/docs/en/about-claude/models/overview), [SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition).
