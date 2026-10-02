@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { Avatar } from "@/components/ui/avatar";
 import { MentionTextarea, MentionText } from "@/components/tasks/mention-textarea";
 import { type TaskAttachmentData, type TaskData, type UserSummary } from "@/lib/types";
+import { isImageFile } from "@/lib/image-files";
 import { Loader2, Send, Trash2, MessageSquare, Pencil } from "lucide-react";
 
 interface TaskUpdateItem {
@@ -80,7 +81,7 @@ export function TaskUpdates({
       const uploaded: TaskAttachmentData[] = [];
       const tokens: string[] = [];
       for (const [index, file] of files.entries()) {
-        if (!file.type.startsWith("image/") || file.size <= 0 || file.size > 8 * 1024 * 1024) throw new Error("Cada imagem deve ter no máximo 8 MB.");
+        if (!isImageFile(file) || file.size <= 0 || file.size > 8 * 1024 * 1024) throw new Error("Cada imagem deve ter no máximo 8 MB.");
         const body = new FormData();
         body.append("file", file, file.name || `imagem-colada-${Date.now()}-${index + 1}.png`);
         const response = await fetch(`/api/tasks/${task.id}/attachments`, { method: "POST", body });

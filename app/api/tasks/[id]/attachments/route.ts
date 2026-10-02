@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
+import { imageMimeType } from "@/lib/image-files";
 
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024; // 8MB por arquivo
 
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
 
   const bytes = await file.arrayBuffer();
   const base64 = Buffer.from(bytes).toString("base64");
-  const mimeType = file.type || "application/octet-stream";
+  const mimeType = imageMimeType(file);
   const dataUrl = `data:${mimeType};base64,${base64}`;
 
   const attachment = await prisma.taskAttachment.create({

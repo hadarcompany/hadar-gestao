@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ["heic-convert"],
   eslint: {
     ignoreDuringBuilds: true,
   },

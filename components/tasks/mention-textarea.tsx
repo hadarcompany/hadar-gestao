@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { isImageFile } from "@/lib/image-files";
+import { transferredFiles } from "@/lib/task-images";
 
 interface MentionUser { id: string; name: string; image?: string | null }
 
@@ -99,10 +101,7 @@ export function MentionTextarea({
         onClick={(e) => updateQuery(value, e.currentTarget.selectionStart ?? value.length)}
         onBlur={() => setQuery(null)}
         onPaste={(e) => {
-          const files = Array.from(e.clipboardData.items)
-            .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
-            .map((item) => item.getAsFile())
-            .filter((file): file is File => Boolean(file));
+          const files = transferredFiles(e.clipboardData).filter(isImageFile);
           if (files.length && onPasteImages) {
             e.preventDefault();
             onPasteImages(files, e.currentTarget.selectionStart ?? value.length);

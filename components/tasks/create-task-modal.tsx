@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { MentionTextarea } from "@/components/tasks/mention-textarea";
@@ -17,6 +17,8 @@ import {
 } from "@/lib/task-templates";
 import { areaForType, defaultAssigneeFor } from "@/lib/areas";
 import { useAreas } from "@/contexts/areas-context";
+import { IMAGE_FILE_ACCEPT, isImageFile } from "@/lib/image-files";
+import { addTaskImages, transferredFiles } from "@/lib/task-images";
 import { Plus, Trash2, GripVertical, ImagePlus, X } from "lucide-react";
 
 interface User { id: string; name: string; email?: string | null; }
@@ -60,6 +62,28 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [draggingImages, setDraggingImages] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const imagesRef = useRef<File[]>([]);
+  const dragDepth = useRef(0);
+  const submitting = useRef(false);
+  const createdTaskId = useRef<string | null>(null);
+
+  const selectImages = useCallback((files: FileList | File[] | null) => {
+    if (!files || submitting.current) return [];
+    const result = addTaskImages(imagesRef.current, Array.from(files));
+    imagesRef.current = result.files;
+    setImages(result.files);
+    setUploadError(result.error);
+    return result.added;
+  }, []);
+
+  function removeImage(index: number) {
+    if (submitting.current) return;
+    imagesRef.current = imagesRef.current.filter((_, i) => i !== index);
+    setImages(imagesRef.current);
+    setUploadError(null);
+  }
 
   // Reset on open
   useEffect(() => {
@@ -70,6 +94,8 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
       setPublishDate(initialPublishDate || ""); setIsExtra(false);
       setDescription(""); setTags([]); setEstimatedTime(""); setChecklist([]);
       setExtraFields({}); setNewChecklistItem(""); setImages([]); setUploadError(null);
+      imagesRef.current = []; dragDepth.current = 0; createdTaskId.current = null;
+      setDraggingImages(false);
     }
   }, [open, initialClientId, initialPublishDate, initialProjectId]);
 
@@ -124,77 +150,97 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
   }
 
   async function handleSubmit() {
-    if (!title.trim()) return;
+    if (!title.trim() || submitting.current) return;
+    submitting.current = true;
     setLoading(true);
+    setUploadError(null);
 
     try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title, type: taskType || null, description, status, priority,
-          startDate: startDate || null, dueDate: dueDate || null,
-          publishDate: publishDate || null, isExtra,
-          estimatedTime: estimatedTime || null,
-          checklist, extraFields: Object.keys(extraFields).length > 0 ? extraFields : null,
-          tags, clientId: clientId || null, assigneeIds,
-          area: area || null, projectId: projectId || null,
-        }),
-      });
+      if (!createdTaskId.current) {
+        const res = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title, type: taskType || null, description, status, priority,
+            startDate: startDate || null, dueDate: dueDate || null,
+            publishDate: publishDate || null, isExtra,
+            estimatedTime: estimatedTime || null,
+            checklist, extraFields: Object.keys(extraFields).length > 0 ? extraFields : null,
+            tags, clientId: clientId || null, assigneeIds,
+            area: area || null, projectId: projectId || null,
+          }),
+        });
 
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Não foi possível criar a tarefa");
-      const created = await res.json();
-      for (const image of images) {
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Não foi possível criar a tarefa");
+        const created = await res.json();
+        createdTaskId.current = created.id;
+      }
+      for (const image of [...imagesRef.current]) {
         const fd = new FormData();
         fd.append("file", image);
-        const upload = await fetch(`/api/tasks/${created.id}/attachments`, { method: "POST", body: fd });
-        if (!upload.ok) throw new Error(`A tarefa foi criada, mas não foi possível anexar ${image.name}.`);
+        const upload = await fetch(`/api/tasks/${createdTaskId.current}/attachments`, { method: "POST", body: fd });
+        if (!upload.ok) {
+          const result = await upload.json().catch(() => ({}));
+          const reason = result.error || (upload.status === 413 ? "O servidor recusou o tamanho do arquivo." : "Não foi possível enviar o arquivo.");
+          throw new Error(`${image.name}: ${reason} A tarefa já foi criada; tente enviar as imagens restantes novamente.`);
+        }
+        imagesRef.current = imagesRef.current.filter((file) => file !== image);
+        setImages([...imagesRef.current]);
       }
       onCreated();
       onClose();
     } catch (e) {
       setUploadError((e as Error).message);
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
-  }
-
-  function selectImages(files: FileList | File[] | null) {
-    if (!files) return;
-    setUploadError(null);
-    const valid = Array.from(files).filter((file) => {
-      if (!file.type.startsWith("image/")) return false;
-      if (file.size === 0 || file.size > 8 * 1024 * 1024) {
-        setUploadError("Cada imagem deve ter no máximo 8 MB.");
-        return false;
-      }
-      return true;
-    });
-    setImages((current) => [...current, ...valid].slice(0, 10));
   }
 
   useEffect(() => {
     if (!open) return;
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
-      const files = Array.from(event.clipboardData?.items ?? [])
-        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
-        .map((item) => item.getAsFile())
-        .filter((file): file is File => Boolean(file));
+      const files = transferredFiles(event.clipboardData).filter(isImageFile);
       if (files.length) { event.preventDefault(); selectImages(files); }
     }
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, selectImages]);
 
   const currentTemplate = taskType ? TASK_TEMPLATES[taskType as TaskType] : null;
   const slideCount = parseInt((extraFields.qtd_slides as string) || "0") || 0;
   const suggestedByArea = !assigneesTouched && area && assigneeIds.length > 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Criar Tarefa" size="xl">
-      <div className="space-y-6">
+    <Modal open={open} onClose={() => { if (!submitting.current) onClose(); }} title="Criar Tarefa" size="xl">
+      <div
+        className="space-y-6"
+        onDragEnter={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          dragDepth.current += 1;
+          if (!submitting.current) setDraggingImages(true);
+        }}
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = submitting.current ? "none" : "copy";
+        }}
+        onDragLeave={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setDraggingImages(false);
+        }}
+        onDrop={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          dragDepth.current = 0;
+          setDraggingImages(false);
+          selectImages(transferredFiles(event.dataTransfer));
+        }}
+      >
         {/* Task Type */}
         <SelectField
           label="Tipo de Tarefa"
@@ -216,30 +262,37 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
           />
         </div>
 
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Imagens da tarefa: selecione, arraste ou cole com Ctrl+V"
+          className={`border-2 border-dashed rounded-xl p-4 transition-colors focus:outline-none focus:ring-2 focus:ring-accent/40 ${draggingImages ? "border-accent bg-accent/10" : "border-gray-200 bg-gray-50"}`}
+        >
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Imagens da tarefa</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">Até 10 imagens, com no máximo 8 MB cada.</p>
+              <p className="text-xs text-gray-500 mt-1">{draggingImages ? "Solte as imagens aqui para adicionar." : "Arraste imagens para cá ou copie e cole com Ctrl+V."}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Até 10 imagens, incluindo HEIC, com no máximo 8 MB cada.</p>
             </div>
-            <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 rounded-lg cursor-pointer">
+            <button type="button" disabled={loading} onClick={() => imageInputRef.current?.click()} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 rounded-lg disabled:opacity-50 shrink-0">
               <ImagePlus size={14} /> Selecionar imagens
-              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { selectImages(e.target.files); e.target.value = ""; }} />
-            </label>
+            </button>
+            <input ref={imageInputRef} type="file" accept={IMAGE_FILE_ACCEPT} disabled={loading} multiple className="hidden" onChange={(e) => { selectImages(e.target.files); e.target.value = ""; }} />
           </div>
           {images.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-3">
               {images.map((image, index) => (
                 <span key={`${image.name}-${index}`} className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg">
                   <span className="truncate max-w-[180px]">{image.name}</span>
-                  <button type="button" onClick={() => setImages((current) => current.filter((_, i) => i !== index))} className="text-gray-400 hover:text-red-600" title="Remover imagem">
+                  <button type="button" disabled={loading} onClick={() => removeImage(index)} className="text-gray-400 hover:text-red-600" title="Remover imagem">
                     <X size={12} />
                   </button>
                 </span>
               ))}
             </div>
           )}
-          {uploadError && <p className="text-xs text-red-600 mt-2">{uploadError}</p>}
+          <p aria-live="polite" className="text-[11px] text-gray-500 mt-2">{images.length}/10 imagens selecionadas. Serão anexadas ao criar a tarefa.</p>
+          {uploadError && <p role="alert" className="text-xs text-red-600 mt-2">{uploadError}</p>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -304,9 +357,8 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
               placeholder="Detalhes da tarefa… use @ para marcar alguém"
               className="bg-gray-100"
               onPasteImages={(files, cursor) => {
-                const valid = files.filter((file) => file.type.startsWith("image/") && file.size > 0 && file.size <= 8 * 1024 * 1024);
-                if (!valid.length) { setUploadError("Cada imagem deve ter no máximo 8 MB."); return; }
-                setImages((current) => [...current, ...valid].slice(0, 10));
+                const valid = selectImages(files);
+                if (!valid.length) return;
                 const labels = valid.map((file) => `[Imagem anexada: ${file.name || "imagem colada"}]`).join("\n");
                 const insertion = `${cursor > 0 && !description.slice(0, cursor).endsWith("\n") ? "\n" : ""}${labels}\n`;
                 setDescription(description.slice(0, cursor) + insertion + description.slice(cursor));
@@ -398,6 +450,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
           <button
             onClick={onClose}
+            disabled={loading}
             className="px-4 py-2 text-sm text-gray-500 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
             Cancelar
@@ -407,7 +460,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
             disabled={loading || !title.trim()}
             className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
           >
-            {loading ? "Criando..." : "Criar Tarefa"}
+            {loading ? "Salvando..." : createdTaskId.current ? "Tentar anexar novamente" : "Criar Tarefa"}
           </button>
         </div>
       </div>

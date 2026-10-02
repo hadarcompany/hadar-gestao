@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/permissions";
+import { isHeicImage, isPreviewableImage } from "@/lib/image-files";
+import { heicToJpeg } from "@/lib/heic";
 
-/** Imagens que podem ser exibidas na própria página (SVG fica de fora: pode executar script). */
-const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+export const runtime = "nodejs";
 
 /** Devolve o arquivo. Com ?inline=1, imagens seguras vão para exibição (prévia); o resto baixa. */
 export async function GET(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string; attachmentId: string }> }) {
@@ -18,13 +19,25 @@ export async function GET(req: NextRequest, { params: routeParams }: { params: P
   }
 
   const base64 = attachment.data.split(",")[1] ?? "";
-  const buffer = Buffer.from(base64, "base64");
-  const inline = new URL(req.url).searchParams.get("inline") === "1" && INLINE_TYPES.has(attachment.mimeType);
-  const name = encodeURIComponent(attachment.fileName);
+  let buffer: Buffer = Buffer.from(base64, "base64");
+  const inline = new URL(req.url).searchParams.get("inline") === "1" && isPreviewableImage(attachment);
+  let mimeType = attachment.mimeType;
+  let fileName = attachment.fileName;
+  // A prévia é JPEG para funcionar em todos os navegadores. O download preserva o HEIC original.
+  if (inline && isHeicImage(attachment)) {
+    try {
+      buffer = await heicToJpeg(buffer);
+      mimeType = "image/jpeg";
+      fileName = fileName.replace(/\.(heic|heif)$/i, "") + ".jpg";
+    } catch (error) {
+      return NextResponse.json({ error: (error as Error).message }, { status: 422 });
+    }
+  }
+  const name = encodeURIComponent(fileName);
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
-      "Content-Type": inline ? attachment.mimeType : "application/octet-stream",
+      "Content-Type": inline ? mimeType : "application/octet-stream",
       "X-Content-Type-Options": "nosniff",
       "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${name}"; filename*=UTF-8''${name}`,
       "Cache-Control": inline ? "private, max-age=3600" : "private, no-store",

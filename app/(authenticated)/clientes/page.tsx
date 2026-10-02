@@ -16,6 +16,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatDateBR } from "@/lib/dates";
 import { WeeklyDemandPanel } from "@/components/clients/weekly-demand-panel";
 import { ClientChatPanel } from "@/components/clients/client-chat-panel";
+import { IMAGE_FILE_ACCEPT } from "@/lib/image-files";
 
 interface ServiceData {
   id: string;
@@ -124,6 +125,7 @@ export default function ClientesPage() {
 
   // Logo
   const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [showDeleteClientConfirm, setShowDeleteClientConfirm] = useState(false);
 
   const fetchClients = useCallback(async () => {
@@ -262,12 +264,19 @@ export default function ClientesPage() {
   async function handleLogoUpload(file: File) {
     if (!selectedClient) return;
     setLogoUploading(true);
+    setLogoError(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await fetch(`/api/clients/${selectedClient.id}/logo`, { method: "POST", body: fd });
+      const response = await fetch(`/api/clients/${selectedClient.id}/logo`, { method: "POST", body: fd });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || "Não foi possível enviar o logo.");
+      }
       fetchClientDetail(selectedClient.id);
       fetchClients();
+    } catch (error) {
+      setLogoError((error as Error).message);
     } finally { setLogoUploading(false); }
   }
 
@@ -762,9 +771,10 @@ export default function ClientesPage() {
                           {logoUploading ? "Enviando..." : "Subir Logo"}
                           <input
                             type="file"
-                            accept="image/*"
+                            accept={IMAGE_FILE_ACCEPT}
                             className="hidden"
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); }}
+                            disabled={logoUploading}
+                            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void handleLogoUpload(f); }}
                           />
                         </label>
                         {selectedClient.logoUrl && (
@@ -786,6 +796,7 @@ export default function ClientesPage() {
                         )}
                       </div>
                     </div>
+                    {logoError && <p className="text-xs text-red-600 mt-3">{logoError}</p>}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

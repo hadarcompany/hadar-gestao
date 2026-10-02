@@ -20,14 +20,12 @@ import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task
 import { useAreas } from "@/contexts/areas-context";
 import { formatDateBR } from "@/lib/dates";
 import { type TaskData, type UserSummary, type TaskAttachmentData } from "@/lib/types";
+import { IMAGE_FILE_ACCEPT, isImageFile, isPreviewableImage } from "@/lib/image-files";
 import {
   CheckSquare, Square, Clock, Calendar, Tag, Pencil, Trash2, ArrowLeftRight, Check, Paperclip,
   Upload, Download, Loader2, X, ChevronLeft, ChevronRight, FolderKanban, ImagePlus,
   LayoutTemplate,
 } from "lucide-react";
-
-/** Tipos exibidos inline (SVG fica de fora: pode carregar script). */
-const PREVIEWABLE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -90,8 +88,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  const images = attachments.filter((a) => PREVIEWABLE.has(a.mimeType));
-  const files = attachments.filter((a) => !PREVIEWABLE.has(a.mimeType));
+  const images = attachments.filter(isPreviewableImage);
+  const files = attachments.filter((a) => !isPreviewableImage(a));
 
   useEffect(() => {
     if (task) {
@@ -149,9 +147,9 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
       const files = Array.from(event.clipboardData?.items ?? [])
-        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .filter((item) => item.kind === "file")
         .map((item) => item.getAsFile())
-        .filter((file): file is File => Boolean(file));
+        .filter((file): file is File => Boolean(file && isImageFile(file)));
       if (files.length) { event.preventDefault(); void handleUploadAttachments(files); }
     }
     window.addEventListener("paste", onPaste);
@@ -429,7 +427,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                     Adicionar imagens
                     <input
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_FILE_ACCEPT}
                       multiple
                       className="hidden"
                       disabled={uploading}

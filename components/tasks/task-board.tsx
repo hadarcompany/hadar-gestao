@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, MousePointer2, Plus, Save, Trash2, Type, ZoomIn, ZoomOut } from "lucide-react";
+import { IMAGE_FILE_ACCEPT, isImageFile } from "@/lib/image-files";
 
 type BoardElement = {
   id: string;
@@ -78,7 +79,7 @@ export function TaskBoard({ taskId }: { taskId: string }) {
   }, [elements, taskId]);
 
   const uploadImages = useCallback(async (files: File[]) => {
-    const valid = files.filter((file) => file.type.startsWith("image/") && file.size > 0 && file.size <= 8 * 1024 * 1024);
+    const valid = files.filter((file) => isImageFile(file) && file.size > 0 && file.size <= 8 * 1024 * 1024);
     if (!valid.length) return;
     setUploading(true);
     try {
@@ -195,7 +196,7 @@ export function TaskBoard({ taskId }: { taskId: string }) {
         <button onClick={addText} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-xs font-semibold text-gray-700 hover:bg-gray-200"><Type size={13} /> Texto</button>
         <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-xs font-semibold text-accent cursor-pointer hover:bg-accent/20">
           {uploading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />} Imagem
-          <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void uploadImages(files); }} />
+          <input type="file" accept={IMAGE_FILE_ACCEPT} multiple className="hidden" onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void uploadImages(files); }} />
         </label>
         <button onClick={removeSelected} disabled={!selectedId} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"><Trash2 size={13} /> Excluir</button>
         <div className="inline-flex items-center rounded-lg border border-gray-200 overflow-hidden ml-1">
@@ -222,7 +223,7 @@ export function TaskBoard({ taskId }: { taskId: string }) {
             ref={canvasRef}
             tabIndex={0}
             onPaste={(event) => {
-              const files = Array.from(event.clipboardData.items).filter((item) => item.kind === "file" && item.type.startsWith("image/")).map((item) => item.getAsFile()).filter((file): file is File => Boolean(file));
+              const files = Array.from(event.clipboardData.items).filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => Boolean(file && isImageFile(file)));
               if (files.length) { event.preventDefault(); void uploadImages(files); }
             }}
             onDoubleClick={(event) => { if (event.target === event.currentTarget) addText(); }}
