@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ExternalLink, Loader2, Megaphone, MessageCircle, RefreshCw, Unplug } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ClaudeIntegrationCard } from "@/components/settings/claude-integration-card";
 
 interface MetaStatus {
   configured: boolean; connected: boolean; accountCount: number;
@@ -21,13 +22,15 @@ export function IntegrationsPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [metaResponse, whatsappResponse] = await Promise.all([
-      fetch("/api/meta/status", { cache: "no-store" }),
-      fetch("/api/whatsapp/session", { cache: "no-store" }),
-    ]);
-    if (metaResponse.ok) setMeta(await metaResponse.json());
-    if (whatsappResponse.ok) setWhatsapp(await whatsappResponse.json());
-    setLoading(false);
+    try {
+      const [metaResponse, whatsappResponse] = await Promise.all([
+        fetch("/api/meta/status", { cache: "no-store" }),
+        fetch("/api/whatsapp/session", { cache: "no-store" }),
+      ]);
+      if (metaResponse.ok) setMeta(await metaResponse.json());
+      if (whatsappResponse.ok) setWhatsapp(await whatsappResponse.json());
+    } catch { setNotice("Não foi possível atualizar o status de todas as integrações."); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -52,9 +55,10 @@ export function IntegrationsPanel() {
     await load();
   }
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>;
   return <div className="space-y-5">
+    <ClaudeIntegrationCard />
     {notice && <div className="p-3 text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-xl">{notice}</div>}
+    {loading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div> : <>
     <div className="bg-white border border-gray-200 rounded-2xl p-5">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex gap-3"><div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Megaphone size={20} /></div><div><h2 className="font-semibold text-gray-900">Meta Ads</h2><p className="text-xs text-gray-400 mt-1">Campanhas e resultados do Facebook e Instagram.</p></div></div>
@@ -80,5 +84,6 @@ export function IntegrationsPanel() {
       </div>
     </div>
     <ConfirmDialog open={disconnect} title="Desconectar conta Meta" message="A aplicação deixará de consultar as campanhas até uma nova autorização. Os vínculos com clientes serão preservados." confirmLabel="Desconectar" cancelLabel="Cancelar" onConfirm={() => void removeConnection()} onCancel={() => setDisconnect(false)} />
+    </>}
   </div>;
 }

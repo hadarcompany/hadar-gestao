@@ -6,6 +6,8 @@ import { parseChatBody } from "@/lib/assistant/data";
 import { AssistantError } from "@/lib/assistant/types";
 import { runAssistant } from "@/lib/assistant/agent";
 import { checkAssistantOrigin } from "@/lib/assistant/http";
+import { MAX_CHAT_BODY_BYTES } from "@/lib/assistant/attachments";
+import { getAssistantIntegrationStatus } from "@/lib/assistant/integration-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -13,7 +15,10 @@ export const maxDuration = 180;
 export async function GET() {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  return NextResponse.json({ configured: !!process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6" }, { headers: { "Cache-Control": "no-store" } });
+  try {
+    const { configured, model } = await getAssistantIntegrationStatus();
+    return NextResponse.json({ configured, model }, { headers: { "Cache-Control": "no-store" } });
+  } catch { return NextResponse.json({ error: "Não foi possível verificar a configuração do Assistente." }, { status: 503 }); }
 }
 
 export async function POST(req: NextRequest) {
@@ -22,9 +27,10 @@ export async function POST(req: NextRequest) {
   let runId: string | undefined;
   try {
     checkAssistantOrigin(req);
-    if (!process.env.ANTHROPIC_API_KEY) throw new AssistantError("O assistente ainda não foi configurado. Defina ANTHROPIC_API_KEY no servidor.", 503);
+    if (!(await getAssistantIntegrationStatus()).configured) throw new AssistantError("Configure a chave do Claude em Configurações > Integrações para usar o Assistente.", 503);
+    if (Number(req.headers.get("content-length")) > MAX_CHAT_BODY_BYTES) throw new AssistantError("Arquivos ou comando muito grandes. Os anexos devem somar até 3 MB.", 413);
     const text = await req.text();
-    if (text.length > 50000) throw new AssistantError("Comando muito longo.", 413);
+    if (Buffer.byteLength(text, "utf8") > MAX_CHAT_BODY_BYTES) throw new AssistantError("Arquivos ou comando muito grandes. Os anexos devem somar até 3 MB.", 413);
     const body = parseChatBody(JSON.parse(text));
     const run = await prisma.$transaction(async (db) => {
       // Serializa a admissão dos comandos por usuário entre instâncias do servidor.

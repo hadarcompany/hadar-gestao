@@ -1,0 +1,76 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Bot, CheckCircle2, Loader2, RefreshCw, Unplug } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DEFAULT_ASSISTANT_MODEL, type AssistantIntegrationStatus } from "@/lib/assistant/integration";
+
+export function ClaudeIntegrationCard() {
+  const [status, setStatus] = useState<AssistantIntegrationStatus | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState(DEFAULT_ASSISTANT_MODEL);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<"save" | "test" | "remove" | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [disconnect, setDisconnect] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const response = await fetch("/api/integrations/claude", { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Não foi possível consultar a integração Claude.");
+      setStatus(body); setModel(body.model);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível consultar a integração Claude."); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function submit(action: "save" | "test" | "remove") {
+    if (busy) return;
+    setBusy(action); setError(""); setNotice(""); setDisconnect(false);
+    try {
+      const response = await fetch("/api/integrations/claude", {
+        method: action === "save" ? "PUT" : action === "test" ? "POST" : "DELETE",
+        ...(action !== "remove" ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), model }) } : {}),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Não foi possível atualizar a integração.");
+      if (action === "test") setNotice(apiKey.trim() ? "Conexão testada com sucesso. Clique em Salvar para usar esta chave no aplicativo." : "Conexão com Claude testada com sucesso.");
+      else {
+        setStatus(body); setModel(body.model); setApiKey("");
+        setNotice(action === "save" ? "Configuração salva. O Assistente já pode usar esta chave." : "Integração removida. O Assistente está desativado até uma nova configuração.");
+        window.dispatchEvent(new CustomEvent("hadar:assistant-configured"));
+      }
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível atualizar a integração."); }
+    finally { setBusy(null); }
+  }
+
+  return <div className="bg-white border border-gray-200 rounded-2xl p-5">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex gap-3"><div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center"><Bot size={20} /></div><div><h2 className="font-semibold text-gray-900">Claude · Assistente de IA</h2><p className="text-xs text-gray-400 mt-1">Comandos por texto ou voz, com PDFs e imagens como contexto.</p></div></div>
+      {status?.configured && <span className="flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 size={14} /> Configurado</span>}
+    </div>
+    {loading ? <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-accent" size={20} /></div> : <form className="mt-5 space-y-4 border-t border-gray-100 pt-4" onSubmit={(event) => { event.preventDefault(); void submit("save"); }}>
+      {!status && <button type="button" onClick={() => void load()} className="flex items-center gap-2 text-xs text-accent"><RefreshCw size={13} /> Tentar novamente</button>}
+      {status && <>
+        <div>
+          <label htmlFor="claude-api-key" className="block text-xs font-semibold text-gray-700 mb-1.5">{status.configured ? "Substituir chave API" : "Chave API da Anthropic"}</label>
+          <input id="claude-api-key" name="claude-api-key" type="password" autoComplete="off" spellCheck={false} maxLength={510} value={apiKey} disabled={!!busy} onChange={(event) => setApiKey(event.target.value)} placeholder={status.configured ? "Chave já configurada. Deixe vazio para manter." : "Cole sua chave sk-ant-..."} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent disabled:opacity-50" />
+          <p className="mt-1.5 text-xs text-gray-400">A chave fica protegida no servidor e não será exibida novamente depois de salva.</p>
+        </div>
+        <details className="text-xs text-gray-500"><summary className="cursor-pointer">Modelo do Claude</summary><label htmlFor="claude-model" className="sr-only">Modelo do Claude</label><input id="claude-model" maxLength={107} value={model} disabled={!!busy} onChange={(event) => setModel(event.target.value)} className="mt-2 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent" /><p className="mt-1">Use um modelo disponível na sua conta Anthropic.</p></details>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="submit" disabled={!!busy || (!apiKey.trim() && !status.configured) || !model.trim()} className="px-4 py-2 text-xs font-semibold bg-accent text-white rounded-lg flex items-center gap-2 disabled:opacity-40">{busy === "save" && <Loader2 size={13} className="animate-spin" />} Salvar</button>
+          <button type="button" disabled={!!busy || (!apiKey.trim() && !status.configured) || !model.trim()} onClick={() => void submit("test")} className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg flex items-center gap-2 hover:bg-gray-50 disabled:opacity-40">{busy === "test" && <Loader2 size={13} className="animate-spin" />} Testar conexão</button>
+          {status.configured && <button type="button" disabled={!!busy} onClick={() => setDisconnect(true)} className="px-3 py-2 text-xs font-semibold text-red-600 border border-red-200 rounded-lg flex items-center gap-2 hover:bg-red-50 disabled:opacity-40"><Unplug size={13} /> Remover integração</button>}
+        </div>
+      </>}
+    </form>}
+    {notice && <p role="status" className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700">{notice}</p>}
+    {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
+    <ConfirmDialog open={disconnect} title="Remover integração Claude" message="A chave salva será removida e o Assistente deixará de responder até você configurar uma chave novamente." confirmLabel="Remover integração" cancelLabel="Cancelar" onConfirm={() => void submit("remove")} onCancel={() => setDisconnect(false)} />
+  </div>;
+}

@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, Check, ChevronDown, History, Loader2, Mic, MicOff, Plus, Send, Trash2, X } from "lucide-react";
+import { Bot, Check, ChevronDown, FileText, History, Loader2, Mic, MicOff, Paperclip, Plus, Send, Trash2, X } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { ActionView, AssistantReply, ChatMessage } from "@/lib/assistant/types";
+import type { ActionView, AssistantAttachment, AssistantReply, ChatMessage } from "@/lib/assistant/types";
+import { assistantConversationContext, attachmentMediaType, ATTACHMENT_ACCEPT, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS } from "@/lib/assistant/attachments";
 
 type RecognitionResult = { isFinal: boolean; [index: number]: { transcript: string } };
 type Recognition = {
@@ -23,6 +25,26 @@ const FIELD_LABELS: Record<string, string> = {
   creditCardId: "Cartão", paidWithCash: "Descontar da reserva", bank: "Banco", brand: "Bandeira", isActive: "Ativo", stage: "Etapa", email: "E-mail", phone: "Telefone",
   targetValue: "Valor da meta", note: "Observação", id: "Registro", value: "Valor", ownerId: "Responsável",
 };
+
+function readAttachment(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") { reject(new Error("Não foi possível ler o arquivo.")); return; }
+      resolve(reader.result.slice(reader.result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(new Error(`Não foi possível ler ${file.name}.`));
+    reader.onabort = () => reject(new Error("A leitura do arquivo foi interrompida."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function AttachmentPreview({ attachment }: { attachment: AssistantAttachment }) {
+  return <div className="flex min-w-0 items-center gap-2 text-xs">
+    {attachment.mediaType === "application/pdf" ? <FileText size={24} className="shrink-0 text-accent" /> : <Image src={`data:${attachment.mediaType};base64,${attachment.data}`} alt="Prévia do anexo" width={36} height={36} unoptimized className="h-9 w-9 shrink-0 rounded object-cover" />}
+    <span className="min-w-0"><span className="block truncate">{attachment.name}</span><span className="text-gray-400">{Math.ceil(attachment.size / 1000)} KB</span></span>
+  </div>;
+}
 
 function ActionCard({ action, busy, onConfirm }: { action: ActionView; busy: boolean; onConfirm: (id: string, cancel: boolean) => void }) {
   const failed = action.status === "FAILED";
@@ -50,9 +72,12 @@ export function AssistantPanel() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<PanelMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<AssistantAttachment[]>([]);
+  const [readingFiles, setReadingFiles] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [configVersion, setConfigVersion] = useState(0);
   const [autoExecute, setAutoExecute] = useState(true);
   const [autoVoice, setAutoVoice] = useState(true);
   const [listening, setListening] = useState(false);
@@ -63,6 +88,8 @@ export function AssistantPanel() {
   const recognition = useRef<Recognition | null>(null);
   const constructor = useRef<RecognitionConstructor | null>(null);
   const busyRef = useRef(false);
+  const readingFilesRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const sendRef = useRef<(text: string) => Promise<void>>(async () => {});
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -74,6 +101,12 @@ export function AssistantPanel() {
   }, []);
 
   useEffect(() => {
+    const refreshConfiguration = () => setConfigVersion((version) => version + 1);
+    window.addEventListener("hadar:assistant-configured", refreshConfiguration);
+    return () => window.removeEventListener("hadar:assistant-configured", refreshConfiguration);
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     let active = true;
     fetch("/api/assistant", { cache: "no-store" }).then(async (res) => {
@@ -82,7 +115,7 @@ export function AssistantPanel() {
       if (active) setConfigured(body.configured);
     }).catch((err) => { if (active) setError(err instanceof Error ? err.message : "Não foi possível conectar."); });
     return () => { active = false; };
-  }, [open]);
+  }, [open, configVersion]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, busy, open]);
 
@@ -98,20 +131,20 @@ export function AssistantPanel() {
   }, []);
 
   const send = useCallback(async (text: string) => {
-    if (!text.trim() || busyRef.current || configured === false) return;
+    if ((!text.trim() && !attachments.length) || busyRef.current || readingFilesRef.current || configured === false) return;
     if (recognition.current) { recognition.current.onend = null; recognition.current.abort(); recognition.current = null; setListening(false); }
     busyRef.current = true;
     setBusy(true);
     setError("");
-    const userMessage: PanelMessage = { id: crypto.randomUUID(), role: "user", content: text.trim() };
+    const userMessage: PanelMessage = { id: crypto.randomUUID(), role: "user", content: text.trim() || "Analise os arquivos anexados.", ...(attachments.length ? { attachments } : {}) };
     const requestId = crypto.randomUUID();
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setDraft("");
+    setAttachments([]);
     setShowHistory(false);
     try {
-      let context = nextMessages.slice(-21).map(({ role, content }) => ({ role, content }));
-      if (context[0]?.role === "assistant") context = context.slice(1);
+      const context = assistantConversationContext(nextMessages);
       const res = await fetch("/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, autoExecute, messages: context }) });
       const reply = await res.json() as AssistantReply & { error?: string };
       if (!res.ok || reply.error) throw new Error(reply.error || "Não foi possível executar o comando.");
@@ -123,9 +156,28 @@ export function AssistantPanel() {
       }
     } catch (err) { setError(`${err instanceof Error ? err.message : "A conexão foi interrompida."} Confira o histórico de ações antes de repetir um comando.`); }
     finally { busyRef.current = false; setBusy(false); }
-  }, [messages, configured, autoExecute, router]);
+  }, [messages, attachments, configured, autoExecute, router]);
 
   useEffect(() => { sendRef.current = send; }, [send]);
+
+  async function addAttachments(files: File[]) {
+    if (!files.length || busyRef.current || readingFilesRef.current) return;
+    readingFilesRef.current = true; setReadingFiles(true); setError("");
+    try {
+      const existing = [...messages.flatMap((message) => message.attachments || []), ...attachments];
+      if (existing.length + files.length > MAX_ATTACHMENTS) throw new Error(`Envie até ${MAX_ATTACHMENTS} arquivos por conversa. Inicie uma nova conversa para enviar outros.`);
+      if (existing.reduce((total, file) => total + file.size, 0) + files.reduce((total, file) => total + file.size, 0) > MAX_ATTACHMENT_BYTES) throw new Error("Os anexos devem somar até 3 MB por conversa. Use arquivos menores ou inicie uma nova conversa.");
+      const added: AssistantAttachment[] = [];
+      for (const file of files) {
+        const mediaType = attachmentMediaType(file.name, file.type);
+        if (!mediaType) throw new Error("Envie PDFs ou imagens JPG, PNG, GIF e WebP.");
+        if (!file.size || file.name.length > 200) throw new Error(`Arquivo vazio ou nome muito longo: ${file.name.slice(0, 100)}`);
+        added.push({ name: file.name, mediaType, size: file.size, data: await readAttachment(file) });
+      }
+      setAttachments((current) => [...current, ...added]);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível anexar o arquivo."); }
+    finally { readingFilesRef.current = false; setReadingFiles(false); }
+  }
 
   async function confirmAction(id: string, cancel: boolean) {
     if (busyRef.current) return;
@@ -144,7 +196,7 @@ export function AssistantPanel() {
 
   function startVoice() {
     if (listening) { recognition.current?.stop(); return; }
-    if (!constructor.current || busyRef.current) return;
+    if (!constructor.current || busyRef.current || readingFilesRef.current) return;
     setError("");
     const speech = new constructor.current();
     speech.lang = "pt-BR"; speech.continuous = false; speech.interimResults = true;
@@ -186,7 +238,7 @@ export function AssistantPanel() {
         <div><p className="font-semibold flex items-center gap-2"><Bot size={19} /> Assistente Hadar</p><p className="text-xs text-gray-300 mt-0.5">Comandos por texto ou voz · Claude</p></div>
         <div className="flex gap-1">
           <button title="Histórico de ações" aria-label="Ver histórico de ações" disabled={busy} onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }} className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-40"><History size={17} /></button>
-          <button title="Nova conversa" aria-label="Iniciar nova conversa" disabled={busy || listening} onClick={() => { setMessages([]); setDraft(""); setError(""); setShowHistory(false); }} className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-40"><Plus size={18} /></button>
+          <button title="Nova conversa" aria-label="Iniciar nova conversa" disabled={busy || listening || readingFiles} onClick={() => { setMessages([]); setAttachments([]); setDraft(""); setError(""); setShowHistory(false); }} className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-40"><Plus size={18} /></button>
           <button onClick={closePanel} aria-label="Fechar assistente" className="p-2 rounded-lg hover:bg-white/10"><X size={18} /></button>
         </div>
       </header>
@@ -199,17 +251,18 @@ export function AssistantPanel() {
         </div>
       </details>
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50/60" aria-live="polite">
-        {configured === false && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">O assistente aguarda configuração. O administrador deve adicionar ANTHROPIC_API_KEY no servidor.</p>}
+        {configured === false && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">O assistente aguarda configuração. O administrador pode conectar o Claude em <a href="/configuracoes?tab=integracoes" className="font-semibold underline">Configurações &gt; Integrações</a>.</p>}
         {showHistory ? <>
           <p className="text-sm font-semibold text-gray-800 mb-2">Suas últimas 30 ações</p>
           {historyLoading ? <Loader2 className="animate-spin mx-auto my-5 text-accent" /> : history.length ? history.map((action) => <ActionCard key={action.id} action={action} busy={busy} onConfirm={confirmAction} />) : <p className="text-sm text-gray-500">Nenhuma ação encontrada.</p>}
         </> : <>
           {!messages.length && <div className="space-y-3 text-sm text-gray-600">
-            <p>Peça o que você precisa fazer no aplicativo.</p>
+            <p>Peça o que você precisa fazer no aplicativo. Anexe PDFs e imagens para dar contexto.</p>
             {["Crie uma tarefa de editar um reels para amanhã e atribua a mim.", "Liste as tarefas atrasadas.", "Quero registrar uma despesa de R$ 150 paga por Pix."].map((example) => <button key={example} onClick={() => setDraft(example)} className="block w-full text-left rounded-xl border border-gray-200 bg-white p-3 hover:border-accent">{example}</button>)}
           </div>}
           {messages.map((message) => <div key={message.id} className={`mb-4 ${message.role === "user" ? "pl-8" : "pr-2"}`}>
             <div className={`rounded-2xl p-3 text-sm whitespace-pre-wrap break-words ${message.role === "user" ? "bg-accent text-white rounded-br-sm" : "bg-white border border-gray-200 text-gray-700 rounded-bl-sm"}`}>{message.content}</div>
+            {!!message.attachments?.length && <div className="mt-2 space-y-2 rounded-xl border border-gray-200 bg-white p-2 text-gray-600">{message.attachments.map((attachment, index) => <AttachmentPreview key={index} attachment={attachment} />)}</div>}
             {message.actions?.map((action) => <ActionCard key={action.id} action={action} busy={busy} onConfirm={confirmAction} />)}
           </div>)}
           {busy && <div className="flex items-center gap-2 text-xs text-gray-500"><Loader2 size={16} className="animate-spin" /> Processando seu comando...</div>}
@@ -218,16 +271,24 @@ export function AssistantPanel() {
       </div>
       {error && <p role="alert" className="text-xs text-red-700 bg-red-50 px-4 py-3 border-t border-red-100">{error}</p>}
       <form className="border-t border-gray-200 p-3" onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
+        <input ref={fileInputRef} type="file" multiple accept={ATTACHMENT_ACCEPT} className="hidden" aria-label="Anexar PDFs e imagens" onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void addAttachments(files); }} />
+        {attachments.length > 0 && <div className="mb-2 max-h-28 overflow-y-auto space-y-2 rounded-xl border border-gray-200 p-2">
+          {attachments.map((attachment, index) => <div key={index} className="flex items-center justify-between gap-2 text-gray-600"><AttachmentPreview attachment={attachment} /><button type="button" aria-label={`Remover ${attachment.name}`} disabled={busy || readingFiles || listening} onClick={() => setAttachments((current) => current.filter((_, i) => i !== index))} className="shrink-0 rounded p-1 hover:bg-gray-100"><X size={14} /></button></div>)}
+        </div>}
+        {readingFiles && <p className="mb-2 flex items-center gap-2 text-xs text-gray-500"><Loader2 size={14} className="animate-spin" /> Preparando anexos...</p>}
         <label htmlFor="assistant-command" className="sr-only">Seu comando</label>
         <textarea id="assistant-command" rows={2} maxLength={8000} value={draft} disabled={busy || configured === false} onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !listening) { event.preventDefault(); void send(draft); } }}
           placeholder={listening ? "Ouvindo... fale seu comando" : "Digite ou fale seu comando..."} className="w-full resize-none rounded-xl bg-gray-100 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent disabled:opacity-50" />
         <div className="flex justify-between items-center gap-2 mt-2">
-          <button type="button" aria-label={listening ? "Terminar comando de voz" : "Falar um comando"} disabled={!voiceSupported || busy || configured === false} onClick={startVoice}
+          <div className="flex items-center gap-1">
+          <button type="button" aria-label="Anexar PDFs e imagens" title="PDFs e imagens · até 3 MB por conversa" disabled={busy || readingFiles || listening || configured === false} onClick={() => fileInputRef.current?.click()} className="rounded-lg px-2 py-2 bg-gray-100 text-gray-700 disabled:opacity-40"><Paperclip size={17} /></button>
+          <button type="button" aria-label={listening ? "Terminar comando de voz" : "Falar um comando"} disabled={!voiceSupported || busy || readingFiles || configured === false} onClick={startVoice}
             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-40 ${listening ? "bg-red-50 text-red-700 animate-pulse" : "bg-gray-100 text-gray-700"}`}>{listening ? <MicOff size={17} /> : <Mic size={17} />}{listening ? "Terminar fala" : "Falar"}</button>
-          <button type="submit" disabled={busy || !draft.trim() || configured === false || listening} className="flex items-center gap-2 bg-accent text-white rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40"><Send size={15} /> Enviar</button>
+          </div>
+          <button type="submit" disabled={busy || readingFiles || (!draft.trim() && !attachments.length) || configured === false || listening} className="flex items-center gap-2 bg-accent text-white rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40"><Send size={15} /> Enviar</button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-2">{voiceSupported ? "Voz transcrita pelo navegador. O comando e os dados consultados são enviados ao Claude." : "Voz indisponível neste navegador. Você pode digitar os comandos."}</p>
+        <p className="text-[10px] text-gray-400 mt-2">PDF, JPG, PNG, GIF e WebP · até 3 MB por conversa. Texto, anexos e dados consultados são enviados ao Claude.{voiceSupported ? " Voz transcrita pelo navegador." : " Voz indisponível neste navegador."}</p>
       </form>
     </section>}
   </>;

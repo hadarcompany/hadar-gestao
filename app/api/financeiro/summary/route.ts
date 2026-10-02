@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { loadMediaIndex } from "@/lib/media";
 import { dateKeyToUTCDate } from "@/lib/dates";
 import { canView } from "@/lib/permissions";
+import { fixedExpenseTotals } from "@/lib/fixed-expenses";
 
 function periodDateRange(startMonth: number, startYear: number, endMonth: number, endYear: number) {
   const start = dateKeyToUTCDate(`${startYear}-${String(startMonth).padStart(2, "0")}-01`);
@@ -95,15 +96,10 @@ export async function GET(req: NextRequest) {
     });
   });
 
-  const fixedExpenses = await prisma.fixedExpense.findMany({
-    where: { OR: months.map((m) => ({ month: m.month, year: m.year })) },
-  });
-  const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-  const expenseByCategory = new Map<string, number>();
-  fixedExpenses.forEach((e) => {
-    expenseByCategory.set(e.category, (expenseByCategory.get(e.category) || 0) + e.amount);
-  });
+  const fixedExpenses = await prisma.fixedExpense.findMany();
+  const fixedTotals = fixedExpenseTotals(fixedExpenses, months.length);
+  const totalFixedExpenses = fixedTotals.periodTotal;
+  const expenseByCategory = fixedTotals.byCategory;
 
   const startDate = new Date(startYear, startMonth - 1, 1);
   const endDate = new Date(endYear, endMonth, 0, 23, 59, 59);
@@ -135,9 +131,7 @@ export async function GET(req: NextRequest) {
         return revenueMonth === m.month && revenueYear === m.year;
       })
       .reduce((sum, r) => sum + r.amount, 0);
-    const mFixed = fixedExpenses
-      .filter((e) => e.month === m.month && e.year === m.year)
-      .reduce((sum, e) => sum + e.amount, 0);
+    const mFixed = fixedTotals.monthlyTotal;
     const mStart = new Date(m.year, m.month - 1, 1);
     const mEnd = new Date(m.year, m.month, 0, 23, 59, 59);
     const mVariable = variableExpenses

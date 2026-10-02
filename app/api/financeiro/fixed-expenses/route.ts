@@ -5,21 +5,13 @@ import { canEdit, canView } from "@/lib/permissions";
 import { ExpensePaymentError } from "@/lib/expense-payments";
 import { resolveExpensePayment } from "@/lib/expense-payments-server";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso ao financeiro." }, { status: 403 });
 
-  const { searchParams } = new URL(req.url);
-  const month = searchParams.get("month");
-  const year = searchParams.get("year");
-
-  const where: Record<string, unknown> = {};
-  if (month) where.month = parseInt(month);
-  if (year) where.year = parseInt(year);
-
+  // month/year são metadados legados do cadastro, não limitam a recorrência.
   const expenses = await prisma.fixedExpense.findMany({
-    where,
     include: { creditCard: true },
     orderBy: { createdAt: "desc" },
   });
@@ -45,8 +37,8 @@ export async function POST(req: NextRequest) {
           category,
           amount: parseFloat(amount),
           paidWithCash: paidWithCash || false,
-          month: parseInt(month),
-          year: parseInt(year),
+          month: month === undefined ? new Date().getMonth() + 1 : parseInt(month),
+          year: year === undefined ? new Date().getFullYear() : parseInt(year),
         },
       });
 

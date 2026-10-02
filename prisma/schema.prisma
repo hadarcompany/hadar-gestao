@@ -823,6 +823,18 @@ model CashEntry {
   @@map("cash_entries")
 }
 
+model AssistantIntegration {
+  id              String   @id @default("primary")
+  enabled         Boolean  @default(true)
+  apiKeyEncrypted String?
+  model           String   @default("claude-sonnet-4-6")
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("assistant_integration")
+}
+
 model CashConfig {
   id         String   @id @default("singleton")
   minBalance Float    @default(1000)

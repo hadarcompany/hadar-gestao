@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
         orderBy: { dueDate: "asc" },
         take: 8,
       }),
-      prisma.fixedExpense.findMany({ where: { month: currentMonth, year: currentYear }, select: { amount: true } }),
+      prisma.fixedExpense.findMany({ select: { amount: true } }),
       prisma.variableExpense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } }, select: { amount: true } }),
       prisma.investment.findMany({ where: { date: { gte: monthStart, lt: monthEnd } }, select: { amount: true } }),
     ]);

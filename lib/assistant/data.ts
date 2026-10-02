@@ -1,4 +1,6 @@
 import { AssistantError, type ChatMessage } from "./types";
+import { parseAssistantAttachments } from "./attachments-server";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS } from "./attachments";
 
 const SECRET_FIELDS = /password|secret|token|api.?key|encrypted|permissions|logoUrl|image|accesses|asaasCustomerId|cpfCnpj/i;
 
@@ -28,12 +30,20 @@ export function parseChatBody(raw: unknown) {
   if (typeof body.requestId !== "string" || !/^[\w-]{10,100}$/.test(body.requestId)) throw new AssistantError("Identificador da requisição inválido.");
   if (!Array.isArray(body.messages) || !body.messages.length || body.messages.length > 24) throw new AssistantError("Envie até 24 mensagens por conversa.");
   let length = 0;
+  let attachmentBytes = 0;
+  let attachmentCount = 0;
   const messages: ChatMessage[] = body.messages.map((rawMessage) => {
     if (!rawMessage || typeof rawMessage !== "object" || Array.isArray(rawMessage)) throw new AssistantError("Mensagem inválida.");
     const message = rawMessage as Record<string, unknown>;
     if ((message.role !== "user" && message.role !== "assistant") || typeof message.content !== "string" || !message.content.trim() || message.content.length > 8000) throw new AssistantError("Mensagem inválida ou muito longa.");
     length += message.content.length;
-    return { role: message.role, content: message.content };
+    const attachments = parseAssistantAttachments(message.attachments);
+    if (message.role === "assistant" && attachments.length) throw new AssistantError("Anexos só podem ser enviados pelo usuário.");
+    attachmentBytes += attachments.reduce((total, attachment) => total + attachment.size, 0);
+    attachmentCount += attachments.length;
+    if (attachmentBytes > MAX_ATTACHMENT_BYTES) throw new AssistantError("Os anexos devem somar até 3 MB por conversa. Inicie uma nova conversa para enviar outros arquivos.", 413);
+    if (attachmentCount > MAX_ATTACHMENTS) throw new AssistantError(`Envie até ${MAX_ATTACHMENTS} arquivos por conversa.`);
+    return { role: message.role, content: message.content, ...(attachments.length ? { attachments } : {}) };
   });
   if (length > 32000 || messages[0].role !== "user" || messages[messages.length - 1].role !== "user") throw new AssistantError("Histórico inválido ou muito longo. Inicie uma nova conversa.");
   if (body.autoExecute !== undefined && typeof body.autoExecute !== "boolean") throw new AssistantError("Modo de execução inválido.");

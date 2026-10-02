@@ -113,7 +113,7 @@ export default function FinanceiroPage() {
 
       {activeTab === "dashboard" && <DashboardTab />}
       {activeTab === "charges" && <AsaasChargesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
-      {activeTab === "fixed" && <FixedExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
+      {activeTab === "fixed" && <FixedExpensesTab />}
       {activeTab === "variable" && <VariableExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "cards" && <CreditCardsTab />}
       {activeTab === "investments" && <InvestmentsTab />}
@@ -503,9 +503,7 @@ interface FixedExpense extends ExpensePaymentInfo {
   id: string; name: string; category: string; amount: number; paidWithCash: boolean; month: number; year: number;
 }
 
-function FixedExpensesTab({ month, year, setMonth, setYear }: {
-  month: number; year: number; setMonth: (m: number) => void; setYear: (y: number) => void;
-}) {
+function FixedExpensesTab() {
   const [items, setItems] = useState<FixedExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -519,10 +517,12 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
   const fetch_ = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/financeiro/fixed-expenses?month=${month}&year=${year}`);
-      if (res.ok) setItems(await res.json());
-    } finally { setLoading(false); }
-  }, [month, year]);
+      const res = await fetch("/api/financeiro/fixed-expenses", { cache: "no-store" });
+      if (!res.ok) throw new Error("Não foi possível carregar as despesas fixas.");
+      setItems(await res.json());
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar as despesas fixas."); }
+    finally { setLoading(false); }
+  }, []);
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
@@ -533,7 +533,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
       const res = await fetch("/api/financeiro/fixed-expenses", {
         method: editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, ...(editId ? { id: editId } : { month, year }) }),
+        body: JSON.stringify({ ...form, ...(editId ? { id: editId } : {}) }),
       });
       if (!res.ok) { const result = await res.json(); throw new Error(result.error || "Não foi possível salvar a despesa."); }
       setShowModal(false);
@@ -545,8 +545,12 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/financeiro/fixed-expenses?id=${id}`, { method: "DELETE" });
-    fetch_();
+    setError("");
+    try {
+      const res = await fetch(`/api/financeiro/fixed-expenses?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Não foi possível excluir a despesa fixa.");
+      fetch_();
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível excluir a despesa fixa."); }
   }
 
   function openEdit(item: FixedExpense) {
@@ -561,23 +565,24 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
   return (
     <div className="animate-in fade-in">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
-        <FilterDialog month={month} year={year} onApply={(m, y) => { setMonth(m); setYear(y); }} />
+        <p className="text-sm text-gray-500">Recorrentes todos os meses, até você excluir.</p>
         <button onClick={() => { setEditId(null); setForm(emptyForm); setError(""); setShowModal(true); }} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Nova Despesa Fixa
         </button>
       </div>
 
+      {error && !showModal && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? <Spinner /> : (
         <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200/60 bg-gray-50/30">
-                <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor</Th><Th>Pagamento</Th><Th>Origem</Th><Th align="right">Ações</Th>
+                <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor mensal</Th><Th>Pagamento</Th><Th>Origem</Th><Th align="right">Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa fixa neste mês.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa fixa cadastrada.</td></tr>
               ) : items.map((e) => (
                 <tr key={e.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{e.name}</td>
@@ -598,7 +603,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
               ))}
               {items.length > 0 && (
                 <tr className="bg-gray-50/50">
-                  <td colSpan={2} className="px-6 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider">Total de Despesas Fixas</td>
+                  <td colSpan={2} className="px-6 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider">Total mensal de despesas fixas</td>
                   <td className="px-6 py-4 text-base font-bold text-red-600">{R$(total)}</td>
                   <td colSpan={3} />
                 </tr>
@@ -641,7 +646,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
       <ConfirmDialog
         open={!!deleteId}
         title="Excluir Despesa Fixa"
-        message="Tem certeza que deseja excluir esta despesa fixa?"
+        message="Excluir esta despesa fixa da lista e do orçamento de todos os meses?"
         confirmLabel="Sim, excluir"
         cancelLabel="Cancelar"
         onConfirm={() => { const id = deleteId!; setDeleteId(null); handleDelete(id); }}

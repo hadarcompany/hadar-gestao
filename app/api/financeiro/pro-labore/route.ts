@@ -3,6 +3,7 @@ import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { dateKeyToUTCDate } from "@/lib/dates";
 import { canView } from "@/lib/permissions";
+import { fixedExpenseTotals } from "@/lib/fixed-expenses";
 
 interface MonthlyProLabore {
   month: number;
@@ -26,6 +27,8 @@ export async function GET(req: NextRequest) {
   const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
 
   const results: MonthlyProLabore[] = [];
+  const fixedExpenses = await prisma.fixedExpense.findMany();
+  const totalFixed = fixedExpenseTotals(fixedExpenses).monthlyTotal;
 
   for (let month = 1; month <= 12; month++) {
     const receivables = await prisma.receivable.findMany({
@@ -46,11 +49,6 @@ export async function GET(req: NextRequest) {
       },
     });
     const receivedRevenue = receivables.reduce((sum, r) => sum + r.amount, 0);
-
-    const fixedExpenses = await prisma.fixedExpense.findMany({
-      where: { month, year },
-    });
-    const totalFixed = fixedExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
