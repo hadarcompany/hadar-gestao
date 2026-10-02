@@ -17,6 +17,9 @@ import {
 } from "recharts";
 import { formatDateBR } from "@/lib/dates";
 import { AsaasChargesTab } from "@/components/financeiro/asaas-charges-tab";
+import { CreditCardsTab } from "@/components/financeiro/credit-cards-tab";
+import { ExpensePaymentFields, type ExpensePaymentInfo } from "@/components/financeiro/expense-payment-fields";
+import { expensePaymentLabel } from "@/lib/expense-payments";
 
 // ── helpers ──────────────────────────────────────────────────────
 function R$(v: number) {
@@ -27,13 +30,14 @@ const now = new Date();
 const CURRENT_MONTH = now.getMonth() + 1;
 const CURRENT_YEAR = now.getFullYear();
 
-type Tab = "dashboard" | "charges" | "fixed" | "variable" | "investments" | "prolabore" | "cash";
+type Tab = "dashboard" | "charges" | "fixed" | "variable" | "cards" | "investments" | "prolabore" | "cash";
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "dashboard", label: "Dashboard", icon: <BarChart3 size={16} /> },
   { key: "charges", label: "Cobranças", icon: <WalletCards size={16} /> },
   { key: "fixed", label: "Fixas", icon: <CreditCard size={16} /> },
   { key: "variable", label: "Avulsas", icon: <ShoppingBag size={16} /> },
+  { key: "cards", label: "Cartões", icon: <CreditCard size={16} /> },
   { key: "investments", label: "Investimentos", icon: <PiggyBank size={16} /> },
   { key: "prolabore", label: "Pró-labore", icon: <Users2 size={16} /> },
   { key: "cash", label: "Caixa", icon: <Wallet size={16} /> },
@@ -111,6 +115,7 @@ export default function FinanceiroPage() {
       {activeTab === "charges" && <AsaasChargesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "fixed" && <FixedExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "variable" && <VariableExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
+      {activeTab === "cards" && <CreditCardsTab />}
       {activeTab === "investments" && <InvestmentsTab />}
       {activeTab === "prolabore" && <ProLaboreTab year={year} setYear={setYear} />}
       {activeTab === "cash" && <CashTab />}
@@ -494,7 +499,7 @@ function ReceivablesTab({ month, year, setMonth, setYear }: {
 // ══════════════════════════════════════════════════════════════════
 // 3. DESPESAS FIXAS
 // ══════════════════════════════════════════════════════════════════
-interface FixedExpense {
+interface FixedExpense extends ExpensePaymentInfo {
   id: string; name: string; category: string; amount: number; paidWithCash: boolean; month: number; year: number;
 }
 
@@ -505,7 +510,9 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", category: "OUTROS", amount: "", paidWithCash: false });
+  const emptyForm = { name: "", category: "OUTROS", amount: "", paidWithCash: false, paymentMethod: "", creditCardId: "" };
+  const [form, setForm] = useState(emptyForm);
+  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -521,17 +528,20 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
 
   async function handleSave() {
     setSaving(true);
+    setError("");
     try {
-      await fetch(editId ? "/api/financeiro/fixed-expenses" : "/api/financeiro/fixed-expenses", {
+      const res = await fetch("/api/financeiro/fixed-expenses", {
         method: editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, ...(editId ? { id: editId } : { month, year }) }),
       });
+      if (!res.ok) { const result = await res.json(); throw new Error(result.error || "Não foi possível salvar a despesa."); }
       setShowModal(false);
       setEditId(null);
-      setForm({ name: "", category: "OUTROS", amount: "", paidWithCash: false });
+      setForm(emptyForm);
       fetch_();
-    } finally { setSaving(false); }
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível salvar a despesa."); }
+    finally { setSaving(false); }
   }
 
   async function handleDelete(id: string) {
@@ -540,8 +550,9 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
   }
 
   function openEdit(item: FixedExpense) {
+    setError("");
     setEditId(item.id);
-    setForm({ name: item.name, category: item.category, amount: String(item.amount), paidWithCash: item.paidWithCash });
+    setForm({ name: item.name, category: item.category, amount: String(item.amount), paidWithCash: item.paidWithCash, paymentMethod: item.paymentMethod ?? "", creditCardId: item.creditCardId ?? "" });
     setShowModal(true);
   }
 
@@ -551,22 +562,22 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
     <div className="animate-in fade-in">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <FilterDialog month={month} year={year} onApply={(m, y) => { setMonth(m); setYear(y); }} />
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
+        <button onClick={() => { setEditId(null); setForm(emptyForm); setError(""); setShowModal(true); }} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Nova Despesa Fixa
         </button>
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200/60 bg-gray-50/30">
-                <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor</Th><Th>Origem</Th><Th align="right">Ações</Th>
+                <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor</Th><Th>Pagamento</Th><Th>Origem</Th><Th align="right">Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa fixa neste mês.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa fixa neste mês.</td></tr>
               ) : items.map((e) => (
                 <tr key={e.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{e.name}</td>
@@ -574,6 +585,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
                     <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">{CATEGORY_LABELS[e.category] || e.category}</span>
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(e.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{expensePaymentLabel(e)}</td>
                   <td className="px-6 py-4">
                     {e.paidWithCash
                       ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
@@ -588,7 +600,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
                 <tr className="bg-gray-50/50">
                   <td colSpan={2} className="px-6 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider">Total de Despesas Fixas</td>
                   <td className="px-6 py-4 text-base font-bold text-red-600">{R$(total)}</td>
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                 </tr>
               )}
             </tbody>
@@ -604,6 +616,9 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
             <SelectField label="Categoria" value={form.category} onChange={(v) => setForm({ ...form, category: v })} options={FIXED_CATEGORIES} />
             <Input label="Valor (R$)" type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           </div>
+          <ExpensePaymentFields paymentMethod={form.paymentMethod} creditCardId={form.creditCardId}
+            selectedCard={items.find((item) => item.id === editId)?.creditCard}
+            onChange={(payment) => setForm({ ...form, ...payment })} />
           <div className="pt-2">
             <label className="flex items-center gap-3 text-sm text-gray-600 font-medium cursor-pointer bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-accent/50 transition-colors">
               <input type="checkbox" checked={form.paidWithCash}
@@ -614,11 +629,12 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
-            <button onClick={handleSave} disabled={saving || !form.name || !form.amount}
+            <button onClick={handleSave} disabled={saving || !form.name.trim() || !form.amount || (!editId && !form.paymentMethod) || (form.paymentMethod === "CREDIT_CARD" && !form.creditCardId)}
               className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Salvando..." : editId ? "Salvar alterações" : "Adicionar Despesa"}
             </button>
           </div>
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         </div>
       </Modal>
 
@@ -638,7 +654,7 @@ function FixedExpensesTab({ month, year, setMonth, setYear }: {
 // ══════════════════════════════════════════════════════════════════
 // 4. DESPESAS AVULSAS
 // ══════════════════════════════════════════════════════════════════
-interface VariableExpense {
+interface VariableExpense extends ExpensePaymentInfo {
   id: string; name: string; category: string; amount: number; date: string; paidWithCash: boolean;
 }
 
@@ -649,7 +665,9 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", category: "OUTROS", amount: "", date: "", paidWithCash: false });
+  const emptyForm = { name: "", category: "OUTROS", amount: "", date: "", paidWithCash: false, paymentMethod: "", creditCardId: "" };
+  const [form, setForm] = useState(emptyForm);
+  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -665,17 +683,20 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
 
   async function handleSave() {
     setSaving(true);
+    setError("");
     try {
-      await fetch("/api/financeiro/variable-expenses", {
+      const res = await fetch("/api/financeiro/variable-expenses", {
         method: editId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, ...(editId ? { id: editId } : {}) }),
       });
+      if (!res.ok) { const result = await res.json(); throw new Error(result.error || "Não foi possível salvar a despesa."); }
       setShowModal(false);
       setEditId(null);
-      setForm({ name: "", category: "OUTROS", amount: "", date: "", paidWithCash: false });
+      setForm(emptyForm);
       fetch_();
-    } finally { setSaving(false); }
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível salvar a despesa."); }
+    finally { setSaving(false); }
   }
 
   async function handleDelete(id: string) {
@@ -684,8 +705,9 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
   }
 
   function openEdit(item: VariableExpense) {
+    setError("");
     setEditId(item.id);
-    setForm({ name: item.name, category: item.category, amount: String(item.amount), date: item.date.slice(0, 10), paidWithCash: item.paidWithCash });
+    setForm({ name: item.name, category: item.category, amount: String(item.amount), date: item.date.slice(0, 10), paidWithCash: item.paidWithCash, paymentMethod: item.paymentMethod ?? "", creditCardId: item.creditCardId ?? "" });
     setShowModal(true);
   }
 
@@ -695,22 +717,22 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
     <div className="animate-in fade-in">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
         <FilterDialog month={month} year={year} onApply={(m, y) => { setMonth(m); setYear(y); }} />
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
+        <button onClick={() => { setEditId(null); setForm(emptyForm); setError(""); setShowModal(true); }} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
           <Plus size={16} /> Nova Despesa Avulsa
         </button>
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200/60 bg-gray-50/30">
-                <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor</Th><Th>Data</Th><Th>Origem</Th><Th align="right">Ações</Th>
+                <Th>Nome / Título</Th><Th>Categoria</Th><Th>Valor</Th><Th>Data</Th><Th>Pagamento</Th><Th>Origem</Th><Th align="right">Ações</Th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa avulsa neste mês.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma despesa avulsa neste mês.</td></tr>
               ) : items.map((e) => (
                 <tr key={e.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{e.name}</td>
@@ -719,6 +741,7 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(e.amount)}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{formatDateBR(e.date)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{expensePaymentLabel(e)}</td>
                   <td className="px-6 py-4">
                     {e.paidWithCash
                       ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
@@ -733,7 +756,7 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
                 <tr className="bg-gray-50/50">
                   <td colSpan={2} className="px-6 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider">Total de Despesas Avulsas</td>
                   <td className="px-6 py-4 text-base font-bold text-red-600">{R$(total)}</td>
-                  <td colSpan={3} />
+                  <td colSpan={4} />
                 </tr>
               )}
             </tbody>
@@ -750,6 +773,9 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
             <Input label="Valor (R$)" type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             <Input label="Data" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </div>
+          <ExpensePaymentFields paymentMethod={form.paymentMethod} creditCardId={form.creditCardId}
+            selectedCard={items.find((item) => item.id === editId)?.creditCard}
+            onChange={(payment) => setForm({ ...form, ...payment })} />
 
           <div className="pt-2">
             <label className="flex items-center gap-3 text-sm text-gray-600 font-medium cursor-pointer bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-accent/50 transition-colors">
@@ -762,11 +788,12 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
-            <button onClick={handleSave} disabled={saving || !form.name || !form.amount || !form.date}
+            <button onClick={handleSave} disabled={saving || !form.name.trim() || !form.amount || !form.date || (!editId && !form.paymentMethod) || (form.paymentMethod === "CREDIT_CARD" && !form.creditCardId)}
               className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
               {saving ? "Salvando..." : editId ? "Salvar alterações" : "Adicionar Despesa"}
             </button>
           </div>
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         </div>
       </Modal>
 

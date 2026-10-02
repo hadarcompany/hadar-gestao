@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { canEdit, canView } from "@/lib/permissions";
+import { ExpensePaymentError } from "@/lib/expense-payments";
+import { resolveExpensePayment } from "@/lib/expense-payments-server";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -21,6 +23,7 @@ export async function GET(req: NextRequest) {
 
   const expenses = await prisma.variableExpense.findMany({
     where,
+    include: { creditCard: true },
     orderBy: { date: "desc" },
   });
 
@@ -35,27 +38,36 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { name, category, amount, date, paidWithCash } = body;
 
-  const expense = await prisma.variableExpense.create({
-    data: {
-      name,
-      category,
-      amount: parseFloat(amount),
-      date: new Date(date),
-      paidWithCash: paidWithCash || false,
-    },
-  });
+  try {
+    const expense = await prisma.$transaction(async (db) => {
+      const payment = await resolveExpensePayment(db, body);
+      const expense = await db.variableExpense.create({
+        data: {
+          ...payment,
+          name,
+          category,
+          amount: parseFloat(amount),
+          date: new Date(date),
+          paidWithCash: paidWithCash || false,
+        },
+      });
 
-  if (paidWithCash) {
-    await prisma.cashEntry.create({
-      data: {
-        type: "RETIRADA_DESPESA",
-        amount: parseFloat(amount),
-        description: `Despesa Avulsa: ${name}`,
-      },
+      if (paidWithCash) {
+        await db.cashEntry.create({
+          data: {
+            type: "RETIRADA_DESPESA",
+            amount: parseFloat(amount),
+            description: `Despesa Avulsa: ${name}`,
+          },
+        });
+      }
+      return expense;
     });
+    return NextResponse.json(expense, { status: 201 });
+  } catch (error) {
+    if (error instanceof ExpensePaymentError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
   }
-
-  return NextResponse.json(expense, { status: 201 });
 }
 
 export async function DELETE(req: NextRequest) {
@@ -79,15 +91,27 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
-  const expense = await prisma.variableExpense.update({
-    where: { id },
-    data: {
-      ...(body.name !== undefined ? { name: String(body.name) } : {}),
-      ...(body.category !== undefined ? { category: body.category } : {}),
-      ...(body.amount !== undefined ? { amount: parseFloat(body.amount) } : {}),
-      ...(body.date !== undefined ? { date: new Date(body.date) } : {}),
-      ...(body.paidWithCash !== undefined ? { paidWithCash: Boolean(body.paidWithCash) } : {}),
-    },
-  });
-  return NextResponse.json(expense);
+  try {
+    const expense = await prisma.$transaction(async (db) => {
+      const existing = await db.variableExpense.findUnique({ where: { id } });
+      if (!existing) return null;
+      const payment = await resolveExpensePayment(db, body, existing);
+      return db.variableExpense.update({
+        where: { id },
+        data: {
+          ...payment,
+          ...(body.name !== undefined ? { name: String(body.name) } : {}),
+          ...(body.category !== undefined ? { category: body.category } : {}),
+          ...(body.amount !== undefined ? { amount: parseFloat(body.amount) } : {}),
+          ...(body.date !== undefined ? { date: new Date(body.date) } : {}),
+          ...(body.paidWithCash !== undefined ? { paidWithCash: Boolean(body.paidWithCash) } : {}),
+        },
+      });
+    });
+    if (!expense) return NextResponse.json({ error: "Despesa não encontrada." }, { status: 404 });
+    return NextResponse.json(expense);
+  } catch (error) {
+    if (error instanceof ExpensePaymentError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
+  }
 }

@@ -3,11 +3,12 @@
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { LabelsProvider } from "@/contexts/labels-context";
 import { AreasProvider } from "@/contexts/areas-context";
+import { AssistantPanel } from "@/components/assistant/assistant-panel";
 
 export default function AuthenticatedLayout({
   children,
@@ -17,7 +18,14 @@ export default function AuthenticatedLayout({
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [dataVersion, setDataVersion] = useState(0);
   const financeAllowed = user?.role === "ADMIN" || user?.permissions?.financeiro === "view" || user?.permissions?.financeiro === "edit";
+
+  useEffect(() => {
+    const refreshPage = () => setDataVersion((version) => version + 1);
+    window.addEventListener("hadar:assistant-updated", refreshPage);
+    return () => window.removeEventListener("hadar:assistant-updated", refreshPage);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -51,8 +59,9 @@ export default function AuthenticatedLayout({
           <header className="sticky top-0 z-40 -mx-8 mb-6 px-8 py-3 flex items-center justify-end bg-[#f5f5f4]/85 backdrop-blur border-b border-gray-200/70">
             <NotificationBell />
           </header>
-          {children}
+          <div key={dataVersion}>{children}</div>
         </main>
+        <AssistantPanel />
       </div>
       </AreasProvider>
     </LabelsProvider>

@@ -88,6 +88,15 @@ enum FixedExpenseCategory {
   OUTROS
 }
 
+enum ExpensePaymentMethod {
+  PIX
+  BOLETO
+  CREDIT_CARD
+  CASH
+  BANK_TRANSFER
+  OTHER
+}
+
 enum VariableExpenseCategory {
   ALIMENTACAO
   LOCOMOCAO
@@ -183,6 +192,7 @@ model User {
   ownedLeads           Lead[]               @relation("LeadOwner")
   taskUpdates          TaskUpdate[]
   descriptionEdits     Task[]               @relation("TaskDescriptionEditor")
+  assistantRuns        AssistantRun[]
 
   @@map("users")
 }
@@ -300,6 +310,42 @@ model TaskBoard {
   updatedAt DateTime @updatedAt
 
   @@map("task_boards")
+}
+
+/// Comandos do assistente: limite de uso e repetição segura de uma requisição.
+model AssistantRun {
+  id        String            @id @default(cuid())
+  requestId String
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String            @default("RUNNING")
+  result    Json?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  actions   AssistantAction[]
+
+  @@unique([userId, requestId])
+  @@index([userId, createdAt])
+  @@map("assistant_runs")
+}
+
+/// Ação validada antes de executar; uma confirmação só pode ser consumida uma vez.
+model AssistantAction {
+  id        String       @id @default(cuid())
+  runId     String
+  run       AssistantRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  name      String
+  dedupeKey String
+  input     Json
+  status    String       @default("PENDING")
+  result    Json?
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([runId, dedupeKey])
+  @@index([runId, createdAt])
+  @@map("assistant_actions")
 }
 
 /// Área de trabalho com nome editável. O id é o código gravado em `Task.area`
@@ -701,30 +747,54 @@ model AsaasWebhookEvent {
   @@map("asaas_webhook_events")
 }
 
-model FixedExpense {
-  id           String               @id @default(cuid())
-  name         String
-  category     FixedExpenseCategory
-  amount       Float
-  paidWithCash Boolean              @default(false)
-  month        Int
-  year         Int
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+/// Identificação visual para controle interno, sem dados sensíveis do cartão.
+model CreditCard {
+  id               String            @id @default(cuid())
+  name             String
+  bank             String?
+  brand            String?
+  color            String            @default("#FF5A00")
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  fixedExpenses    FixedExpense[]
+  variableExpenses VariableExpense[]
 
+  @@map("credit_cards")
+}
+
+model FixedExpense {
+  id            String                @id @default(cuid())
+  name          String
+  category      FixedExpenseCategory
+  amount        Float
+  paidWithCash  Boolean               @default(false)
+  paymentMethod ExpensePaymentMethod?
+  creditCardId  String?
+  creditCard    CreditCard?           @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
+  month         Int
+  year          Int
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([creditCardId])
   @@map("fixed_expenses")
 }
 
 model VariableExpense {
-  id           String                  @id @default(cuid())
-  name         String
-  category     VariableExpenseCategory
-  amount       Float
-  date         DateTime
-  paidWithCash Boolean                 @default(false)
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
+  id            String                  @id @default(cuid())
+  name          String
+  category      VariableExpenseCategory
+  amount        Float
+  date          DateTime
+  paidWithCash  Boolean                 @default(false)
+  paymentMethod ExpensePaymentMethod?
+  creditCardId  String?
+  creditCard    CreditCard?             @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
 
+  @@index([creditCardId])
   @@map("variable_expenses")
 }
 
