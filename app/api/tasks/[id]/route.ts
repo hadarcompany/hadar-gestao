@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -5,11 +6,14 @@ import { withMedia } from "@/lib/media";
 import { TASK_TEMPLATES, generateChecklist } from "@/lib/task-templates";
 import { TASK_INCLUDE } from "@/lib/task-transfer";
 import { areaForType } from "@/lib/areas";
+import { TASK_FIELDS, pickWritableFields } from "@/lib/security-input";
 
 export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/tasks/[id]", params.id);
+  if (denied) return denied;
 
   const task = await prisma.task.findUnique({
     where: { id: params.id },
@@ -24,12 +28,14 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks/[id]", params.id);
+  if (denied) return denied;
 
-  const body = await req.json();
-  // assigneeIds/transferNote são tratados por /api/tasks/[id]/transfer (histórico + chat +
-  // notificação centralizados); aqui apenas edições diretas do formulário/lista são aplicadas.
-  const { assigneeIds, transferNote, ...data } = body;
-  void transferNote;
+  let body: Record<string, any>;
+  try { body = pickWritableFields(await req.json(), TASK_FIELDS); }
+  catch { return NextResponse.json({ error: "Campos de tarefa inválidos." }, { status: 400 }); }
+  // Transferências usam /transfer; aqui ficam as edições diretas do formulário.
+  const { assigneeIds, ...data } = body;
 
   if (data.startDate !== undefined) data.startDate = data.startDate ? new Date(data.startDate) : null;
   if (data.dueDate !== undefined) data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
@@ -163,6 +169,8 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/tasks/[id]", params.id);
+  if (denied) return denied;
 
   await prisma.task.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });

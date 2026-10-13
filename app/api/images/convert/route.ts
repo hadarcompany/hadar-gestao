@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { isHeicImage } from "@/lib/image-files";
@@ -8,6 +9,8 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/images/convert");
+  if (denied) return denied;
 
   const formData = await req.formData().catch(() => null);
   const file = formData?.get("file");

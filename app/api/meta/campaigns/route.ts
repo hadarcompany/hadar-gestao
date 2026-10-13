@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { canView } from "@/lib/permissions";
@@ -24,6 +25,8 @@ function actionValue(actions: ActionMetric[] | undefined, types: string[]) {
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/meta/campaigns");
+  if (denied) return denied;
   if (!canView(auth, "meta-ads")) return NextResponse.json({ error: "Sem acesso ao Meta Ads." }, { status: 403 });
   const accountId = req.nextUrl.searchParams.get("accountId");
   const since = req.nextUrl.searchParams.get("since");

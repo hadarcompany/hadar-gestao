@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +11,7 @@ import { getAsaasConfig, getAsaasPayment, paymentUpdateData } from "@/lib/asaas"
 export const dynamic = "force-dynamic";
 
 async function reconcileDashboardCharges() {
-  if (!getAsaasConfig().configured) return;
+  if (!(await getAsaasConfig()).configured) return;
   const staleBefore = new Date(Date.now() - 60_000);
   const charges = await prisma.receivable.findMany({
     where: {
@@ -40,6 +41,8 @@ async function reconcileDashboardCharges() {
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/dashboard");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const fromParam = searchParams.get("from");

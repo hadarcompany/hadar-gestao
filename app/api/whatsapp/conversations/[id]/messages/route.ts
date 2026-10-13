@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { canEdit, canView } from "@/lib/permissions";
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/whatsapp/conversations/[id]/messages");
+  if (denied) return denied;
   if (!canView(auth, "pipeline")) return NextResponse.json({ error: "Sem acesso ao pipeline." }, { status: 403 });
   const { id } = await params;
   const conversation = await prisma.whatsAppConversation.findUnique({ where: { id }, select: { id: true } });
@@ -21,6 +24,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/whatsapp/conversations/[id]/messages");
+  if (denied) return denied;
   if (!canEdit(auth, "pipeline")) return NextResponse.json({ error: "Sem permissão para enviar mensagens." }, { status: 403 });
   const { id } = await params;
   const conversation = await prisma.whatsAppConversation.findUnique({ where: { id } });

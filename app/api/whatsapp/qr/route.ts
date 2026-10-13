@@ -1,3 +1,5 @@
+import { NextRequest } from "next/server";
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { canView } from "@/lib/permissions";
@@ -5,9 +7,11 @@ import { getWhatsAppProviderQr, whatsappProvider } from "@/lib/whatsapp/provider
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return new NextResponse(null, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/whatsapp/qr");
+  if (denied) return denied;
   if (!canView(auth, "pipeline")) return new NextResponse(null, { status: 403 });
   if (whatsappProvider() !== "WAHA") return new NextResponse(null, { status: 404 });
   try {

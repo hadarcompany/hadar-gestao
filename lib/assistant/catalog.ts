@@ -87,7 +87,7 @@ export const RESOURCES: Record<string, { path: string; module: ModuleKey; query:
 
 export const PAGES: Record<string, ModuleKey> = {
   dashboard: "dashboard", tarefas: "tarefas", "meu-trabalho": "meu-trabalho", clientes: "clientes", servicos: "servicos",
-  pipeline: "pipeline", financeiro: "financeiro", calendario: "calendario", nps: "nps", metas: "metas", acessos: "acessos", "meta-ads": "meta-ads", "minha-semana": "minha-semana",
+  pipeline: "pipeline", financeiro: "financeiro", calendario: "calendario", nps: "nps", metas: "metas", "meta-ads": "meta-ads", "minha-semana": "minha-semana",
 };
 
 export function assistantNavigation(raw: unknown, auth: AuthUser) {

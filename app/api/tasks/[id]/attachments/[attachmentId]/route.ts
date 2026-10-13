@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +13,8 @@ export async function GET(req: NextRequest, { params: routeParams }: { params: P
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks/[id]/attachments/[attachmentId]", params.id);
+  if (denied) return denied;
 
   const attachment = await prisma.taskAttachment.findUnique({ where: { id: params.attachmentId } });
   if (!attachment || attachment.taskId !== params.id) {
@@ -49,6 +52,8 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/tasks/[id]/attachments/[attachmentId]", params.id);
+  if (denied) return denied;
 
   const attachment = await prisma.taskAttachment.findUnique({ where: { id: params.attachmentId } });
   if (!attachment || attachment.taskId !== params.id) {

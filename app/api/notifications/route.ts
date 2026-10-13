@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +61,8 @@ async function ensureOverduePaymentNotifications(auth: AuthUser) {
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/notifications");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const unreadOnly = searchParams.get("unreadOnly") === "true";
@@ -88,6 +91,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/notifications");
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
   if (body.markAllRead) {

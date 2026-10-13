@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import type { AsaasBillingType } from "@prisma/client";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
@@ -28,6 +29,8 @@ function errorResponse(error: unknown) {
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/asaas/charges");
+  if (denied) return denied;
   if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para visualizar o financeiro." }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
@@ -70,12 +73,14 @@ export async function GET(req: NextRequest) {
     return acc;
   }, { total: 0, paid: 0, pending: 0, overdue: 0 });
 
-  return NextResponse.json({ charges: await withMedia(charges), summary, integration: getAsaasConfig() });
+  return NextResponse.json({ charges: await withMedia(charges), summary, integration: await getAsaasConfig() });
 }
 
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/asaas/charges");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para gerar cobranças." }, { status: 403 });
 
   let receivableId: string | null = null;

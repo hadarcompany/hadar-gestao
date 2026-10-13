@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
@@ -18,9 +19,11 @@ function cardData(body: Record<string, unknown>) {
   return { name, bank: bank || null, brand: brand || null, color, isActive: body.isActive ?? true };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/credit-cards");
+  if (denied) return denied;
   if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso ao financeiro." }, { status: 403 });
   const cards = await prisma.creditCard.findMany({ orderBy: [{ isActive: "desc" }, { name: "asc" }] });
   return NextResponse.json(cards);
@@ -29,6 +32,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/credit-cards");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
   let data;
   try { data = cardData(await req.json()); }
@@ -39,6 +44,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/credit-cards");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
   const body = await req.json();
   if (typeof body.id !== "string" || !body.id) return NextResponse.json({ error: "ID obrigatório." }, { status: 400 });
@@ -53,6 +60,8 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/credit-cards");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "ID obrigatório." }, { status: 400 });

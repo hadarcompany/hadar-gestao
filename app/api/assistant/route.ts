@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
@@ -12,9 +13,11 @@ import { getAssistantIntegrationStatus } from "@/lib/assistant/integration-serve
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/assistant");
+  if (denied) return denied;
   try {
     const { configured, model } = await getAssistantIntegrationStatus();
     return NextResponse.json({ configured, model }, { headers: { "Cache-Control": "no-store" } });
@@ -24,6 +27,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/assistant");
+  if (denied) return denied;
   let runId: string | undefined;
   try {
     checkAssistantOrigin(req);

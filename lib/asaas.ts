@@ -1,4 +1,8 @@
 import type { AsaasBillingType, ReceivableStatus } from "@prisma/client";
+import { AsaasApiError } from "./asaas-integration";
+import { getAsaasRuntimeConfig } from "./asaas-integration-server";
+export { AsaasApiError } from "./asaas-integration";
+export { getAsaasConfig } from "./asaas-integration-server";
 
 type AsaasList<T> = {
   object: "list";
@@ -35,36 +39,24 @@ export type AsaasPayment = {
   bankSlipUrl?: string;
 };
 
-export class AsaasApiError extends Error {
-  constructor(message: string, public status: number, public details?: unknown) {
-    super(message);
-    this.name = "AsaasApiError";
-  }
-}
-
-export function getAsaasConfig() {
-  const environment = process.env.ASAAS_ENVIRONMENT === "production" ? "production" : "sandbox";
-  return {
-    environment,
-    configured: Boolean(process.env.ASAAS_API_KEY),
-    baseUrl: environment === "production" ? "https://api.asaas.com/v3" : "https://api-sandbox.asaas.com/v3",
-  } as const;
-}
-
 export async function asaasRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const apiKey = process.env.ASAAS_API_KEY;
-  const { baseUrl } = getAsaasConfig();
-  if (!apiKey) throw new AsaasApiError("A integração com o Asaas ainda não foi configurada.", 503);
+  return requestAsaasWithConfig<T>(await getAsaasRuntimeConfig(), path, init);
+}
 
-  const response = await fetch(`${baseUrl}${path}`, {
+export async function requestAsaasWithConfig<T>(config: { apiKey: string; baseUrl: string }, path: string, init: RequestInit = {}, request: typeof fetch = fetch): Promise<T> {
+  const { apiKey, baseUrl } = config;
+  if (!["https://api.asaas.com/v3", "https://api-sandbox.asaas.com/v3"].includes(baseUrl) || !path.startsWith("/") || path.startsWith("//")) throw new AsaasApiError("Endereço do Asaas inválido.", 400);
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("User-Agent", process.env.ASAAS_USER_AGENT || "HadarGestao/1.0");
+  headers.set("access_token", apiKey);
+
+  const response = await request(`${baseUrl}${path}`, {
     ...init,
     cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": process.env.ASAAS_USER_AGENT || "HadarGestao/1.0",
-      access_token: apiKey,
-      ...init.headers,
-    },
+    headers,
+    signal: init.signal || AbortSignal.timeout(30_000),
+    redirect: "error",
   });
 
   const payload = await response.json().catch(() => null);
@@ -73,7 +65,7 @@ export async function asaasRequest<T>(path: string, init: RequestInit = {}): Pro
       ? (payload as { errors?: { description?: string }[] }).errors
       : null;
     const message = errors?.map((item) => item.description).filter(Boolean).join(" ") || `Erro ${response.status} ao comunicar com o Asaas.`;
-    throw new AsaasApiError(message, response.status, payload);
+    throw new AsaasApiError(message.replaceAll(apiKey, "[chave omitida]"), response.status);
   }
   return payload as T;
 }

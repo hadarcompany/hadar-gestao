@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +35,8 @@ export async function PATCH(
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/content-calendar/[id]");
+  if (denied) return denied;
 
   const { id } = params;
   const { weekStart, reels, carroseis, criativosTrafico } = await req.json();
@@ -73,6 +76,8 @@ export async function DELETE(
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/content-calendar/[id]");
+  if (denied) return denied;
 
   await prisma.contentCalendar.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });

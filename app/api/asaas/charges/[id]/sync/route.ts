@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -15,6 +16,8 @@ import { canEdit } from "@/lib/permissions";
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/asaas/charges/[id]/sync");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para sincronizar cobranças." }, { status: 403 });
 
   const { id } = await params;

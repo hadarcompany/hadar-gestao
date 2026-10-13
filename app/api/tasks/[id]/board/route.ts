@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
@@ -32,6 +33,8 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   const { id } = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/tasks/[id]/board", id);
+  if (denied) return denied;
   if (!canView(auth, "tarefas")) return NextResponse.json({ error: "Sem acesso às tarefas." }, { status: 403 });
 
   const task = await prisma.task.findUnique({ where: { id }, select: { id: true, title: true, board: true } });
@@ -43,6 +46,8 @@ export async function PUT(req: NextRequest, { params: routeParams }: { params: P
   const { id } = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks/[id]/board", id);
+  if (denied) return denied;
   if (!canEdit(auth, "tarefas")) return NextResponse.json({ error: "Sem permissão para editar tarefas." }, { status: 403 });
 
   const body = await req.json().catch(() => null);

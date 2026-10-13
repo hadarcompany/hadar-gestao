@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +9,8 @@ import { PROJECT_INCLUDE, PROJECT_STATUS_VALUES } from "@/lib/projects-server";
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/projects");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const kind = searchParams.get("kind");
@@ -34,6 +37,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/projects");
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
 

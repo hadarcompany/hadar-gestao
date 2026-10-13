@@ -1,16 +1,26 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, MODULE_KEYS } from "@/lib/permissions";
+import { createSupabaseAdminClient, findSupabaseAuthUserByEmail } from "@/lib/supabase/admin";
 import bcrypt from "bcryptjs";
 
 export async function PATCH(req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/users/[id]");
+  if (denied) return denied;
 
   const body = await req.json();
+  if (body.role !== undefined && !["ADMIN", "MEMBER"].includes(body.role)) return NextResponse.json({ error: "Cargo inválido." }, { status: 400 });
+  if (body.permissions !== undefined && (body.permissions === null || typeof body.permissions !== "object" || Array.isArray(body.permissions) || Object.entries(body.permissions).some(([key, level]) => !MODULE_KEYS.includes(key as typeof MODULE_KEYS[number]) || !["none", "view", "edit"].includes(String(level))))) {
+    return NextResponse.json({ error: "Permissões inválidas." }, { status: 400 });
+  }
+  if (body.password !== undefined && (typeof body.password !== "string" || body.password.length < 12 || body.password.length > 1024)) return NextResponse.json({ error: "Use uma senha de pelo menos 12 caracteres." }, { status: 400 });
+  if (body.image !== undefined && body.image !== null && (typeof body.image !== "string" || !/^data:image\/(png|jpeg|gif|webp);base64,/.test(body.image) || body.image.length > 3 * 1024 * 1024)) return NextResponse.json({ error: "Imagem inválida ou muito grande." }, { status: 400 });
   const isSelf = auth.id === params.id;
   const admin = isAdmin(auth);
 
@@ -39,6 +49,14 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   let plainPassword: string | undefined;
   if (body.password) {
     plainPassword = body.password;
+    const target = await prisma.user.findUnique({ where: { id: params.id }, select: { email: true } });
+    if (!target) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
+    try {
+      const authUser = await findSupabaseAuthUserByEmail(target.email);
+      if (!authUser) return NextResponse.json({ error: "Conta de autenticação não encontrada." }, { status: 409 });
+      const { error } = await createSupabaseAdminClient().auth.admin.updateUserById(authUser.id, { password: plainPassword });
+      if (error) return NextResponse.json({ error: "Não foi possível alterar a senha." }, { status: 503 });
+    } catch { return NextResponse.json({ error: "Não foi possível alterar a senha." }, { status: 503 }); }
     data.password = await bcrypt.hash(body.password, 10);
   }
 
@@ -50,13 +68,10 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
 
   // Sincroniza com Supabase Auth (metadados e, se alterada, a senha)
   try {
-    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
     const supabaseAdmin = createSupabaseAdminClient();
-    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const authUser = authUsers?.users.find((u) => u.email === user.email);
+    const authUser = await findSupabaseAuthUserByEmail(user.email);
     if (authUser) {
       await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
-        ...(plainPassword ? { password: plainPassword } : {}),
         user_metadata: { name: user.name },
         app_metadata: {
           prisma_id: user.id,

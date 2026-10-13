@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, ExternalLink, Loader2, Megaphone, MessageCircle, RefreshCw, Unplug } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ClaudeIntegrationCard } from "@/components/settings/claude-integration-card";
+import { AsaasIntegrationCard } from "@/components/settings/asaas-integration-card";
 
 interface MetaStatus {
   configured: boolean; connected: boolean; accountCount: number;
@@ -56,6 +57,7 @@ export function IntegrationsPanel() {
   }
 
   return <div className="space-y-5">
+    <AsaasIntegrationCard />
     <ClaudeIntegrationCard />
     {notice && <div className="p-3 text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-xl">{notice}</div>}
     {loading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div> : <>

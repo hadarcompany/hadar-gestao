@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +13,8 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/leads/[id]");
+  if (denied) return denied;
 
   const current = await prisma.lead.findUnique({ where: { id: params.id }, select: { stage: true } });
   if (!current) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
@@ -45,6 +48,8 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/leads/[id]");
+  if (denied) return denied;
   if (auth.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await prisma.lead.delete({ where: { id: params.id } });

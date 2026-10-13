@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +11,8 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/tasks/[id]/updates", params.id);
+  if (denied) return denied;
 
   const updates = await prisma.taskUpdate.findMany({
     where: { taskId: params.id },
@@ -25,6 +28,8 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks/[id]/updates", params.id);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
   const content = typeof body.content === "string" ? body.content.trim() : "";

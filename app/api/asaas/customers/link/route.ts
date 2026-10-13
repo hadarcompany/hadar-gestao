@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,8 @@ type Mapping = { asaasCustomerId: string; clientId: string };
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/asaas/customers/link");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para vincular clientes." }, { status: 403 });
 
   try {

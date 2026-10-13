@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +12,8 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/clients/[id]/logo");
+  if (denied) return denied;
 
   const formData = await req.formData();
   const file = formData.get("file");
@@ -46,6 +49,8 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/clients/[id]/logo");
+  if (denied) return denied;
 
   await prisma.client.update({
     where: { id: params.id },
@@ -59,6 +64,8 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/clients/[id]/logo");
+  if (denied) return denied;
 
   const client = await prisma.client.findUnique({ where: { id: params.id }, select: { logoUrl: true } });
   return dataUrlResponse(client?.logoUrl);

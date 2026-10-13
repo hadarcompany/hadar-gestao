@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -5,9 +6,11 @@ import { canEdit, canView } from "@/lib/permissions";
 import { ExpensePaymentError } from "@/lib/expense-payments";
 import { resolveExpensePayment } from "@/lib/expense-payments-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/fixed-expenses");
+  if (denied) return denied;
   if (!canView(auth, "financeiro")) return NextResponse.json({ error: "Sem acesso ao financeiro." }, { status: 403 });
 
   // month/year são metadados legados do cadastro, não limitam a recorrência.
@@ -22,6 +25,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/fixed-expenses");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
 
   const body = await req.json();
@@ -63,6 +68,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/fixed-expenses");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
 
   const body = await req.json();
@@ -97,6 +104,8 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/financeiro/fixed-expenses");
+  if (denied) return denied;
   if (!canEdit(auth, "financeiro")) return NextResponse.json({ error: "Sem permissão para editar o financeiro." }, { status: 403 });
 
   const { searchParams } = new URL(req.url);

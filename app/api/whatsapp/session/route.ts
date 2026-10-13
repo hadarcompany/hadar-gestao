@@ -1,3 +1,5 @@
+import { NextRequest } from "next/server";
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { canView, isAdmin } from "@/lib/permissions";
@@ -5,9 +7,11 @@ import { getWhatsAppProviderState, logoutWhatsAppProvider, startWhatsAppProvider
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/whatsapp/session");
+  if (denied) return denied;
   if (!canView(auth, "pipeline")) return NextResponse.json({ error: "Sem acesso ao pipeline." }, { status: 403 });
   if (!whatsappProviderConfigured()) return NextResponse.json(await getWhatsAppProviderState());
   try {
@@ -17,9 +21,11 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/whatsapp/session");
+  if (denied) return denied;
   if (!isAdmin(auth)) return NextResponse.json({ error: "Apenas administradores podem conectar o WhatsApp." }, { status: 403 });
   if (!whatsappProviderConfigured()) return NextResponse.json({ error: "O provedor de WhatsApp selecionado ainda não está configurado." }, { status: 503 });
   try {
@@ -29,9 +35,11 @@ export async function POST() {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/whatsapp/session");
+  if (denied) return denied;
   if (!isAdmin(auth)) return NextResponse.json({ error: "Apenas administradores podem desconectar o WhatsApp." }, { status: 403 });
   if (whatsappProvider() !== "WAHA") return NextResponse.json({ error: "A Cloud API deve ser desconectada pelas configurações da Meta." }, { status: 400 });
   try {

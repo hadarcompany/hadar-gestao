@@ -1,13 +1,18 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { TASK_INCLUDE } from "@/lib/task-transfer";
 import { areaForType } from "@/lib/areas";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
+import { hasGlobalTaskAccess } from "@/lib/api-policy";
+import { TASK_FIELDS, pickWritableFields } from "@/lib/security-input";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -22,6 +27,10 @@ export async function GET(req: NextRequest) {
   if (clientId) where.clientId = clientId;
   if (priority) where.priority = priority;
   if (assigneeId) where.assignees = { some: { userId: assigneeId } };
+  if (!hasGlobalTaskAccess(auth)) where.OR = [{ createdById: auth.id }, { assignees: { some: { userId: auth.id } } }];
+  if (!["dueDate", "createdAt", "updatedAt", "title", "status", "priority", "startDate", "publishDate"].includes(sort) || !["asc", "desc"].includes(order)) {
+    return NextResponse.json({ error: "Ordenação inválida." }, { status: 400 });
+  }
 
   const tasks = await prisma.task.findMany({
     where,
@@ -35,8 +44,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks");
+  if (denied) return denied;
 
-  const body = await req.json();
+  let body: Record<string, any>;
+  try { body = pickWritableFields(await req.json(), TASK_FIELDS); }
+  catch { return NextResponse.json({ error: "Campos de tarefa inválidos." }, { status: 400 }); }
   const {
     title, type, description, status, priority,
     startDate, dueDate, publishDate, isExtra, estimatedTime, checklist,

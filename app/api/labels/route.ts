@@ -1,12 +1,15 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/labels");
+  if (denied) return denied;
 
   const labels = await prisma.taskLabel.findMany({ orderBy: [{ position: "asc" }, { createdAt: "asc" }] });
   return NextResponse.json(labels);
@@ -15,6 +18,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/labels");
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 40) : "";

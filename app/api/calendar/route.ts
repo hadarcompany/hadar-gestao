@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { getCalendarWeeks } from "@/lib/calendar";
@@ -7,6 +8,8 @@ import { getCurrentWeekRange } from "@/lib/dates";
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/calendar");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const clientId = searchParams.get("clientId") || null;

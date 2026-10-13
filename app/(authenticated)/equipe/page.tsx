@@ -56,7 +56,10 @@ function getUserPermissions(user: UserData): Record<string, string> {
   if (user.role === "ADMIN") {
     return Object.fromEntries(MODULES.map((m) => [m.key, "edit"]));
   }
-  return (user.permissions as Record<string, string>) || { ...DEFAULT_PERMISSIONS };
+  const permissions = user.permissions;
+  return permissions
+    ? Object.fromEntries(MODULES.map(module => [module.key, permissions[module.key] || "none"]))
+    : { ...DEFAULT_PERMISSIONS };
 }
 
 export default function EquipePage() {

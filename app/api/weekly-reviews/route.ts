@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +8,8 @@ import { startOfWeek } from "date-fns";
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/weekly-reviews");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const weekParam = searchParams.get("week");
@@ -14,7 +17,8 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = {};
   if (weekParam) where.weekStart = new Date(weekParam);
-  if (userId) where.userId = userId;
+  if (auth.role !== "ADMIN") where.userId = auth.id;
+  else if (userId) where.userId = userId;
 
   const reviews = await prisma.weeklyReview.findMany({
     where,
@@ -28,6 +32,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/weekly-reviews");
+  if (denied) return denied;
 
   const body = await req.json();
   const { howWasWeek, difficulties, improvements } = body;

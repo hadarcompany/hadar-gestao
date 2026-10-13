@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { isAdmin } from "@/lib/permissions";
@@ -17,6 +18,8 @@ function settingsUrl(req: NextRequest, params: Record<string, string>) {
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth || !isAdmin(auth)) return NextResponse.redirect(settingsUrl(req, { meta_error: "unauthorized" }));
+  const denied = await guardApiRequest(auth, req, "/api/meta/callback");
+  if (denied) return denied;
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
   const expectedState = req.cookies.get("meta_oauth_state")?.value;

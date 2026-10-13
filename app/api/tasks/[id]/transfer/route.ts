@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { transferTask } from "@/lib/task-transfer";
@@ -7,6 +8,8 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks/[id]/transfer", params.id);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
   const toUserIds: string[] = Array.isArray(body.toUserIds) ? body.toUserIds : [];

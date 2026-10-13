@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +8,8 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/tasks/[id]/updates/[updateId]", params.id);
+  if (denied) return denied;
 
   const update = await prisma.taskUpdate.findUnique({ where: { id: params.updateId } });
   if (!update || update.taskId !== params.id) {

@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +9,8 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/labels/[id]");
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
   const data: { name?: string; color?: string } = {};
@@ -23,6 +26,8 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/labels/[id]");
+  if (denied) return denied;
 
   await prisma.$transaction([
     prisma.$executeRaw`UPDATE "tasks" SET "labelIds" = array_remove("labelIds", ${params.id}) WHERE ${params.id} = ANY("labelIds")`,

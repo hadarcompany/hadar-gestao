@@ -844,6 +844,20 @@ model CashConfig {
   @@map("cash_config")
 }
 
+/// Credenciais do Asaas da empresa proprietária desta instalação.
+model AsaasIntegration {
+  id                    String   @id @default("primary")
+  enabled               Boolean  @default(true)
+  environment           String   @default("sandbox")
+  apiKeyEncrypted       String?
+  webhookTokenEncrypted String?
+  updatedById           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("asaas_integration")
+}
+
 model ClientHealthScore {
   id    String @id @default(cuid())
   month Int

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import type { AsaasPayment } from "@/lib/asaas";
 import { paymentUpdateData } from "@/lib/asaas";
 import { dateKeyToUTCDate } from "@/lib/dates";
+import { getAsaasWebhookToken } from "@/lib/asaas-integration-server";
+import { validAsaasWebhookToken } from "@/lib/asaas-integration";
 
 type AsaasWebhookPayload = {
   id?: string;
@@ -55,9 +57,9 @@ async function createPaymentNotifications(
 }
 
 export async function POST(req: NextRequest) {
-  const expectedToken = process.env.ASAAS_WEBHOOK_TOKEN;
+  const expectedToken = await getAsaasWebhookToken();
   const receivedToken = req.headers.get("asaas-access-token");
-  if (!expectedToken || receivedToken !== expectedToken) {
+  if (!validAsaasWebhookToken(expectedToken, receivedToken)) {
     return NextResponse.json({ error: "Webhook não autorizado." }, { status: 401 });
   }
 

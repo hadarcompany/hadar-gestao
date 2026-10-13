@@ -1,12 +1,16 @@
+import { NextRequest } from "next/server";
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
 import { isAdmin } from "@/lib/permissions";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/users");
+  if (denied) return denied;
 
   const users = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true, permissions: true },

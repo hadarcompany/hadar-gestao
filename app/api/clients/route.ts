@@ -1,11 +1,21 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
+import { canView } from "@/lib/permissions";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/clients");
+  if (denied) return denied;
+
+  // Selects de tarefas/calendário recebem somente identificação, sem dados privados.
+  if (!canView(auth, "clientes")) {
+    const clients = await prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
+    return NextResponse.json(await withMedia(clients, "client"));
+  }
 
   const clients = await prisma.client.findMany({
     omit: { logoUrl: true },
@@ -22,6 +32,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/clients");
+  if (denied) return denied;
 
   const body = await req.json();
   const client = await prisma.client.create({

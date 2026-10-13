@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
@@ -7,6 +8,8 @@ import { metaAppConfigured, metaGraphVersion, metaRedirectUri } from "@/lib/meta
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.redirect(new URL("/login", req.url));
+  const denied = await guardApiRequest(auth, req, "/api/meta/connect");
+  if (denied) return denied;
   if (!isAdmin(auth)) return NextResponse.json({ error: "Apenas administradores podem conectar a Meta." }, { status: 403 });
   if (!metaAppConfigured()) return NextResponse.json({ error: "Configure as credenciais do aplicativo Meta na Vercel." }, { status: 503 });
 

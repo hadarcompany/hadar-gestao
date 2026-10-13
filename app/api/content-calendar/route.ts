@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +15,8 @@ function buildItems(reels: number, carroseis: number, criativosTrafico: number) 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/content-calendar");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const clientId = searchParams.get("clientId");
@@ -41,6 +44,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/content-calendar");
+  if (denied) return denied;
 
   const { clientId, weekStart, reels, carroseis, criativosTrafico } = await req.json();
 

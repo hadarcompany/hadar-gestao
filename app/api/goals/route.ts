@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -112,6 +113,8 @@ async function calculateCurrentValue(
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/goals");
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
@@ -167,6 +170,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/goals");
+  if (denied) return denied;
 
   const body = await req.json();
   const { title, type, targetValue, period, month, year, customValue } = body;

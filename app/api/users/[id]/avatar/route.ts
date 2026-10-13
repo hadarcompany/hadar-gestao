@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +8,8 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/users/[id]/avatar");
+  if (denied) return denied;
 
   const user = await prisma.user.findUnique({ where: { id: params.id }, select: { image: true } });
   return dataUrlResponse(user?.image);

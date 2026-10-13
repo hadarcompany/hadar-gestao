@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,8 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/tasks/[id]/attachments", params.id);
+  if (denied) return denied;
 
   const task = await prisma.task.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!task) return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });
@@ -48,6 +51,8 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/tasks/[id]/attachments", params.id);
+  if (denied) return denied;
   const task = await prisma.task.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!task) return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });
   const attachments = await prisma.taskAttachment.findMany({

@@ -1,13 +1,17 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { withMedia } from "@/lib/media";
 import { canView } from "@/lib/permissions";
+import { CLIENT_FIELDS, pickWritableFields } from "@/lib/security-input";
 
 export async function GET(_req: NextRequest, { params: routeParams }: { params: Promise<{ id: string }> }) {
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/clients/[id]");
+  if (denied) return denied;
 
   const client = await prisma.client.findUnique({
     where: { id: params.id },
@@ -23,7 +27,6 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
         orderBy: { date: "desc" },
         include: { author: { select: { id: true, name: true } } },
       },
-      accesses: true,
       services: {
         orderBy: { createdAt: "desc" },
         include: { client: { select: { id: true, name: true } } },
@@ -49,8 +52,12 @@ export async function PATCH(req: NextRequest, { params: routeParams }: { params:
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/clients/[id]");
+  if (denied) return denied;
 
-  const body = await req.json();
+  let body: Record<string, any>;
+  try { body = pickWritableFields(await req.json(), CLIENT_FIELDS); }
+  catch { return NextResponse.json({ error: "Campos de cliente inválidos." }, { status: 400 }); }
   if (body.contractStartDate) body.contractStartDate = new Date(body.contractStartDate);
   if (body.renewalDate) body.renewalDate = new Date(body.renewalDate);
   if (body.email !== undefined) body.email = body.email ? String(body.email).trim().toLowerCase() : null;
@@ -83,6 +90,8 @@ export async function DELETE(_req: NextRequest, { params: routeParams }: { param
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/clients/[id]");
+  if (denied) return denied;
 
   await prisma.client.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });

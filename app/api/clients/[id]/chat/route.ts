@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +9,8 @@ export async function GET(_req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, _req, "/api/clients/[id]/chat");
+  if (denied) return denied;
 
   const [messages, readState] = await Promise.all([
     prisma.clientChatMessage.findMany({
@@ -29,6 +32,8 @@ export async function POST(req: NextRequest, { params: routeParams }: { params: 
   const params = await routeParams;
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/clients/[id]/chat");
+  if (denied) return denied;
 
   const client = await prisma.client.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!client) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });

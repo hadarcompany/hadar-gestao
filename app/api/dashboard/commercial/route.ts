@@ -1,3 +1,4 @@
+import { guardApiRequest } from "@/lib/api-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
@@ -15,6 +16,8 @@ import { canView } from "@/lib/permissions";
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await guardApiRequest(auth, req, "/api/dashboard/commercial");
+  if (denied) return denied;
   const financialVisible = canView(auth, "financeiro");
 
   const { searchParams } = new URL(req.url);

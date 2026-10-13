@@ -66,6 +66,8 @@ export function dataUrlResponse(value: string | null | undefined): NextResponse 
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": mime,
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
       // O link já carrega a versão (?v=updatedAt): trocar a imagem gera outro endereço.
       "Cache-Control": "private, max-age=31536000, immutable",
     },

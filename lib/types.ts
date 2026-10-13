@@ -72,7 +72,6 @@ export interface ClientData {
   logoUrl?: string | null;
   _count: { tasks: number };
   interactions: InteractionData[];
-  accesses?: AccessData[];
   tasks?: TaskData[];
   services?: Array<{ id: string; type: string; name: string | null }>;
 }
@@ -83,15 +82,4 @@ export interface InteractionData {
   content: string;
   date: string;
   author: { id: string; name: string };
-}
-
-export interface AccessData {
-  id: string;
-  platform: string;
-  url: string | null;
-  email: string | null;
-  password: string | null;
-  observations: string | null;
-  clientId: string;
-  client: { id: string; name: string };
 }
