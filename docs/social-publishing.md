@@ -33,9 +33,9 @@ Eles ainda não foram aplicados à hospedagem. Não regenerar as chaves de
 criptografia ao instalar a configuração. Revisão para clientes externos e
 teste real de conexão/publicação ainda precisam ser concluídos.
 
-A conta **@hadarcompany** foi convidada como **Testador do Instagram**, conforme
-autorização do responsável. O painel mostra **Pendente** até o convite ser aceito
-no Instagram, em **Apps e sites / Convites de testador**.
+A conta **@hadarcompany** aceitou o convite de **Testador do Instagram** em
+20/10/2026. O aceite foi informado pelo responsável e confirmado após atualizar
+o painel da Meta: a indicação **Pendente** não aparece mais nessa conta.
 
 O código e os testes estão locais. O módulo, as novas tabelas, o bucket de
 mídia e o agendador ainda não foram instalados nas instâncias de produção.
