@@ -58,6 +58,10 @@ ou volumes indiscriminadamente. Monitorar memória à medida que novos clientes 
 - Supabase exclusivo: `Insider-gestao`, ref `nmpglrzusdvbuhwrqkmm`, região us-east-1.
 - Release: `/opt/hadar-gestao/releases/20261020-insidermidia-02`.
 - Configuração privada: `/opt/hadar-gestao/instances/insidermidia/.env` (600).
+- Runtime Prisma no pooler de transação (6543), com `pgbouncer=true`,
+  `connection_limit=2` e `pool_timeout=20`. A conexão administrativa e os backups
+  usam o pooler de sessão (5432). Esse ajuste evita reservar conexões de sessão
+  para cada cliente Prisma das rotas da aplicação.
 - App na rede `gestao-insidermidia_web`, sem porta 3000 publicada no host.
 - Caddy conectado à rede do app e configurado para preservar a conexão quando recriado.
   Configurações anteriores em `instances/insidermidia/proxy-backup`.
