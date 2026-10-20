@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { publicOrigin } from "./lib/public-url";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -39,13 +40,13 @@ export async function middleware(request: NextRequest) {
 
   if (!isApiAuth && !isPublicWebhook) {
     if (!user && !isLoginPage) {
-      const url = request.nextUrl.clone();
+      const url = new URL(request.nextUrl.pathname + request.nextUrl.search, publicOrigin(request.url));
       url.pathname = "/login";
       return NextResponse.redirect(url);
     }
 
     if (user && isLoginPage) {
-      const url = request.nextUrl.clone();
+      const url = new URL(request.nextUrl.pathname + request.nextUrl.search, publicOrigin(request.url));
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }

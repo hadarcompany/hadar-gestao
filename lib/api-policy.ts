@@ -1,5 +1,6 @@
 import type { AuthUser } from "@/types/auth";
 import { canEdit, canView, isAdmin, type ModuleKey } from "./permissions";
+import { publicOrigin } from "./public-url";
 
 const TASK_READ: ModuleKey[] = ["tarefas", "meu-trabalho", "calendario"];
 const TASK_EDIT: ModuleKey[] = ["tarefas", "meu-trabalho"];
@@ -42,9 +43,10 @@ export function canAccessApi(auth: AuthUser, route: string, method: string, sear
   return false;
 }
 
-export function validMutationOrigin(request: Request) {
+export function validMutationOrigin(request: Request, configuredUrl = process.env.APP_URL) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return true;
   if (request.headers.get("sec-fetch-site") === "cross-site") return false;
   const origin = request.headers.get("origin");
-  return !origin || origin === new URL(request.url).origin;
+  try { return !origin || origin === publicOrigin(request.url, configuredUrl); }
+  catch { return false; }
 }
