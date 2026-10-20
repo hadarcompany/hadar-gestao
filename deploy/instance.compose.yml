@@ -24,7 +24,7 @@ services:
       web:
         aliases: ["${INSTANCE_SLUG}-gestao"]
     healthcheck:
-      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login',{signal:AbortSignal.timeout(8000)}).then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login',{signal:AbortSignal.timeout(8000)}).then(r=>process.exit(r.status===200||r.status===402?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       start_period: 30s

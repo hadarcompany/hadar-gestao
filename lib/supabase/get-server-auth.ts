@@ -1,8 +1,10 @@
 import { createSupabaseServerClient } from "./server";
 import type { AuthUser } from "@/types/auth";
 import { prisma } from "@/lib/prisma";
+import { trialExpired } from "@/lib/instance-trial";
 
 export async function getServerAuth(): Promise<AuthUser | null> {
+  if (trialExpired()) return null;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

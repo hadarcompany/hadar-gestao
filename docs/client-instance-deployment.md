@@ -56,7 +56,7 @@ ou volumes indiscriminadamente. Monitorar memória à medida que novos clientes 
 
 - Domínio: `https://insidermidia.agenciahadar.com.br` na VPS `129.121.45.211`.
 - Supabase exclusivo: `Insider-gestao`, ref `nmpglrzusdvbuhwrqkmm`, região us-east-1.
-- Release: `/opt/hadar-gestao/releases/20261020-insidermidia-01`.
+- Release: `/opt/hadar-gestao/releases/20261020-insidermidia-02`.
 - Configuração privada: `/opt/hadar-gestao/instances/insidermidia/.env` (600).
 - App na rede `gestao-insidermidia_web`, sem porta 3000 publicada no host.
 - Caddy conectado à rede do app e configurado para preservar a conexão quando recriado.
@@ -70,9 +70,16 @@ ou volumes indiscriminadamente. Monitorar memória à medida que novos clientes 
 - Login agora recarrega o contexto de autenticação após receber cookies do servidor.
   A origem pública da VPS é definida por `APP_URL`, sem confiar em headers arbitrários.
 
-## Pendências operacionais
+## Operação
 
-- Rotacionar credenciais da Hadar expostas no histórico, preservando integrações.
-- Validar backup e restauração do banco exclusivo do cliente.
-- Suspensão automática de período de teste e cadastro automático de empresas/DNS
-  ainda não estão implementados. Os arquivos padronizam o deploy por instância.
+Backups criptografados e suspensão de teste estão implementados. Consulte
+[backups e período de teste](backup-and-trial.md). A data de expiração da Insider
+aguarda a definição comercial do responsável; até lá, a variável fica vazia.
+O cadastro automático de empresas e DNS ainda não está implementado.
+
+Na Hadar, as chaves legadas do Supabase e a antiga assinatura HS256 foram
+revogadas. A aplicação usa uma chave administrativa nova, uma conexão de banco
+com usuário próprio e uma chave de criptografia estável. Asaas foi validado no
+domínio de produção após a revogação, incluindo conexão e webhook configurado.
+A senha do usuário administrativo `postgres` ainda depende da troca no painel
+pelo responsável e da atualização das ferramentas e backups logo em seguida.

@@ -12,6 +12,7 @@ import { guardApiRequest } from "../lib/api-guard";
 import { createLoginLimiter, parseLogin } from "../lib/login-security";
 import { CLIENT_FIELDS, TASK_FIELDS, pickWritableFields } from "../lib/security-input";
 import { publicOrigin } from "../lib/public-url";
+import { trialExpired, trialDenial } from "../lib/instance-trial";
 
 const root = process.cwd();
 const nativeRequire = createRequire(join(root, "package.json"));
@@ -34,6 +35,22 @@ function loadModule(file: string, mocks: Record<string, unknown> = {}) {
 const request = (path: string, method = "GET", body?: unknown, headers: Record<string, string> = {}) => new NextRequest(`https://gestao.example.test${path}`, { method, headers: { ...headers, ...(body ? { "Content-Type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
 const context = (id = "task-1") => ({ params: Promise.resolve({ id }) });
 const authMock = (user: AuthUser | null) => ({ getServerAuth: async () => user });
+
+test("teste vence no instante definido e configuração ausente não limita a Hadar", async () => {
+  const expiry = "2026-11-03T23:59:59-03:00";
+  const end = Date.parse(expiry);
+  assert.equal(trialExpired("", end), false);
+  assert.equal(trialExpired(expiry, end - 1), false);
+  assert.equal(trialExpired(expiry, end), true);
+  assert.equal(trialExpired("data inválida", end), true);
+  assert.equal(trialExpired("2026-11-03", end), true);
+  const denied = trialDenial(request("/api/tasks", "POST", {}), expiry, end)!;
+  assert.equal(denied.status, 402);
+  assert.equal((await denied.json()).error, "TRIAL_EXPIRED");
+  assert.equal(trialDenial(request("/dashboard"), expiry, end)!.status, 402);
+  assert.equal(trialDenial(request("/api/auth/logout", "POST"), expiry, end), null);
+  assert.equal(trialDenial(request("/api/webhooks/asaas", "POST"), expiry, end), null);
+});
 
 test("visualização não permite edição/exclusão; desconhecidos e Acessos negados mesmo para admin", () => {
   for (const path of ["/api/tasks", "/api/tasks/[id]", "/api/clients/[id]"]) {

@@ -1,8 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { publicOrigin } from "./lib/public-url";
+import { trialDenial } from "./lib/instance-trial";
 
 export async function middleware(request: NextRequest) {
+  const expired = trialDenial(request);
+  if (expired) return expired;
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
