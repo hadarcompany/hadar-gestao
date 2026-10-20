@@ -59,6 +59,10 @@ export function IntegrationsPanel() {
   return <div className="space-y-5">
     <AsaasIntegrationCard />
     <ClaudeIntegrationCard />
+    <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div><h2 className="font-semibold text-gray-900">Redes sociais e publicações</h2><p className="text-sm text-gray-600 mt-1">Conecte Instagram e páginas do Facebook de cada cliente para preparar e agendar conteúdo.</p></div>
+      <Link href="/publicacoes" className="px-4 py-2 text-sm border border-gray-300 rounded-lg whitespace-nowrap">Conectar contas por cliente</Link>
+    </div>
     {notice && <div className="p-3 text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-xl">{notice}</div>}
     {loading ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div> : <>
     <div className="bg-white border border-gray-200 rounded-2xl p-5">

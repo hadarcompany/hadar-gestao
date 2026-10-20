@@ -36,12 +36,14 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === "/login";
   const isApiAuth = pathname.startsWith("/api/auth");
+  // Worker authenticates its own bearer secret, never a browser session.
+  const isSocialWorker = pathname === "/api/social/worker";
   const isPublicWebhook =
     pathname === "/api/webhooks/asaas" ||
     pathname === "/api/webhooks/whatsapp" ||
     pathname === "/api/webhooks/meta/whatsapp";
 
-  if (!isApiAuth && !isPublicWebhook) {
+  if (!isApiAuth && !isPublicWebhook && !isSocialWorker) {
     if (!user && !isLoginPage) {
       const url = new URL(request.nextUrl.pathname + request.nextUrl.search, publicOrigin(request.url));
       url.pathname = "/login";
@@ -55,6 +57,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (pathname.startsWith("/api/social/")) supabaseResponse.headers.set("Cache-Control", "private, no-store");
   return supabaseResponse;
 }
 

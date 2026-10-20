@@ -13,11 +13,22 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlparse, quote
+from urllib.request import Request, build_opener, HTTPRedirectHandler
+from urllib.error import HTTPError
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 MAGIC = b"HADAR-BACKUP-v1\x00"
 IMAGE = "postgres:18-bookworm"
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError("Storage redirects are not allowed")
+
+
+def storage_open(request, timeout):
+    return build_opener(NoRedirect).open(request, timeout=timeout)
 
 
 def run(args, **kwargs):
@@ -90,6 +101,75 @@ def dump_database(url, target):
         run(args, env=pg_environment(url), stdout=output, timeout=600)
 
 
+def storage_files(config, temporary):
+    """Archive configured private buckets; no caller-provided external URLs."""
+    buckets = config.get("storageBuckets", [])
+    if not buckets:
+        return []
+    env = {}
+    for line in Path(config["environmentFile"]).read_text().splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        env[key] = json.loads(value) if value.startswith('"') else value.strip("'")
+    origin = env.get("NEXT_PUBLIC_SUPABASE_URL", "").rstrip("/")
+    if not re.fullmatch(r"https://[a-z0-9]+\.supabase\.co", origin):
+        raise ValueError("Invalid storage origin")
+    token = env.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not token:
+        raise ValueError("Missing storage credentials")
+    headers = {"apikey": token, "Authorization": "Bearer " + token}
+    result = []
+    total = 0
+    for bucket in buckets:
+        if not re.fullmatch(r"[a-z0-9-]+", bucket):
+            raise ValueError("Invalid bucket")
+        pending = [""]
+        while pending:
+            prefix = pending.pop()
+            offset = 0
+            while True:
+                payload = json.dumps({"prefix": prefix, "limit": 1000, "offset": offset, "sortBy": {"column": "name", "order": "asc"}}).encode()
+                request = Request(origin + "/storage/v1/object/list/" + bucket, data=payload, headers=dict(headers, **{"Content-Type": "application/json"}), method="POST")
+                try:
+                    with storage_open(request, timeout=60) as response:
+                        rows = json.load(response)
+                except HTTPError as error:
+                    # A configured bucket must exist: silently skipping a bucket
+                    # would make a successful backup misleading.
+                    raise RuntimeError("Storage listing failed") from error
+                if not isinstance(rows, list):
+                    raise ValueError("Invalid storage listing")
+                for row in rows:
+                    name = row.get("name", "")
+                    if not name or "/" in name or "\\" in name or name in (".", ".."):
+                        raise ValueError("Unsafe storage path")
+                    remote = prefix + name
+                    if not row.get("id"):
+                        pending.append(remote + "/")
+                        continue
+                    target = temporary / "storage" / bucket / remote
+                    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    request = Request(origin + "/storage/v1/object/authenticated/" + bucket + "/" + quote(remote, safe="/"), headers=headers)
+                    actual_size = 0
+                    with storage_open(request, timeout=120) as response, target.open("xb") as stream:
+                        for block in iter(lambda: response.read(1024 * 1024), b""):
+                            total += len(block)
+                            actual_size += len(block)
+                            if total > int(config.get("storageMaxBytes", 2 * 1024**3)):
+                                raise ValueError("Storage backup size limit exceeded")
+                            stream.write(block)
+                    if row.get("metadata", {}).get("size") is not None and actual_size != int(row["metadata"]["size"]):
+                        raise ValueError("Incomplete storage object")
+                    result.append({"bucket": bucket, "path": remote, "bytes": actual_size, "sha256": digest(target), "contentType": row.get("metadata", {}).get("mimetype")})
+                    if len(result) > 10000:
+                        raise ValueError("Storage backup object limit exceeded")
+                if len(rows) < 1000:
+                    break
+                offset += 1000
+    return result
+
+
 def verify_restore(dump, roles=()):
     name = "hadar-restore-" + uuid.uuid4().hex
     env = dict(os.environ, POSTGRES_PASSWORD=secrets.token_urlsafe(32))
@@ -144,15 +224,19 @@ def backup(config_path):
         dump = temp / "database.dump"
         dump_database(config["databaseUrl"], dump)
         counts = verify_restore(dump, config.get("restoreRoles", []))
+        objects = storage_files(config, temp)
         manifest = {"instance": slug, "createdAt": now.isoformat(), "schemas": ["public", "auth"],
                     "restoreVerified": True, "restoredCounts": counts,
-                    "databaseSha256": digest(dump), "externalStorageObjectsIncluded": False}
+                    "databaseSha256": digest(dump), "externalStorageObjectsIncluded": bool(config.get("storageBuckets")),
+                    "storageBuckets": config.get("storageBuckets", []), "storageObjects": objects}
         (temp / "manifest.json").write_text(json.dumps(manifest))
         archive = temp / "backup.tar"
         with tarfile.open(archive, "w") as tar:
             tar.add(dump, arcname="database.dump")
             tar.add(temp / "manifest.json", arcname="manifest.json")
             tar.add(config["environmentFile"], arcname="application.env")
+            if objects:
+                tar.add(temp / "storage", arcname="storage")
         encrypted = temp / "backup.hgb"
         encrypt(archive, encrypted, key)
         checked = temp / "checked.tar"
