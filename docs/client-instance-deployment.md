@@ -73,8 +73,9 @@ ou volumes indiscriminadamente. Monitorar memória à medida que novos clientes 
 ## Operação
 
 Backups criptografados e suspensão de teste estão implementados. Consulte
-[backups e período de teste](backup-and-trial.md). A data de expiração da Insider
-aguarda a definição comercial do responsável; até lá, a variável fica vazia.
+[backups e período de teste](backup-and-trial.md). O responsável aprovou 14 dias
+para a Insider: acesso até 03/11/2026 às 23h59, em Brasília. O bloqueio começa em
+`2026-11-04T00:00:00-03:00`, sem excluir os dados.
 O cadastro automático de empresas e DNS ainda não está implementado.
 
 Na Hadar, as chaves legadas do Supabase e a antiga assinatura HS256 foram
