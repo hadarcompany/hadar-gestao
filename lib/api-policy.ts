@@ -1,9 +1,10 @@
 import type { AuthUser } from "@/types/auth";
 import { canEdit, canView, isAdmin, type ModuleKey } from "./permissions";
+import { publicOrigin } from "./public-url";
 
 const TASK_READ: ModuleKey[] = ["tarefas", "meu-trabalho", "calendario"];
 const TASK_EDIT: ModuleKey[] = ["tarefas", "meu-trabalho"];
-export const CLIENT_LOOKUP: ModuleKey[] = ["tarefas", "meu-trabalho", "calendario", "servicos", "nps", "financeiro", "metas", "meta-ads"];
+export const CLIENT_LOOKUP: ModuleKey[] = ["tarefas", "meu-trabalho", "calendario", "servicos", "nps", "financeiro", "metas", "meta-ads", "publicacoes"];
 
 export function hasGlobalTaskAccess(auth: AuthUser, write = false) {
   return write ? canEdit(auth, "tarefas") : canView(auth, "tarefas") || canView(auth, "calendario");
@@ -31,6 +32,10 @@ export function canAccessApi(auth: AuthUser, route: string, method: string, sear
   if (route.startsWith("/api/leads") || route.startsWith("/api/whatsapp")) return module("pipeline");
   if (route.startsWith("/api/dashboard")) return module("dashboard");
   if (route.startsWith("/api/integrations")) return isAdmin(auth);
+  if (route.startsWith("/api/social/")) {
+    if (/\/(connect|callback|accounts|selection|setup)/.test(route)) return isAdmin(auth);
+    return module("publicacoes");
+  }
   if (route.startsWith("/api/meta")) {
     if (/\/(connect|callback)$/.test(route) || !read) return isAdmin(auth);
     return module("meta-ads");
@@ -42,9 +47,10 @@ export function canAccessApi(auth: AuthUser, route: string, method: string, sear
   return false;
 }
 
-export function validMutationOrigin(request: Request) {
+export function validMutationOrigin(request: Request, configuredUrl = process.env.APP_URL) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return true;
   if (request.headers.get("sec-fetch-site") === "cross-site") return false;
   const origin = request.headers.get("origin");
-  return !origin || origin === new URL(request.url).origin;
+  try { return !origin || origin === publicOrigin(request.url, configuredUrl); }
+  catch { return false; }
 }

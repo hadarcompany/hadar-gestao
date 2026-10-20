@@ -1,11 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -28,8 +26,8 @@ export default function LoginPage() {
       const data = await res.json();
       setError(data.error ?? "Email ou senha incorretos");
     } else {
-      router.push("/dashboard");
-      router.refresh();
+      // Login sets cookies on the server; remount the browser AuthProvider with that session.
+      window.location.assign("/dashboard");
     }
   }
 

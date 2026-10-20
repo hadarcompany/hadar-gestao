@@ -1,0 +1,5 @@
+# Acrescentar ao Caddy atual somente após o app estar saudável e o DNS apontar à VPS.
+# Conectar antes o hadar-caddy à rede gestao-insidermidia_web.
+insidermidia.agenciahadar.com.br {
+    reverse_proxy insidermidia-gestao:3000
+}

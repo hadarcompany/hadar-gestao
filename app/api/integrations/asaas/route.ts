@@ -6,6 +6,7 @@ import { AsaasApiError, ASAAS_KEY_CONTEXT, ASAAS_WEBHOOK_CONTEXT, asaasIntegrati
 import { getAsaasConfig } from "@/lib/asaas-integration-server";
 import { encryptIntegrationSecret } from "@/lib/integrations/crypto";
 import { requestAsaasWithConfig } from "@/lib/asaas";
+import { publicOrigin } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 const headers = { "Cache-Control": "no-store" };
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const denied = await guardApiRequest(auth, req, "/api/integrations/asaas");
   if (denied) return denied;
-  try { return NextResponse.json({ ...await getAsaasConfig(), webhookUrl: new URL("/api/webhooks/asaas", req.url).href }, { headers }); }
+  try { return NextResponse.json({ ...await getAsaasConfig(), webhookUrl: new URL("/api/webhooks/asaas", publicOrigin(req.url)).href }, { headers }); }
   catch { return NextResponse.json({ error: "Não foi possível consultar a configuração do Asaas." }, { status: 503, headers }); }
 }
 
@@ -46,7 +47,7 @@ export async function PUT(req: NextRequest) {
     parseAsaasIntegrationInput({ apiKey, environment });
     const data = { enabled: true, environment, apiKeyEncrypted: encryptIntegrationSecret(apiKey, ASAAS_KEY_CONTEXT), updatedById: auth.id, ...(input.webhookToken ? { webhookTokenEncrypted: encryptIntegrationSecret(input.webhookToken, ASAAS_WEBHOOK_CONTEXT) } : {}) };
     const saved = await prisma.asaasIntegration.upsert({ where: { id: "primary" }, create: { id: "primary", ...data }, update: data });
-    return NextResponse.json({ ...asaasIntegrationStatus(saved), webhookUrl: new URL("/api/webhooks/asaas", req.url).href }, { headers });
+    return NextResponse.json({ ...asaasIntegrationStatus(saved), webhookUrl: new URL("/api/webhooks/asaas", publicOrigin(req.url)).href }, { headers });
   } catch (error) { return failure(error); }
 }
 
@@ -76,6 +77,6 @@ export async function DELETE(req: NextRequest) {
   try {
     const data = { enabled: false, apiKeyEncrypted: null, webhookTokenEncrypted: null, updatedById: auth.id };
     const saved = await prisma.asaasIntegration.upsert({ where: { id: "primary" }, create: { id: "primary", ...data }, update: data });
-    return NextResponse.json({ ...asaasIntegrationStatus(saved), webhookUrl: new URL("/api/webhooks/asaas", req.url).href }, { headers });
+    return NextResponse.json({ ...asaasIntegrationStatus(saved), webhookUrl: new URL("/api/webhooks/asaas", publicOrigin(req.url)).href }, { headers });
   } catch (error) { return failure(error); }
 }

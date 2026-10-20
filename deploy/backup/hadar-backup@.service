@@ -1,0 +1,13 @@
+[Unit]
+Description=Encrypted and restore-verified backup for Hadar instance %i
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/flock -w 1800 /run/lock/hadar-backup.lock /usr/bin/python3 /opt/hadar-gestao/operations/backup.py /opt/hadar-gestao/operations/config/%i.json
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle

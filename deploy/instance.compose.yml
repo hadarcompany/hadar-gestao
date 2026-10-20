@@ -1,0 +1,50 @@
+name: gestao-${INSTANCE_SLUG:?Define INSTANCE_SLUG}
+services:
+  app:
+    image: hadar-gestao/${INSTANCE_SLUG}:${RELEASE_TAG:?Define RELEASE_TAG}
+    build:
+      context: ..
+      dockerfile: deploy/app.Dockerfile
+      target: runner
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Define client Supabase URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?Define client public key}
+    env_file: ${INSTANCE_ENV_FILE:?Use an absolute path outside the release}
+    restart: unless-stopped
+    init: true
+    mem_limit: 768m
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    volumes:
+      - next-cache:/app/.next/cache
+    networks:
+      web:
+        aliases: ["${INSTANCE_SLUG}-gestao"]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login',{signal:AbortSignal.timeout(8000)}).then(r=>process.exit(r.status===200||r.status===402?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+  admin:
+    image: hadar-gestao/${INSTANCE_SLUG}-admin:${RELEASE_TAG}
+    build:
+      context: ..
+      dockerfile: deploy/app.Dockerfile
+      target: tooling
+    profiles: [admin]
+    env_file: ${INSTANCE_ENV_FILE}
+    init: true
+    mem_limit: 512m
+    networks: [web]
+networks:
+  web:
+volumes:
+  next-cache:
+

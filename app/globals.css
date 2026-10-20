@@ -29,3 +29,15 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #b8b8b6;
 }
+/* The publishing workspace folds its navigation on phones. Other screens keep
+   their existing shell until their responsive layout is reviewed. */
+.social-mobile-menu { display: none; }
+.social-mobile-brand { display: none; }
+@media (max-width: 767px) {
+  .social-shell > aside { display: none; }
+  .social-shell > aside[data-mobile-open="true"] { display: flex; width: min(300px, 85vw); padding-top: 48px; box-shadow: 12px 0 40px #0002; }
+  .social-shell > .social-mobile-menu { display: block; position: fixed; left: 16px; top: 10px; z-index: 60; min-height: 44px; padding: 8px 14px; background: #fff; border: 1px solid #cdd2cd; border-radius: 8px; }
+  .social-shell > main { margin-left: 0; padding-left: 16px; padding-right: 16px; min-width: 0; width: 100%; }
+  .social-shell > main > header { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; min-height: 64px; }
+  .social-mobile-brand { display: inline; position: absolute; left: 96px; font-size: 14px; font-weight: 600; }
+}

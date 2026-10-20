@@ -22,6 +22,7 @@ const MODULES = [
   { key: "tarefas", label: "Tarefas" },
   { key: "meu-trabalho", label: "Meu Trabalho" },
   { key: "calendario", label: "Calendário" },
+  { key: "publicacoes", label: "Publicações" },
   { key: "pipeline", label: "Pipeline" },
   { key: "meta-ads", label: "Meta Ads" },
   { key: "clientes", label: "Clientes" },
@@ -50,6 +51,7 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
   "minha-semana": "none",
   metas: "none",
   "meta-ads": "none",
+  publicacoes: "none",
 };
 
 function getUserPermissions(user: UserData): Record<string, string> {

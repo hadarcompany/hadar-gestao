@@ -11,6 +11,8 @@ import { canAccessApi, hasGlobalTaskAccess, validMutationOrigin } from "../lib/a
 import { guardApiRequest } from "../lib/api-guard";
 import { createLoginLimiter, parseLogin } from "../lib/login-security";
 import { CLIENT_FIELDS, TASK_FIELDS, pickWritableFields } from "../lib/security-input";
+import { publicOrigin } from "../lib/public-url";
+import { trialExpired, trialDenial } from "../lib/instance-trial";
 
 const root = process.cwd();
 const nativeRequire = createRequire(join(root, "package.json"));
@@ -34,6 +36,22 @@ const request = (path: string, method = "GET", body?: unknown, headers: Record<s
 const context = (id = "task-1") => ({ params: Promise.resolve({ id }) });
 const authMock = (user: AuthUser | null) => ({ getServerAuth: async () => user });
 
+test("teste vence no instante definido e configuração ausente não limita a Hadar", async () => {
+  const expiry = "2026-11-03T23:59:59-03:00";
+  const end = Date.parse(expiry);
+  assert.equal(trialExpired("", end), false);
+  assert.equal(trialExpired(expiry, end - 1), false);
+  assert.equal(trialExpired(expiry, end), true);
+  assert.equal(trialExpired("data inválida", end), true);
+  assert.equal(trialExpired("2026-11-03", end), true);
+  const denied = trialDenial(request("/api/tasks", "POST", {}), expiry, end)!;
+  assert.equal(denied.status, 402);
+  assert.equal((await denied.json()).error, "TRIAL_EXPIRED");
+  assert.equal(trialDenial(request("/dashboard"), expiry, end)!.status, 402);
+  assert.equal(trialDenial(request("/api/auth/logout", "POST"), expiry, end), null);
+  assert.equal(trialDenial(request("/api/webhooks/asaas", "POST"), expiry, end), null);
+});
+
 test("visualização não permite edição/exclusão; desconhecidos e Acessos negados mesmo para admin", () => {
   for (const path of ["/api/tasks", "/api/tasks/[id]", "/api/clients/[id]"]) {
     assert.equal(canAccessApi(member, path, "GET"), true);
@@ -49,6 +67,18 @@ test("origem externa não pode modificar dados, inclusive com sessão", () => {
   assert.equal(validMutationOrigin(request("/api/tasks", "POST", {}, { origin: "https://attacker.test" })), false);
   assert.equal(validMutationOrigin(request("/api/tasks", "POST", {}, { origin: "https://gestao.example.test" })), true);
   assert.equal(validMutationOrigin(request("/api/tasks", "POST", {}, { "sec-fetch-site": "cross-site" })), false);
+});
+
+test("VPS aceita a origem pública configurada e rejeita origem forjada por headers do proxy", () => {
+  const external = "https://insider.example.test";
+  const proxied = (origin: string) => new Request("https://localhost:3000/api/auth/login", { method: "POST", headers: { origin, "x-forwarded-host": "attacker.test" } });
+  assert.equal(validMutationOrigin(proxied(external), external), true);
+  assert.equal(validMutationOrigin(proxied("https://attacker.test"), external), false);
+  assert.equal(validMutationOrigin(proxied("https://localhost:3000"), external), false);
+  assert.equal(validMutationOrigin(proxied(external), "invalid URL"), false);
+  assert.equal(publicOrigin(proxied(external).url, external), external);
+  assert.equal(publicOrigin("https://gestao.example.test/api/tasks", ""), "https://gestao.example.test");
+  assert.throws(() => publicOrigin(proxied(external).url, "https://user:password@example.test"));
 });
 
 test("API real de tarefa bloqueia membro sem edição antes de consultar ou gravar dados", async () => {

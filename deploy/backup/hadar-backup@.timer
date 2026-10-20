@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily backup for Hadar instance %i at 03:00 Sao Paulo
+
+[Timer]
+OnCalendar=*-*-* 06:00:00 UTC
+RandomizedDelaySec=5m
+Persistent=true
+Unit=hadar-backup@%i.service
+
+[Install]
+WantedBy=timers.target

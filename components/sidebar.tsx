@@ -57,6 +57,7 @@ const NAV_CATEGORIES: NavCategory[] = [
       { href: "/projetos", label: "Projetos", icon: FolderKanban, permKey: "tarefas" },
       { href: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, permKey: "meu-trabalho" },
       { href: "/calendario", label: "Calendário", icon: Calendar, permKey: "calendario" },
+      { href: "/publicacoes", label: "Publicações", icon: Megaphone, permKey: "publicacoes" },
       { href: "/minha-semana", label: "Minha Semana", icon: CalendarDays, permKey: "minha-semana" },
     ],
   },
@@ -96,12 +97,14 @@ const DEFAULT_PERMISSIONS: Record<string, string> = {
   metas: "none",
   pipeline: "none",
   "meta-ads": "none",
+  publicacoes: "none",
 };
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
   const visibleCategories = useMemo(() => {
@@ -137,7 +140,9 @@ export function Sidebar() {
   const isConfigActive = pathname === "/configuracoes" || pathname?.startsWith("/configuracoes/");
 
   return (
-    <aside
+    <>
+    <button className="social-mobile-menu" aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}>Menu</button>
+    <aside data-mobile-open={mobileOpen}
       className={cn(
         "fixed left-0 top-0 h-screen bg-sidebar border-r border-gray-200 flex flex-col transition-all duration-300 z-50",
         collapsed ? "w-16" : "w-60"
@@ -181,6 +186,7 @@ export function Sidebar() {
                       <Link
                         key={item.href}
                         href={item.href}
+                        onClick={() => setMobileOpen(false)}
                         className={cn(
                           "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150",
                           isActive ? "bg-sidebar-active text-accent-dark font-medium" : "text-gray-500 hover:text-gray-900 hover:bg-sidebar-hover"
@@ -232,5 +238,6 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

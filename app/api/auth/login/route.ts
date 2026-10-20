@@ -3,8 +3,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { validMutationOrigin } from "@/lib/api-policy";
 import { allowLoginAttempt, parseLogin } from "@/lib/login-security";
+import { trialDenial } from "@/lib/instance-trial";
 
 export async function POST(req: NextRequest) {
+  const expired = trialDenial(req);
+  if (expired) return expired;
   if (!validMutationOrigin(req)) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
   const credentials = parseLogin(await req.json().catch(() => null));
   if (!credentials) return NextResponse.json({ error: "Informe e-mail e senha válidos." }, { status: 400 });

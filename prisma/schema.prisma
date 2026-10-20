@@ -230,6 +230,9 @@ model Client {
   chatReads             ClientChatRead[]
   projects              Project[]
   metaAdAccounts        MetaAdAccount[]
+  socialAccounts        SocialAccount[]
+  socialPosts           SocialPost[]
+  socialAssets          SocialAsset[]
   whatsappConversations WhatsAppConversation[]
 
   @@map("clients")
@@ -576,6 +579,93 @@ model MetaConnection {
   updatedAt            DateTime  @updatedAt
 
   @@map("meta_connections")
+}
+
+// Publicações orgânicas: credenciais e fila separadas de Meta Ads.
+model SocialAccount {
+  id                   String   @id @default(cuid())
+  clientId             String
+  client               Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  provider             String
+  externalId           String
+  name                 String
+  accountType          String?
+  tokenEncrypted       String
+  tokenExpiresAt       DateTime?
+  tokenRefreshedAt      DateTime @default(now())
+  status               String   @default("CONNECTED")
+  connectedById        String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  posts                SocialPost[]
+  @@unique([provider, externalId])
+  @@index([clientId])
+  @@map("social_accounts")
+}
+
+model SocialOAuthSession {
+  id              String   @id
+  clientId        String
+  userId          String
+  provider        String
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  resultEncrypted String?
+  @@index([expiresAt])
+  @@map("social_oauth_sessions")
+}
+
+model SocialAsset {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  userId    String
+  path      String   @unique
+  name      String
+  mime      String
+  bytes     Int
+  reservedBytes Int
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([clientId])
+  @@map("social_assets")
+}
+
+model SocialPost {
+  id               String   @id @default(cuid())
+  clientId         String
+  client           Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  accountId        String
+  account          SocialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  caption          String   @default("")
+  format           String
+  media            Json
+  status           String   @default("DRAFT")
+  scheduledAt      DateTime?
+  nextAttemptAt    DateTime?
+  createdById      String
+  approvedById     String?
+  approvedAt       DateTime?
+  externalPostId   String?
+  publishedAt      DateTime?
+  progress         Json?
+  publishStartedAt DateTime?
+  lockedAt         DateTime?
+  lockToken        String?
+  attempts         Int      @default(0)
+  lastError        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@index([status, nextAttemptAt, scheduledAt])
+  @@index([clientId, createdAt])
+  @@map("social_posts")
+}
+
+model SocialWorkerState {
+  id         String @id @default("primary")
+  lastSeenAt DateTime @default(now())
+  status     String
+  @@map("social_worker_state")
 }
 
 /// Conta de anúncios descoberta pela Marketing API e opcionalmente vinculada a um cliente.

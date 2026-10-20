@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Hadar social publisher every minute for %i
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+AccuracySec=5
+Unit=hadar-social@%i.service
+
+[Install]
+WantedBy=timers.target

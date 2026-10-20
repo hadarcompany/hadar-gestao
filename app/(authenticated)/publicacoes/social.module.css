@@ -1,0 +1,430 @@
+.scope {
+  color: #202320;
+  font-size: 14px;
+  line-height: 1.5;
+  --edge: #e5e7e5;
+  --muted: #626962;
+}
+.scope h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.scope h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.scope p {
+  color: var(--muted);
+}
+.heading,
+.sectionHeading,
+.toolbar,
+.actions,
+.postHeading,
+.account,
+.asset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.heading {
+  margin-bottom: 24px;
+}
+.heading p {
+  margin-top: 4px;
+}
+.toolbar {
+  justify-content: flex-start;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+.scope button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid #cdd2cd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.scope button:hover {
+  border-color: #7c877c;
+}
+.scope button:focus-visible,
+.scope input:focus-visible,
+.scope select:focus-visible,
+.scope textarea:focus-visible {
+  outline: 2px solid #446b4b;
+  outline-offset: 3px;
+}
+.scope button:disabled {
+  color: #626962;
+  background: #f3f4f3;
+  cursor: not-allowed;
+}
+.scope button.primary {
+  background: #283c2d;
+  color: white;
+  border-color: #283c2d;
+}
+.scope label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 500;
+}
+.scope select,
+.scope input:not([type="checkbox"]),
+.scope textarea {
+  border: 1px solid #cdd2cd;
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 40px;
+  background: white;
+  color: #202320;
+  max-width: 100%;
+  font: inherit;
+}
+.toolbar select {
+  min-width: 260px;
+}
+.scope input[type="checkbox"] {
+  accent-color: #446b4b;
+  width: 16px;
+  height: 16px;
+}
+.actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.accounts,
+.calendar,
+.queue {
+  background: white;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 20px;
+}
+.accounts {
+  margin-bottom: 20px;
+}
+.accounts .sectionHeading {
+  margin-bottom: 16px;
+}
+.sectionHeading p {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.account {
+  padding: 12px 0;
+  border-top: 1px solid #f0f2f0;
+  font-size: 13px;
+}
+.account > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.account > span:nth-child(2) {
+  color: var(--muted);
+}
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+.calendar .sectionHeading {
+  margin-bottom: 20px;
+  text-transform: capitalize;
+}
+.weekdays,
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.weekdays {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.scope .day {
+  border: 0;
+  border-top: 1px solid var(--edge);
+  border-right: 1px solid #f0f2f0;
+  border-radius: 0;
+  min-height: 90px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 5px;
+  font-size: 12px;
+  overflow: hidden;
+}
+.day:nth-child(7n),
+.day:nth-child(7n-1) {
+  background: #f7f8f7;
+}
+.scope .selected {
+  background: #edf3ed;
+  outline: 1px solid #6c856f;
+  outline-offset: -1px;
+}
+.today {
+  background: #355d3d;
+  color: white;
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.calendarPost {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 3px;
+  color: #355d3d;
+  background: #edf3ed;
+  padding: 2px 3px;
+  text-align: left;
+  font-size: 11px;
+}
+.outside {
+  background: #fafbfa;
+  border-top: 1px solid var(--edge);
+}
+.filter {
+  margin: 16px 0;
+}
+.post {
+  padding: 16px 0;
+  border-top: 1px solid var(--edge);
+}
+.postHeading {
+  align-items: flex-start;
+}
+.postHeading strong {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.post > p {
+  color: #333b33;
+  margin: 10px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.meta,
+.help {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.post .actions {
+  margin-top: 12px;
+}
+.badge {
+  background: #eef1ee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  flex: none;
+  max-width: 170px;
+}
+.bad {
+  background: #fff0eb;
+  color: #8d3424;
+}
+.scope .errorText {
+  color: #9b3528;
+  font-size: 13px;
+}
+.error,
+.notice {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+.error {
+  color: #8d3424;
+  background: #fff0eb;
+}
+.notice {
+  background: #eaf2e9;
+  color: #305434;
+}
+.empty {
+  padding: 20px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.empty svg {
+  margin-bottom: 8px;
+}
+.queue .empty p + p {
+  margin-top: 4px;
+}
+.dialog {
+  width: min(600px, calc(100vw - 32px));
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  padding: 24px;
+  background: #fff;
+  color: #202320;
+  box-shadow: 0 12px 48px #0002;
+}
+.dialog::backdrop {
+  background: #17201ab3;
+}
+.dialog > label,
+.dialog > fieldset {
+  margin-top: 16px;
+}
+.dialog > p {
+  margin-top: 8px;
+}
+.scope fieldset {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 12px;
+}
+.scope legend {
+  padding: 0 4px;
+  font-size: 13px;
+}
+.scope .check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  font-weight: 400;
+}
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.asset {
+  font-size: 12px;
+  margin-top: 8px;
+}
+.asset span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.asset button {
+  padding: 4px;
+  min-height: 28px;
+}
+@media (max-width: 1200px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .accounts .sectionHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .queue {
+    min-width: 0;
+  }
+}
+@media (max-width: 600px) {
+  .heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .toolbar {
+    align-items: stretch;
+  }
+  .toolbar label {
+    min-width: 0;
+    flex: 1;
+  }
+  .toolbar select {
+    min-width: 0;
+    width: 100%;
+  }
+  .accounts,
+  .calendar,
+  .queue {
+    padding: 14px;
+  }
+  .scope button {
+    min-height: 44px;
+  }
+  .calendar .day {
+    min-height: 72px;
+    padding: 6px 2px;
+  }
+  .calendarPost {
+    font-size: 11px;
+  }
+  .sectionHeading {
+    flex-wrap: wrap;
+  }
+  .account {
+    flex-wrap: wrap;
+  }
+  .account > span:first-child {
+    flex-basis: 65%;
+  }
+  .dialog {
+    padding: 16px;
+  }
+  .scope .day {
+    min-width: 0;
+  }
+  .calendar > .sectionHeading .actions {
+    gap: 4px;
+  }
+  .calendar > .sectionHeading button {
+    padding: 4px 7px;
+  }
+  .scope h1 {
+    font-size: 22px;
+  }
+}
+
+.previews {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.previews img,
+.previews video {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  background: #f5f6f5;
+  border-radius: 8px;
+}
+.previews figcaption {
+  font-size: 12px;
+  color: #626962;
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+}
+
+.calendarDraft {
+  background: #f2f4f2;
+  color: #626962;
+}
