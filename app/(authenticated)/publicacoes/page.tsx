@@ -913,7 +913,7 @@ export default function PublicationsPage() {
           />
         </label>
         <p className={styles.help}>
-          JPEG até 8 MB. MP4 até 200 MB; para Reels e Stories, prefira vídeo
+          JPEG até 8 MB. MP4 até 50 MB; para Reels e Stories, prefira vídeo
           vertical 9:16. Carrosséis: 2 a 10 imagens. Em Stories, textos e trilha
           sonora precisam estar no próprio arquivo; a legenda não é adicionada
           ao Story.

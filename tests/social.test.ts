@@ -104,6 +104,35 @@ test("permissão para preparar conteúdo não permite conectar ou aprovar contas
     false,
   );
 });
+
+test("upload acima do limite gratuito é recusado antes de reservar espaço ou emitir token", async () => {
+  let storageCalled = false;
+  const route = load("app/api/social/media/route.ts", {
+    "@/lib/social/core": {
+      ...native(resolve("lib/social/core.ts")),
+      socialAuth: async () => ({ auth: { id: "editor" } }),
+      requireClient: async () => "client-a",
+    },
+    "@/lib/supabase/admin": {
+      createSupabaseAdminClient: () => {
+        storageCalled = true;
+        throw Error("Storage must not be called");
+      },
+    },
+  });
+  const response = await route.POST(
+    new Request("https://gestao.example.test/api/social/media", {
+      method: "POST",
+      body: JSON.stringify({
+        clientId: "client-a",
+        mime: "video/mp4",
+        bytes: 60 * 1024 * 1024,
+      }),
+    }),
+  );
+  assert.equal(response.status, 400);
+  assert.equal(storageCalled, false);
+});
 test("conexão abre Instagram diretamente, com state opaco e vínculo ao usuário/cliente", async () => {
   const previous = { ...process.env };
   const sessions: any[] = [];

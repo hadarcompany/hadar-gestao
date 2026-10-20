@@ -22,9 +22,9 @@ export async function POST(req: Request) {
       !["image/jpeg", "video/mp4"].includes(mime) ||
       !Number.isSafeInteger(bytes) ||
       bytes < 1 ||
-      bytes > (mime === "image/jpeg" ? 8 : 200) * 1024 * 1024
+      bytes > (mime === "image/jpeg" ? 8 : 50) * 1024 * 1024
     )
-      throw new SocialError("Use JPEG de até 8 MB ou MP4 de até 200 MB.");
+      throw new SocialError("Use JPEG de até 8 MB ou MP4 de até 50 MB.");
     const storage = createSupabaseAdminClient().storage;
     const { data: bucket, error: bucketError } =
       await storage.getBucket(SOCIAL_BUCKET);
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       );
     if (
       !bucket.file_size_limit ||
-      bucket.file_size_limit > 200 * 1024 * 1024 ||
+      bucket.file_size_limit > 50 * 1024 * 1024 ||
       !bucket.allowed_mime_types?.length ||
       bucket.allowed_mime_types.some(
         (type) => !["image/jpeg", "video/mp4"].includes(type),
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       });
       const limit =
         Number(process.env.SOCIAL_STORAGE_LIMIT_MB || 512) * 1024 * 1024;
-      const reservedBytes = (mime === "image/jpeg" ? 8 : 200) * 1024 * 1024;
+      const reservedBytes = (mime === "image/jpeg" ? 8 : 50) * 1024 * 1024;
       if (
         !Number.isFinite(limit) ||
         (used._sum.reservedBytes || 0) + reservedBytes > limit

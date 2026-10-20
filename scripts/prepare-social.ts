@@ -121,7 +121,7 @@ async function main() {
     if (!bucket) {
       const created = await storage.createBucket("social-media", {
         public: false,
-        fileSizeLimit: 200 * 1024 * 1024,
+        fileSizeLimit: 50 * 1024 * 1024,
         allowedMimeTypes: ["image/jpeg", "video/mp4"],
       });
       if (created.error)
@@ -133,7 +133,7 @@ async function main() {
     else {
       const configured = await storage.updateBucket("social-media", {
         public: false,
-        fileSizeLimit: 200 * 1024 * 1024,
+        fileSizeLimit: 50 * 1024 * 1024,
         allowedMimeTypes: ["image/jpeg", "video/mp4"],
       });
       if (configured.error)

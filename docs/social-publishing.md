@@ -4,7 +4,7 @@
 
 O módulo tem login oficial separado para Instagram e Facebook, contas por cliente,
 rascunhos, edição, aprovação administrativa, calendário em Brasília e fila persistente.
-Os publicadores implementam posts JPEG, carrosséis de 2 a 10 imagens, Reels MP4 e
+Os publicadores implementam posts JPEG (até 8 MB), carrosséis de 2 a 10 imagens, Reels MP4 (até 50 MB) e
 Stories de imagem/vídeo. No Instagram, Stories exigem conta Business. No Facebook,
 as publicações vão para páginas, nunca para perfis pessoais.
 
@@ -29,16 +29,22 @@ teste. O fluxo **Publicações Hadar Gestão** usa token de usuário e configura
 Os dois IDs, secrets e o config ID estão nos arquivos privados
 `Documentos/Hadar/Credenciais/Hadar/Publicacoes - Configuracao.env` e
 `Documentos/Hadar/Credenciais/Insider Midia/Publicacoes - Configuracao.env`.
-Eles ainda não foram aplicados à hospedagem. Não regenerar as chaves de
-criptografia ao instalar a configuração. Revisão para clientes externos e
-teste real de conexão/publicação ainda precisam ser concluídos.
+As variáveis novas foram cadastradas no ambiente Production da Hadar na Vercel,
+conforme autorização específica do responsável. A Insider permanece sem esse
+módulo instalado. Não regenerar as chaves de criptografia ao instalar a
+configuração. Revisão para clientes externos e teste real de conexão/publicação
+ainda precisam ser concluídos.
 
 A conta **@hadarcompany** aceitou o convite de **Testador do Instagram** em
 20/10/2026. O aceite foi informado pelo responsável e confirmado após atualizar
 o painel da Meta: a indicação **Pendente** não aparece mais nessa conta.
 
-O código e os testes estão locais. O módulo, as novas tabelas, o bucket de
-mídia e o agendador ainda não foram instalados nas instâncias de produção.
+Na Hadar, a preparação aditiva das cinco tabelas com RLS e do bucket privado de
+50 MB foi concluída após backup com restauração verificada. A publicação do
+código e a instalação do agendador/backup de mídia ainda estão em andamento.
+O limite de vídeo de 50 MB respeita o plano gratuito: aumentar o bucket para
+200 MB foi recusado pelo serviço. Um plano pago também exigirá ajustar os limites
+do módulo e implementar envio com retomada para arquivos maiores.
 
 ## Criar o aplicativo Meta
 
