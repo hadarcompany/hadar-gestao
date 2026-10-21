@@ -161,6 +161,6 @@ test("todos os handlers autenticados aplicam a autorização dentro da API", () 
     const source = readFileSync(file, "utf8");
     if (!source.includes("getServerAuth()")) continue;
     const handlers = source.split(/(?=export async function (?:GET|POST|PATCH|PUT|DELETE)\()/).filter(block => block.startsWith("export async function"));
-    for (const block of handlers) if (block.includes("getServerAuth()")) assert.ok(block.includes("guardApiRequest(auth,") || block.includes("requireAssistantIntegrationAdmin(await getServerAuth())"), file);
+    for (const block of handlers) if (block.includes("getServerAuth()")) assert.ok(/guardApiRequest\(\s*auth,/.test(block) || block.includes("requireAssistantIntegrationAdmin(await getServerAuth())"), file);
   }
 });
