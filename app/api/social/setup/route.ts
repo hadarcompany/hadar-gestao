@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { settings, socialAuth } from "@/lib/social/core";
 import { prisma } from "@/lib/prisma";
+import { mediaVideoLimitMB } from "@/lib/social/vps-media";
 export async function GET(req: Request) {
   const access = await socialAuth(req, "/api/social/posts");
   if (access.response) return access.response;
@@ -8,6 +9,9 @@ export async function GET(req: Request) {
     where: { id: "primary" },
   });
   return NextResponse.json({
+    videoLimitMB: mediaVideoLimitMB(),
+    mediaRetentionHours:
+      process.env.SOCIAL_MEDIA_CLEANUP_ENABLED === "true" ? 48 : null,
     instagram: !!(
       settings("INSTAGRAM", req.url).id &&
       settings("INSTAGRAM", req.url).secret &&

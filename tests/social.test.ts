@@ -106,6 +106,8 @@ test("permissão para preparar conteúdo não permite conectar ou aprovar contas
 });
 
 test("upload acima do limite gratuito é recusado antes de reservar espaço ou emitir token", async () => {
+  const previousProvider = process.env.SOCIAL_MEDIA_PROVIDER;
+  delete process.env.SOCIAL_MEDIA_PROVIDER;
   let storageCalled = false;
   const route = load("app/api/social/media/route.ts", {
     "@/lib/social/core": {
@@ -132,6 +134,89 @@ test("upload acima do limite gratuito é recusado antes de reservar espaço ou e
   );
   assert.equal(response.status, 400);
   assert.equal(storageCalled, false);
+  if (previousProvider !== undefined)
+    process.env.SOCIAL_MEDIA_PROVIDER = previousProvider;
+});
+
+test("limpeza preserva mídia compartilhada com rascunho e só libera quota após excluir o arquivo", async () => {
+  const before = process.env.SOCIAL_MEDIA_CLEANUP_ENABLED;
+  process.env.SOCIAL_MEDIA_CLEANUP_ENABLED = "true";
+  const events: string[] = [];
+  const database: any = {
+    $queryRaw: async () => [
+      { id: "shared" },
+      { id: "done" },
+      { id: "delete-failed" },
+    ],
+    $executeRaw: async () => {},
+    socialAsset: {
+      findUnique: async ({ where }: any) => ({
+        id: where.id,
+        state: "AVAILABLE",
+        createdAt: new Date(0),
+      }),
+      update: async ({ where }: any) => events.push(`claim:${where.id}`),
+      updateMany: async ({ where, data }: any) => {
+        assert.equal(data.reservedBytes, 0);
+        events.push(`release:${where.id}`);
+      },
+    },
+    socialPost: { findMany: async () => [] },
+  };
+  let refs = 0;
+  database.socialPost.findMany = async () =>
+    ++refs === 1
+      ? [
+          { status: "PUBLISHED", publishedAt: new Date(0) },
+          { status: "DRAFT", publishedAt: null },
+        ]
+      : [{ status: "PUBLISHED", publishedAt: new Date(0) }];
+  database.$transaction = async (fn: any) => fn(database);
+  try {
+    const { cleanSocialMedia } = load("lib/social/media-retention.ts", {
+      "@/lib/prisma": { prisma: database },
+      "./storage": {
+        removeMedia: async ({ id }: any) => {
+          events.push(`delete:${id}`);
+          if (id === "delete-failed") throw Error("offline");
+        },
+      },
+    });
+    assert.equal((await cleanSocialMedia()).removed, 1);
+    assert.deepEqual(events, [
+      "claim:done",
+      "delete:done",
+      "release:done",
+      "claim:delete-failed",
+      "delete:delete-failed",
+    ]);
+  } finally {
+    if (before === undefined) delete process.env.SOCIAL_MEDIA_CLEANUP_ENABLED;
+    else process.env.SOCIAL_MEDIA_CLEANUP_ENABLED = before;
+  }
+});
+
+test("mídia em exclusão não pode ser anexada novamente, mesmo após prévia validação", async () => {
+  const { lockAvailableAssets } = load("lib/social/media-retention.ts", {});
+  let locked = false;
+  await assert.rejects(
+    lockAvailableAssets(
+      {
+        $executeRaw: async () => {
+          locked = true;
+        },
+        socialAsset: {
+          count: async () => {
+            assert(locked);
+            return 0;
+          },
+        },
+      },
+      ["old-asset"],
+      "client-a",
+    ),
+    /não está mais disponível/,
+  );
 });
 test("conexão abre Instagram diretamente, com state opaco e vínculo ao usuário/cliente", async () => {
   const previous = { ...process.env };

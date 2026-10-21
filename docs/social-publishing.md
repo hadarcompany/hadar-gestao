@@ -4,7 +4,7 @@
 
 O módulo tem login oficial separado para Instagram e Facebook, contas por cliente,
 rascunhos, edição, aprovação administrativa, calendário em Brasília e fila persistente.
-Os publicadores implementam posts JPEG (até 8 MB), carrosséis de 2 a 10 imagens, Reels MP4 (até 50 MB) e
+Os publicadores implementam posts JPEG (até 8 MB), carrosséis de 2 a 10 imagens, Reels MP4 (até 200 MB com armazenamento na VPS; 50 MB no Supabase gratuito) e
 Stories de imagem/vídeo. No Instagram, Stories exigem conta Business. No Facebook,
 as publicações vão para páginas, nunca para perfis pessoais.
 
@@ -39,12 +39,16 @@ A conta **@hadarcompany** aceitou o convite de **Testador do Instagram** em
 20/10/2026. O aceite foi informado pelo responsável e confirmado após atualizar
 o painel da Meta: a indicação **Pendente** não aparece mais nessa conta.
 
-Na Hadar, a preparação aditiva das cinco tabelas com RLS e do bucket privado de
-50 MB foi concluída após backup com restauração verificada. A publicação do
-código e a instalação do agendador/backup de mídia ainda estão em andamento.
-O limite de vídeo de 50 MB respeita o plano gratuito: aumentar o bucket para
-200 MB foi recusado pelo serviço. Um plano pago também exigirá ajustar os limites
-do módulo e implementar envio com retomada para arquivos maiores.
+Na Hadar, o código do módulo foi publicado em 20/10/2026 com as cinco tabelas
+protegidas por RLS, bucket privado e worker instalado na VPS. Publicação automática
+permanece desativada. O teste após instalação confirmou a integração Asaas existente.
+
+Para vídeos maiores, a versão de 21/10/2026 acrescenta armazenamento direto na VPS,
+envio em partes e retenção de 48 horas após confirmação de todas as postagens que
+usam o arquivo. Supabase continua como banco e autenticação. Não exige assinatura
+do R2 nem migração de banco. Instalação, quotas, recuperação e limites estão em
+[Vídeos na VPS](vps-media.md). O teste de transporte por HTTPS com 200 MiB passou
+com hash idêntico após download; publicação real na Meta ainda precisa de teste.
 
 ## Criar o aplicativo Meta
 
@@ -130,9 +134,12 @@ recebe políticas somente nas tabelas novas; dados existentes não são alterado
 O envio é direto ao Supabase com autorização temporária para um único caminho,
 sem sobrescrita. Reservamos o tamanho máximo permitido até conferir o arquivo
 real. O limite do módulo é uma proteção adicional, não uma contratação de quota
-do Supabase. Conservar margem no plano existente. Arquivos cancelados/removidos
-do editor continuam no armazenamento; não existe exclusão automática de mídia
-arquivada nesta primeira versão. Conferir a utilização antes de aumentar a quota.
+do Supabase. Conservar margem no plano existente. No modo VPS, a reserva corresponde
+ao tamanho declarado, imposto pelo ticket de upload; o limite de vídeo passa a
+200 MB. Com `SOCIAL_MEDIA_CLEANUP_ENABLED=true`, arquivos publicados são removidos
+após 48 horas conforme as regras do guia da VPS. Rascunhos, cancelados, falhas e
+arquivos disponíveis removidos do editor continuam preservados. Conferir a
+utilização antes de aumentar a quota.
 
 ## Agendador na VPS
 
@@ -211,6 +218,10 @@ O TAR criptografado passa a incluir `storage/social-media/...` e hashes por obje
 no manifesto. Na recuperação, criar bucket **privado**, repor os objetos nos mesmos
 caminhos, conferir os hashes e restaurar o banco. O teste automático de restauração
 SQL não substitui o teste de upload/abertura da mídia no Supabase de destino.
+
+No modo VPS, configurar também os blobs criptografados e deduplicados descritos em
+[Vídeos na VPS](vps-media.md). Os originais podem ser removidos após publicação,
+mas as cópias de backup permanecem até vencer a retenção dos backups que as usam.
 
 ## Referências oficiais
 

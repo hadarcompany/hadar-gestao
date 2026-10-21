@@ -9,6 +9,7 @@ import {
 } from "@/lib/social/core";
 import { scheduledDate, validateContent } from "@/lib/social/validation";
 import { verifyAssets } from "@/lib/social/storage";
+import { lockAvailableAssets } from "@/lib/social/media-retention";
 export async function GET(req: Request) {
   const access = await socialAuth(req, "/api/social/posts");
   if (access.response) return access.response;
@@ -102,7 +103,7 @@ export async function POST(req: Request) {
     });
     if (
       assets.length !== body.assetIds.length ||
-      assets.some((a) => !a.verifiedAt)
+      assets.some((a) => !a.verifiedAt || a.state !== "AVAILABLE")
     )
       throw new SocialError(
         "Uma mídia não pertence ao cliente ou o envio ainda não foi confirmado.",
@@ -136,23 +137,26 @@ export async function POST(req: Request) {
     const scheduledAt = body.scheduledAt
       ? scheduledDate(body.scheduledAt)
       : null;
-    const created = await prisma.$transaction(
-      accounts.map((account) =>
-        prisma.socialPost.create({
-          data: {
-            clientId,
-            accountId: account.id,
-            caption,
-            format,
-            media,
-            status: body.status,
-            scheduledAt,
-            createdById: access.auth!.id,
-          },
-          select: { id: true },
-        }),
-      ),
-    );
+    const created = await prisma.$transaction(async (tx) => {
+      await lockAvailableAssets(tx, body.assetIds, clientId);
+      return Promise.all(
+        accounts.map((account) =>
+          tx.socialPost.create({
+            data: {
+              clientId,
+              accountId: account.id,
+              caption,
+              format,
+              media,
+              status: body.status,
+              scheduledAt,
+              createdById: access.auth!.id,
+            },
+            select: { id: true },
+          }),
+        ),
+      );
+    });
     return NextResponse.json({ posts: created }, { status: 201 });
   } catch (error) {
     return failure(error);

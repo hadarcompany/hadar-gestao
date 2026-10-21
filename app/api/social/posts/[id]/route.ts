@@ -12,6 +12,7 @@ import { scheduledDate, validateContent } from "@/lib/social/validation";
 import { verifyAssets, signedMedia } from "@/lib/social/storage";
 import type { SocialMedia } from "@/lib/social/validation";
 import { Prisma } from "@prisma/client";
+import { lockAvailableAssets } from "@/lib/social/media-retention";
 export async function GET(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -41,7 +42,10 @@ export async function GET(
         name: asset.name,
         mime: asset.mime,
         bytes: asset.bytes,
-        previewUrl: await signedMedia(asset),
+        previewUrl: await signedMedia(asset).catch((error) => {
+          if (error instanceof SocialError && error.status === 410) return null;
+          throw error;
+        }),
       })),
     );
     return NextResponse.json({ ...post, media });
@@ -95,7 +99,7 @@ export async function PATCH(
       });
       if (
         assets.length !== body.assetIds.length ||
-        assets.some((a) => !a.verifiedAt)
+        assets.some((a) => !a.verifiedAt || a.state !== "AVAILABLE")
       )
         throw new SocialError(
           "Uma mídia não pertence ao cliente ou o envio ainda não foi confirmado.",
@@ -129,20 +133,23 @@ export async function PATCH(
       const scheduledAt = body.scheduledAt
         ? scheduledDate(body.scheduledAt)
         : null;
-      const changed = await prisma.socialPost.updateMany({
-        where: { id, status: post.status, publishStartedAt: null },
-        data: {
-          caption,
-          format,
-          media,
-          status: body.status,
-          scheduledAt,
-          nextAttemptAt: null,
-          approvedAt: null,
-          approvedById: null,
-          progress: Prisma.DbNull,
-          lastError: null,
-        },
+      const changed = await prisma.$transaction(async (tx) => {
+        await lockAvailableAssets(tx, body.assetIds, clientId);
+        return tx.socialPost.updateMany({
+          where: { id, status: post.status, publishStartedAt: null },
+          data: {
+            caption,
+            format,
+            media,
+            status: body.status,
+            scheduledAt,
+            nextAttemptAt: null,
+            approvedAt: null,
+            approvedById: null,
+            progress: Prisma.DbNull,
+            lastError: null,
+          },
+        });
       });
       if (!changed.count)
         throw new SocialError("A publicação mudou. Atualize a página.", 409);

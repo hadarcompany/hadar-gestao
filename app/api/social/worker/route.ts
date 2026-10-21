@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runSocialWorker } from "@/lib/social/worker";
 import { prisma } from "@/lib/prisma";
+import { cleanSocialMedia } from "@/lib/social/media-retention";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 export async function POST(req: Request) {
@@ -21,9 +22,13 @@ export async function POST(req: Request) {
       create: { id: "primary", lastSeenAt: new Date(), status: "OK" },
       update: { lastSeenAt: new Date(), status: "OK" },
     });
-    return NextResponse.json(await runSocialWorker(), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    const cleanup = await cleanSocialMedia();
+    return NextResponse.json(
+      { ...(await runSocialWorker()), mediaRemoved: cleanup.removed },
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch {
     return NextResponse.json({ error: "Falha no agendador." }, { status: 500 });
   }
