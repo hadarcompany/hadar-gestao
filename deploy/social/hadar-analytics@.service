@@ -1,0 +1,11 @@
+[Unit]
+Description=Hadar social analytics collection for %i
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/flock -n /run/lock/hadar-analytics-%i.lock /usr/bin/python3 /opt/hadar-gestao/operations/social/worker.py /opt/hadar-gestao/operations/social/config/%i.json --analytics
+TimeoutStartSec=290
+Nice=10

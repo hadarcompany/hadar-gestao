@@ -19,11 +19,16 @@ secret = Path(config["secretFile"]).read_text().strip()
 if len(secret) < 32:
     raise SystemExit("Missing worker secret")
 try:
-    request = Request(config["url"], data=b"", headers={"Authorization": "Bearer " + secret}, method="POST")
+    target = config["url"]
+    if len(sys.argv) == 3 and sys.argv[2] == "--analytics":
+        target = url._replace(path="/api/social/analytics/worker").geturl()
+    elif len(sys.argv) != 2:
+        raise ValueError("Invalid worker mode")
+    request = Request(target, data=b"", headers={"Authorization": "Bearer " + secret}, method="POST")
     with build_opener(NoRedirect).open(request, timeout=270) as response:
         body = json.load(response)
     # Aggregate counts only; never print response content or credentials on failure.
-    print(json.dumps({key: body[key] for key in ("paused", "idle", "processing", "published", "failed", "uncertain") if key in body}))
+    print(json.dumps({key: body[key] for key in ("paused", "idle", "processing", "published", "failed", "uncertain", "collected", "skipped") if key in body}))
 except Exception as error:
     print(json.dumps({"status": "failed", "errorClass": type(error).__name__}))
     raise SystemExit(1)

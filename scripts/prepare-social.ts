@@ -60,13 +60,11 @@ async function main() {
   )
     throw Error("Projeto de autenticação incorreto.");
   const url = new URL(process.env.DIRECT_URL || "");
-  if (
-    !(
-      url.hostname === `db.${expected}.supabase.co` ||
-      (url.hostname.endsWith(".pooler.supabase.com") &&
-        decodeURIComponent(url.username) === `postgres.${expected}`)
-    )
-  )
+  if (!(
+    url.hostname === `db.${expected}.supabase.co` ||
+    (url.hostname.endsWith(".pooler.supabase.com") &&
+      decodeURIComponent(url.username) === `postgres.${expected}`)
+  ))
     throw Error(
       "A conexão administrativa não corresponde ao projeto esperado.",
     );
@@ -136,12 +134,10 @@ async function main() {
     const studioColumns = await database.$queryRaw<
       { column_name: string }[]
     >`SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='social_posts' AND column_name IN ('options','seriesId','occurrenceKey','afterPublishState','afterPublishError')`;
-    if (
-      !(
-        (studioTables.length === 0 && studioColumns.length === 0) ||
-        (studioTables.length === 2 && studioColumns.length === 5)
-      )
-    )
+    if (!(
+      (studioTables.length === 0 && studioColumns.length === 0) ||
+      (studioTables.length === 2 && studioColumns.length === 5)
+    ))
       throw Error("Migração editorial parcial: conferir antes de continuar.");
     if (!studioTables.length) {
       const sql = await readFile(
@@ -163,6 +159,45 @@ async function main() {
       throw Error("As tabelas editoriais precisam de RLS.");
     await database.socialSeries.findFirst({
       select: { id: true, assetIds: true, options: true },
+    });
+    const analyticsTables = [
+      "social_metric_days",
+      "social_media_metrics",
+      "social_analytics_state",
+    ];
+    const analyticsExisting = await database.$queryRaw<
+      { tablename: string }[]
+    >`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename=ANY(${analyticsTables}::text[])`;
+    if (analyticsExisting.length !== 0 && analyticsExisting.length !== 3)
+      throw Error(
+        "Migração de relatórios parcial: conferir antes de continuar.",
+      );
+    if (!analyticsExisting.length) {
+      const sql = await readFile(
+        "prisma/migrations/20261021190000_social_analytics/migration.sql",
+        "utf8",
+      );
+      await database.$transaction(
+        async (tx) => {
+          for (const statement of splitSql(sql))
+            await tx.$executeRawUnsafe(statement);
+        },
+        { timeout: 60000 },
+      );
+    }
+    const analyticsUnprotected = await database.$queryRaw<
+      { tablename: string }[]
+    >`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename=ANY(${analyticsTables}::text[]) AND NOT rowsecurity`;
+    if (analyticsUnprotected.length)
+      throw Error("As tabelas de relatórios precisam de RLS.");
+    await database.socialMetricDay.findFirst({
+      select: { day: true, followers: true },
+    });
+    await database.socialMediaMetric.findFirst({
+      select: { externalId: true, data: true },
+    });
+    await database.socialAnalyticsState.findFirst({
+      select: { accountId: true, lastCollectedAt: true },
     });
     await database.socialAsset.findFirst({
       select: {
