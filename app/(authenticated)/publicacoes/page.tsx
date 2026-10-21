@@ -37,7 +37,7 @@ type Asset = {
   name: string;
   mime: string;
   bytes: number;
-  previewUrl?: string;
+  previewUrl?: string | null;
 };
 const states: Record<string, string> = {
   DRAFT: "Rascunho",
@@ -94,7 +94,10 @@ export default function PublicationsPage() {
     instagram: false,
     facebook: false,
     publishingEnabled: false,
+    videoLimitMB: 50,
+    mediaRetentionHours: null as number | null,
   });
+  const [uploadProgress, setUploadProgress] = useState("");
   const [month, setMonth] = useState(monthNow),
     [status, setStatus] = useState("ALL"),
     [day, setDay] = useState("");
@@ -263,6 +266,15 @@ export default function PublicationsPage() {
       if (assets.length + files.length > 10)
         throw Error("Use até 10 arquivos.");
       for (const file of Array.from(files)) {
+        if (
+          !["image/jpeg", "video/mp4"].includes(file.type) ||
+          file.size < 1 ||
+          file.size >
+            (file.type === "image/jpeg" ? 8 : setup.videoLimitMB) * 1024 * 1024
+        )
+          throw Error(
+            `Use JPEG de até 8 MB ou MP4 de até ${setup.videoLimitMB} MB.`,
+          );
         const prepared = await api(
           "/api/social/media",
           mutation({
@@ -272,13 +284,57 @@ export default function PublicationsPage() {
             bytes: file.size,
           }),
         );
-        const { error: uploadError } = await createSupabaseBrowserClient()
-          .storage.from("social-media")
-          .uploadToSignedUrl(prepared.path, prepared.token, file, {
-            contentType: file.type,
-          });
-        if (uploadError)
-          throw Error(`Falha no envio de ${file.name}. Tente novamente.`);
+        if (prepared.provider === "VPS") {
+          for (
+            let offset = 0;
+            offset < file.size;
+            offset += prepared.upload.chunkBytes
+          ) {
+            const chunk = file.slice(
+              offset,
+              offset + prepared.upload.chunkBytes,
+            );
+            let sent = false;
+            for (let attempt = 0; attempt < 3 && !sent; attempt++) {
+              try {
+                const response = await fetch(
+                  `${prepared.upload.url}?index=${offset / prepared.upload.chunkBytes}`,
+                  {
+                    method: "PUT",
+                    body: chunk,
+                    credentials: "omit",
+                    redirect: "error",
+                    headers: {
+                      Authorization: `Bearer ${prepared.upload.token}`,
+                      "Content-Type": "application/octet-stream",
+                    },
+                    signal: AbortSignal.timeout(60000),
+                  },
+                );
+                sent = response.ok;
+                if (!response.ok && response.status < 500) break;
+              } catch {
+                /* Retry the same immutable part after a lost response. */
+              }
+            }
+            if (!sent)
+              throw Error(
+                `O envio de ${file.name} foi interrompido. Tente novamente.`,
+              );
+            setUploadProgress(
+              `${file.name}: ${Math.round((Math.min(offset + chunk.size, file.size) / file.size) * 100)}%`,
+            );
+          }
+        } else {
+          const { error: uploadError } = await createSupabaseBrowserClient()
+            .storage.from("social-media")
+            .uploadToSignedUrl(prepared.path, prepared.token, file, {
+              contentType: file.type,
+            });
+          if (uploadError)
+            throw Error(`Falha no envio de ${file.name}. Tente novamente.`);
+        }
+        setUploadProgress(`Conferindo ${file.name}…`);
         const verified = await api(
           "/api/social/media",
           mutation({ id: prepared.asset.id, clientId: uploadClient }, "PATCH"),
@@ -288,7 +344,7 @@ export default function PublicationsPage() {
           { ...prepared.asset, previewUrl: verified.previewUrl },
         ]);
       }
-    });
+    }).finally(() => setUploadProgress(""));
   }
   async function save(nextStatus: string) {
     await act(async () => {
@@ -913,21 +969,33 @@ export default function PublicationsPage() {
           />
         </label>
         <p className={styles.help}>
-          JPEG até 8 MB. MP4 até 50 MB; para Reels e Stories, prefira vídeo
-          vertical 9:16. Carrosséis: 2 a 10 imagens. Em Stories, textos e trilha
-          sonora precisam estar no próprio arquivo; a legenda não é adicionada
-          ao Story.
+          JPEG até 8 MB. MP4 até {setup.videoLimitMB} MB; para Reels e Stories,
+          prefira vídeo vertical 9:16. Carrosséis: 2 a 10 imagens. Em Stories,
+          textos e trilha sonora precisam estar no próprio arquivo; a legenda
+          não é adicionada ao Story.
         </p>
+        {setup.mediaRetentionHours && (
+          <p className={styles.help}>
+            Os arquivos são removidos {setup.mediaRetentionHours} horas após a
+            confirmação de todas as publicações que os utilizam. Rascunhos e
+            envios com falha são preservados.
+          </p>
+        )}
+        {uploadProgress && (
+          <p role="status" className={styles.help}>
+            {uploadProgress}
+          </p>
+        )}
         <div className={styles.previews}>
           {assets
             .filter((a) => a.previewUrl)
             .map((a) => (
               <figure key={a.id}>
                 {a.mime === "image/jpeg" ? (
-                  <img src={a.previewUrl} alt={a.name} />
+                  <img src={a.previewUrl!} alt={a.name} />
                 ) : (
                   <video
-                    src={a.previewUrl}
+                    src={a.previewUrl!}
                     controls
                     preload="metadata"
                     aria-label={a.name}
@@ -941,6 +1009,9 @@ export default function PublicationsPage() {
           <div key={a.id} className={styles.asset}>
             <span>
               {i + 1}. {a.name} · {(a.bytes / 1024 / 1024).toFixed(1)} MB
+              {viewOnly &&
+                !a.previewUrl &&
+                " · Arquivo removido; histórico preservado"}
             </span>
             {!viewOnly && (
               <button

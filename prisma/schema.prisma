@@ -626,8 +626,12 @@ model SocialAsset {
   bytes     Int
   reservedBytes Int
   verifiedAt DateTime?
+  storageProvider String @default("SUPABASE")
+  state String @default("UPLOADING")
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   @@index([clientId])
+  @@index([state, createdAt])
   @@map("social_assets")
 }
 

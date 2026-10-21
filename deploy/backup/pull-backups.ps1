@@ -23,6 +23,35 @@ try {
     [IO.File]::WriteAllLines($pullBatchPath,$pullBatch,[Text.UTF8Encoding]::new($false))
     & sftp.exe -q -P $pullConfig.port -i $pullConfig.keyFile -o BatchMode=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -b $pullBatchPath ($pullConfig.user + '@' + $pullConfig.host)
     if ($LASTEXITCODE -ne 0) { throw 'Não foi possível sincronizar os backups por SFTP.' }
+    # Media blobs are shared across daily archives and downloaded once per hash.
+    $mediaBatch = @()
+    $mediaExpected = @{}
+    foreach ($instance in $pullConfig.instances) {
+        $localBackup = Join-Path $pullRoot $instance
+        foreach ($report in (Get-ChildItem -LiteralPath $localBackup -Filter '*.json' -File)) {
+            $metadata = Get-Content -LiteralPath $report.FullName -Raw | ConvertFrom-Json
+            foreach ($blob in $metadata.mediaBlobs) {
+                if ($blob.file -notmatch '^media-[a-f0-9]{64}\.hgm$' -or $blob.sha256 -notmatch '^[a-f0-9]{64}$') { throw 'Manifesto de mídia inválido.' }
+                $localMedia = Join-Path $localBackup $blob.file
+                if (-not $mediaExpected.ContainsKey($localMedia) -and -not (Test-Path -LiteralPath $localMedia)) {
+                    $mediaBatch += 'get -p /srv/hadar-backups/' + $instance + '/' + $blob.file + ' "' + $localMedia.Replace('\','/') + '"'
+                }
+                $mediaExpected[$localMedia] = $blob.sha256
+            }
+        }
+    }
+    if ($mediaBatch.Count -gt 0) {
+        $mediaBatch += 'bye'
+        [IO.File]::WriteAllLines($pullBatchPath,$mediaBatch,[Text.UTF8Encoding]::new($false))
+        & sftp.exe -q -P $pullConfig.port -i $pullConfig.keyFile -o BatchMode=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -b $pullBatchPath ($pullConfig.user + '@' + $pullConfig.host)
+        if ($LASTEXITCODE -ne 0) { throw 'Não foi possível copiar os arquivos de mídia.' }
+    }
+    foreach ($mediaPath in $mediaExpected.Keys) {
+        if ((Get-FileHash -LiteralPath $mediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $mediaExpected[$mediaPath]) {
+            Remove-BackupFile $mediaPath
+            throw 'Arquivo de mídia corrompido. A próxima execução tentará novamente.'
+        }
+    }
     foreach ($instance in $pullConfig.instances) {
         $localBackup = Join-Path $pullRoot $instance
         $serverStatus = Get-Content -LiteralPath (Join-Path $localBackup 'status.json') -Raw | ConvertFrom-Json
@@ -44,6 +73,14 @@ try {
                 Remove-BackupFile $archive.FullName
                 Remove-BackupFile $manifestPath
             }
+        }
+        $retainedMedia = @{}
+        foreach ($report in (Get-ChildItem -LiteralPath $localBackup -Filter '*.json' -File)) {
+            $metadata = Get-Content -LiteralPath $report.FullName -Raw | ConvertFrom-Json
+            foreach ($blob in $metadata.mediaBlobs) { $retainedMedia[$blob.file] = $true }
+        }
+        foreach ($blob in (Get-ChildItem -LiteralPath $localBackup -Filter 'media-*.hgm' -File)) {
+            if (-not $retainedMedia.ContainsKey($blob.Name)) { Remove-BackupFile $blob.FullName }
         }
     }
     @{status='ok';checkedAt=[DateTimeOffset]::UtcNow.ToString('o');instances=$pullConfig.instances} | ConvertTo-Json | Set-Content -LiteralPath $pullStatusPath -Encoding UTF8

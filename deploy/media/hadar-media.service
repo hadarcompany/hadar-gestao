@@ -1,0 +1,26 @@
+[Unit]
+Description=Hadar private media storage
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=hadar-media
+Group=hadar-media
+UMask=0077
+# Docker bridge IP lets the existing Caddy container reach the service; do not
+# bind 0.0.0.0 or publish port 8091 on the public VPS interface.
+ExecStart=/usr/bin/python3 /opt/hadar-media/server.py --bind 172.18.0.1 --config /etc/hadar-media/config.json
+Restart=on-failure
+RestartSec=5
+MemoryMax=256M
+TasksMax=16
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/srv/hadar-media
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -14,6 +14,35 @@ spec.loader.exec_module(backup)
 
 
 class StorageBackupTests(unittest.TestCase):
+    def test_local_media_is_encrypted_once_and_retained_while_any_backup_references_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output, temporary = root / "media", root / "output", root / "tmp"
+            for folder in (source / "object-a", output, temporary):
+                folder.mkdir(parents=True)
+            content = b"private-video" * 100
+            expected = hashlib.sha256(content).hexdigest()
+            (source / "object-a/object").write_bytes(content)
+            (source / "object-a/manifest.json").write_text(json.dumps({"ready": True, "sha256": expected,
+                "s": len(content), "m": "video/mp4", "p": "a" * 16 + "/12345678-1234-4234-9234-123456789abc.mp4"}))
+            key = b"x" * 32
+            config = {"localMediaDirectory": str(source)}
+            with patch.object(backup.os, "chown", create=True):
+                first = backup.local_media_files(config, temporary, output, key)
+                second = backup.local_media_files(config, temporary, output, key)
+            self.assertEqual(first, second)
+            self.assertEqual(len(list(output.glob("*.hgm"))), 1)
+            blob = output / first[0]["file"]
+            restored = temporary / "restored.mp4"
+            backup.decrypt(blob, restored, key)
+            self.assertEqual(restored.read_bytes(), content)
+            (output / "old-backup.json").write_text(json.dumps({"mediaBlobs": first}))
+            backup.prune_media_blobs(output)
+            self.assertTrue(blob.exists())
+            (output / "old-backup.json").unlink()
+            backup.prune_media_blobs(output)
+            self.assertFalse(blob.exists())
+
     def config(self, root):
         env = root / "application.env"
         env.write_text('NEXT_PUBLIC_SUPABASE_URL="https://example.supabase.co"\nSUPABASE_SERVICE_ROLE_KEY="test-only"\n')

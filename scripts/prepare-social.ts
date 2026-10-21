@@ -110,9 +110,33 @@ async function main() {
       { tablename: string }[]
     >`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename=ANY(${targets}::text[]) AND NOT rowsecurity`;
     if (unprotected.length) throw Error("As tabelas precisam de RLS.");
+    const mediaColumns = await database.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns WHERE table_schema='public'
+      AND table_name='social_assets' AND column_name IN ('storageProvider','state','deletedAt')`;
+    if (mediaColumns.length !== 0 && mediaColumns.length !== 3)
+      throw Error("Migração de mídias parcial: conferir antes de continuar.");
+    if (!mediaColumns.length) {
+      const sql = await readFile(
+        "prisma/migrations/20261021120000_vps_media/migration.sql",
+        "utf8",
+      );
+      await database.$transaction(
+        async (tx) => {
+          for (const statement of splitSql(sql))
+            await tx.$executeRawUnsafe(statement);
+        },
+        { timeout: 60000 },
+      );
+    }
     // Confirm the current schema, rather than treating any five tables as ready.
     await database.socialAsset.findFirst({
-      select: { reservedBytes: true, verifiedAt: true },
+      select: {
+        reservedBytes: true,
+        verifiedAt: true,
+        storageProvider: true,
+        state: true,
+        deletedAt: true,
+      },
     });
     const storage = createSupabaseAdminClient().storage;
     const { data: bucket, error } = await storage.getBucket("social-media");

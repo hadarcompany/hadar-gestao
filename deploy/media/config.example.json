@@ -1,0 +1,12 @@
+{
+  "directory": "/srv/hadar-media",
+  "origins": ["https://gestao.agenciahadar.com.br"],
+  "limitBytes": 10737418240,
+  "minFreeBytes": 10737418240,
+  "instances": {
+    "hadar": {
+      "secretFile": "/etc/hadar-media/hadar.key",
+      "limitBytes": 5368709120
+    }
+  }
+}

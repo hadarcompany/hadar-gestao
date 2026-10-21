@@ -6,6 +6,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -206,6 +207,67 @@ def verify_restore(dump, roles=()):
             subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def local_media_files(config, temporary, output, key):
+    """Encrypt each immutable video once; daily manifests reference shared blobs.
+
+    Never put another full copy of every video in each daily database archive.
+    Existing encrypted blobs remain until no retained backup references them.
+    """
+    directory = config.get("localMediaDirectory")
+    if not directory:
+        return []
+    root = Path(directory).resolve()
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("Invalid media source")
+    result = []
+    for manifest_path in root.glob("*/manifest.json"):
+        manifest = json.loads(manifest_path.read_text())
+        if not manifest.get("ready"):
+            continue
+        source = manifest_path.parent / "object"
+        if not source.is_file():
+            raise ValueError("Media object missing during backup")
+        expected = manifest["sha256"]
+        if (not re.fullmatch(r"[a-f0-9]{64}", expected) or
+                not re.fullmatch(r"[a-f0-9]{16}/[a-f0-9-]{36}\.(jpg|mp4)", manifest["p"])):
+            raise ValueError("Invalid media manifest")
+        blob = output / ("media-" + expected + ".hgm")
+        if not blob.exists():
+            used = sum(p.stat().st_size for p in output.glob("media-*.hgm"))
+            if (used + manifest["s"] > int(config.get("mediaBackupMaxBytes", 20 * 1024**3)) or
+                    shutil.disk_usage(output).free - 3 * manifest["s"] < 10 * 1024**3):
+                raise ValueError("Media backup space limit exceeded")
+            encrypted, checked = temporary / "media.encrypted", temporary / "media.checked"
+            try:
+                if digest(source) != expected or source.stat().st_size != manifest["s"]:
+                    raise ValueError("Media object integrity failure")
+                encrypt(source, encrypted, key)
+                decrypt(encrypted, checked, key)
+                if digest(checked) != expected:
+                    raise ValueError("Media backup verification failure")
+                os.replace(encrypted, blob)
+                blob.chmod(0o640)
+                os.chown(blob, -1, output.stat().st_gid)
+            finally:
+                encrypted.unlink(missing_ok=True)
+                checked.unlink(missing_ok=True)
+        result.append({"path": manifest["p"], "bytes": manifest["s"], "mime": manifest["m"],
+                       "plaintextSha256": expected, "file": blob.name, "sha256": digest(blob)})
+    return result
+
+
+def prune_media_blobs(output):
+    referenced = set()
+    for report in output.glob("*.json"):
+        if report.name == "status.json":
+            continue
+        data = json.loads(report.read_text())
+        referenced.update(item["file"] for item in data.get("mediaBlobs", []))
+    for blob in output.glob("media-*.hgm"):
+        if blob.name not in referenced:
+            blob.unlink()
+
+
 def backup(config_path):
     config = json.loads(config_path.read_text())
     slug = config["instance"]
@@ -225,10 +287,12 @@ def backup(config_path):
         dump_database(config["databaseUrl"], dump)
         counts = verify_restore(dump, config.get("restoreRoles", []))
         objects = storage_files(config, temp)
+        media_blobs = local_media_files(config, temp, output, key)
         manifest = {"instance": slug, "createdAt": now.isoformat(), "schemas": ["public", "auth"],
                     "restoreVerified": True, "restoredCounts": counts,
                     "databaseSha256": digest(dump), "externalStorageObjectsIncluded": bool(config.get("storageBuckets")),
-                    "storageBuckets": config.get("storageBuckets", []), "storageObjects": objects}
+                    "storageBuckets": config.get("storageBuckets", []), "storageObjects": objects,
+                    "localMediaObjects": media_blobs}
         (temp / "manifest.json").write_text(json.dumps(manifest))
         archive = temp / "backup.tar"
         with tarfile.open(archive, "w") as tar:
@@ -248,7 +312,8 @@ def backup(config_path):
         os.chmod(final, 0o640)
         os.chown(final, -1, output.stat().st_gid)
         report = {"status": "ok", "instance": slug, "createdAt": now.isoformat(), "file": final.name,
-                  "sha256": digest(final), "bytes": final.stat().st_size, "restoreVerified": True}
+                  "sha256": digest(final), "bytes": final.stat().st_size, "restoreVerified": True,
+                  "mediaBlobs": [{"file": row["file"], "sha256": row["sha256"]} for row in media_blobs]}
         report_file = final.with_suffix(".json")
         report_file.write_text(json.dumps(report))
         report_file.chmod(0o640)
@@ -263,6 +328,7 @@ def backup(config_path):
         if old != final and datetime.fromtimestamp(old.stat().st_mtime, timezone.utc) < cutoff:
             old.unlink()
             old.with_suffix(".json").unlink(missing_ok=True)
+    prune_media_blobs(output)
     print(json.dumps(report))
 
 
