@@ -80,6 +80,9 @@ export async function GET(
           });
           if (saved.clientId !== session.clientId)
             throw new SocialError("account_in_use");
+          await tx.socialReportSnapshot.deleteMany({
+            where: { accountId: saved.id },
+          });
         });
         await prisma.socialOAuthSession.delete({ where: { id } });
         back.searchParams.set("social", "connected");

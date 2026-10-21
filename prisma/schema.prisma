@@ -233,6 +233,7 @@ model Client {
   socialAccounts        SocialAccount[]
   socialPosts           SocialPost[]
   socialAssets          SocialAsset[]
+  socialSeries          SocialSeries[]
   whatsappConversations WhatsAppConversation[]
 
   @@map("clients")
@@ -598,6 +599,8 @@ model SocialAccount {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   posts                SocialPost[]
+  series               SocialSeries[]
+  reports              SocialReportSnapshot[]
   @@unique([provider, externalId])
   @@index([clientId])
   @@map("social_accounts")
@@ -644,6 +647,12 @@ model SocialPost {
   caption          String   @default("")
   format           String
   media            Json
+  options          Json @default("{}")
+  seriesId         String?
+  series           SocialSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  occurrenceKey    String?
+  afterPublishState String @default("NONE")
+  afterPublishError String?
   status           String   @default("DRAFT")
   scheduledAt      DateTime?
   nextAttemptAt    DateTime?
@@ -662,7 +671,47 @@ model SocialPost {
   updatedAt        DateTime @updatedAt
   @@index([status, nextAttemptAt, scheduledAt])
   @@index([clientId, createdAt])
+  @@unique([seriesId, occurrenceKey])
   @@map("social_posts")
+}
+
+model SocialSeries {
+  id String @id @default(cuid())
+  clientId String
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  accountId String
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  caption String
+  format String
+  media Json
+  options Json @default("{}")
+  assetIds String[]
+  weekdays Int[]
+  time String
+  startDate String
+  endDate String?
+  active Boolean @default(true)
+  approvedAt DateTime?
+  approvedById String?
+  createdById String
+  lastExpandedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  posts SocialPost[]
+  @@index([clientId, active])
+  @@index([active, lastExpandedAt])
+  @@map("social_series")
+}
+
+model SocialReportSnapshot {
+  id String @id @default(cuid())
+  accountId String
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  rangeKey String
+  data Json
+  fetchedAt DateTime @default(now())
+  @@unique([accountId, rangeKey])
+  @@map("social_report_snapshots")
 }
 
 model SocialWorkerState {

@@ -73,6 +73,11 @@
   color: white;
   border-color: #283c2d;
 }
+.scope button.primary:disabled {
+  background: #e3e7e3;
+  color: #626962;
+  border-color: #cdd2cd;
+}
 .scope label {
   display: flex;
   flex-direction: column;
@@ -98,6 +103,17 @@
   accent-color: #446b4b;
   width: 16px;
   height: 16px;
+}
+.scope input[type="range"] {
+  accent-color: #446b4b;
+}
+.scope ::selection {
+  background: #d6e5d6;
+  color: #202320;
+}
+.scope textarea,
+.scope input {
+  caret-color: #355d3d;
 }
 .actions {
   justify-content: flex-start;
@@ -143,6 +159,8 @@
 }
 .calendar .sectionHeading {
   margin-bottom: 20px;
+}
+.calendar h2 {
   text-transform: capitalize;
 }
 .weekdays,
@@ -427,4 +445,708 @@
 .calendarDraft {
   background: #f2f4f2;
   color: #626962;
+}
+
+/* Editorial workspace: the content and dates carry the visual hierarchy. */
+.tabs {
+  display: flex;
+  gap: 22px;
+  border-bottom: 1px solid var(--edge);
+  margin: 24px 0 20px;
+}
+.scope .tabs button {
+  border: 0;
+  border-radius: 0;
+  padding: 10px 0;
+  background: transparent;
+  color: #626962;
+  border-bottom: 2px solid transparent;
+}
+.scope .tabs .activeTab {
+  color: #283c2d;
+  border-bottom-color: #355d3d;
+  font-weight: 600;
+}
+.filters {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.filters select {
+  min-width: 160px;
+}
+.accounts summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.accounts[open] summary {
+  margin-bottom: 16px;
+}
+.fullCalendar {
+  min-width: 770px;
+}
+.calendarScroll {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+.calendarCell {
+  min-height: 158px;
+  min-width: 0;
+  border-top: 1px solid var(--edge);
+  border-right: 1px solid #f0f2f0;
+  padding: 5px;
+}
+.calendarCell:nth-child(7n),
+.calendarCell:nth-child(7n-1) {
+  background: #f8f9f8;
+}
+.scope .dayNumber {
+  border: 0;
+  border-radius: 4px;
+  width: 100%;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 1px 4px;
+  margin-bottom: 3px;
+  background: transparent;
+}
+.dayNumber small {
+  color: #626962;
+  font-size: 10px;
+}
+.scope .event {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  min-height: 23px;
+  padding: 2px 3px;
+  border: 0;
+  border-left: 2px solid #9c8c55;
+  border-radius: 3px;
+  margin-bottom: 3px;
+  background: #f5f2e9;
+  font-size: 10px;
+  justify-content: flex-start;
+}
+.event svg {
+  flex: none;
+}
+.event span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: left;
+}
+.event b {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.event small {
+  width: 10px;
+  text-align: center;
+  font-size: 9px;
+}
+.scope .eventPublished {
+  background: #edf3ed;
+  border-left-color: #446b4b;
+}
+.scope .eventBad {
+  background: #fff0eb;
+  border-left-color: #9b3528;
+}
+.scope .moreEvents {
+  padding: 1px 3px;
+  min-height: 24px;
+  border: 0;
+  background: transparent;
+  font-size: 10px;
+  color: #446b4b;
+}
+.queue {
+  margin-top: 20px;
+}
+.postHeading .badge {
+  white-space: normal;
+}
+.composer {
+  width: min(1230px, calc(100vw - 40px));
+  padding: 0;
+  max-height: 94vh;
+}
+.composerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--edge);
+}
+.clientContext {
+  color: #626962;
+  font-size: 12px;
+  display: block;
+  margin-bottom: 3px;
+}
+.composerGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(290px, 1fr);
+  align-items: start;
+  gap: 28px;
+  padding: 24px;
+}
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.formStack fieldset {
+  min-width: 0;
+}
+.formStack label {
+  min-width: 0;
+}
+.formStack textarea {
+  width: 100%;
+  resize: vertical;
+}
+.formStack .help {
+  margin-top: 8px;
+}
+.formColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 16px 0;
+}
+.channelRow {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f2f0;
+}
+.channelRow:last-child {
+  border-bottom: 0;
+}
+.channelRow > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.channelRow .actions {
+  gap: 8px;
+}
+.scope button[aria-pressed="true"] {
+  border-color: #446b4b;
+  background: #edf3ed;
+  color: #283c2d;
+}
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.mediaTile {
+  min-width: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--edge);
+}
+.mediaTile > img,
+.mediaTile > video {
+  width: 100%;
+  height: 170px;
+  object-fit: contain;
+  background: #f1f3f1;
+  border-radius: 6px;
+}
+.mediaTile > span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.mediaTile .actions {
+  gap: 4px;
+}
+.mediaTile button {
+  padding: 4px 6px;
+  min-height: 30px;
+  font-size: 11px;
+}
+.scope .uploadButton {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid #cdd2cd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.uploadButton:focus-within {
+  outline: 2px solid #446b4b;
+  outline-offset: 3px;
+}
+.hiddenInput {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.coverRow {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge);
+}
+.coverRow > strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.coverRow > img {
+  width: 72px;
+  height: 105px;
+  object-fit: contain;
+  margin-bottom: 10px;
+  background: #f1f3f1;
+}
+.scope .nestedFieldset {
+  border: 0;
+  padding: 0;
+}
+.datePanel > .toolbar {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.datePanel > .toolbar input {
+  min-width: 120px;
+}
+.datePanel > .sectionHeading {
+  margin-top: 20px;
+}
+.datePanel > label {
+  margin-top: 16px;
+}
+.miniDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+.scope .miniDays button {
+  padding: 4px;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid transparent;
+}
+.dateList {
+  max-height: 230px;
+  overflow: auto;
+  margin-top: 12px;
+  padding-right: 6px;
+}
+.dateRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f2f0;
+  font-size: 12px;
+}
+.dateRow > span {
+  flex: 1;
+}
+.dateRow input {
+  width: 115px;
+}
+.dateRow button {
+  padding: 4px;
+}
+.advanced {
+  border-top: 1px solid var(--edge);
+  padding-top: 16px;
+}
+.advanced summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.advanced fieldset {
+  border: 0;
+  padding: 14px 0 0;
+}
+.advanced .formStack {
+  margin-top: 16px;
+  gap: 14px;
+}
+.preview {
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+  padding: 18px;
+  background: #f5f7f4;
+  border-radius: 8px;
+}
+.preview > .sectionHeading {
+  margin-bottom: 16px;
+}
+.previewSelect {
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+.phone {
+  overflow: hidden;
+  border: 1px solid #d9ded9;
+  border-radius: 12px;
+  background: #fff;
+  margin: auto;
+  max-width: 330px;
+}
+.phoneHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  font-size: 12px;
+}
+.phoneHeader > strong {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #9cad9e;
+  background: #edf3ed;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.previewMedia {
+  position: relative;
+  background: #edf0ec;
+  aspect-ratio: 1;
+}
+.previewMedia > img,
+.previewMedia > video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.vertical .previewMedia {
+  aspect-ratio: 9/16;
+}
+.previewEmpty {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  color: #626962;
+  font-size: 13px;
+}
+.previewIcons {
+  display: flex;
+  gap: 12px;
+  margin: 12px;
+}
+.previewIcons > svg:last-child {
+  margin-left: auto;
+}
+.scope .previewCaption {
+  color: #303730;
+  padding: 0 12px 16px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.preview > .previewCaption {
+  margin-top: 14px;
+}
+.carouselNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 45%;
+  pointer-events: none;
+}
+.carouselNav > button {
+  pointer-events: auto;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  min-height: 28px;
+  background: #fffe;
+}
+.carouselNav > span {
+  background: #202820d9;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+.composerFooter {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #fff;
+  border-top: 1px solid var(--edge);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.composerFooter > div:first-child {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #626962;
+}
+.composerFooter > .help {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+.composer > .error,
+.composer > .notice {
+  margin: 16px 24px 0;
+}
+.imageDialog {
+  width: min(980px, calc(100vw - 32px));
+}
+.imageWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(230px, 1fr);
+  gap: 24px;
+  margin-top: 20px;
+}
+.editorCanvas {
+  background: #242b25;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.editorCanvas canvas {
+  width: auto;
+  max-width: 100%;
+  max-height: 570px;
+  object-fit: contain;
+}
+.coverPicker {
+  position: fixed;
+  inset: 8vh 15vw;
+  z-index: 5;
+  background: white;
+  padding: 24px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  overflow: auto;
+}
+.coverPicker video {
+  width: 100%;
+  max-height: 55vh;
+  background: #202820;
+  margin: 16px 0;
+}
+.report {
+  background: #fff;
+  padding: 24px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+.report > .toolbar {
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.report > .toolbar input {
+  min-width: 150px;
+}
+.reportAccount {
+  border-top: 1px solid var(--edge);
+  padding: 24px 0;
+  margin-top: 24px;
+}
+.reportMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+.reportMetrics > div {
+  padding: 0 14px;
+  border-left: 2px solid #d2dfd2;
+}
+.reportMetrics dt {
+  color: #626962;
+  font-size: 12px;
+}
+.reportMetrics dd {
+  color: #283c2d;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin-top: 4px;
+}
+.permissionNote {
+  background: #f5f6f3;
+  border-left: 3px solid #adb99e;
+  padding: 12px 16px;
+  margin: 20px 0;
+}
+.permissionNote p {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.tableScroll {
+  overflow-x: auto;
+}
+.reportTable {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  min-width: 580px;
+  text-align: left;
+}
+.reportTable th {
+  color: #626962;
+  font-weight: 500;
+  border-bottom: 1px solid #cdd2cd;
+  padding: 10px 8px;
+}
+.reportTable td {
+  border-bottom: 1px solid #eef1ee;
+  padding: 12px 8px;
+}
+.reportTable td:first-child {
+  max-width: 310px;
+  overflow-wrap: anywhere;
+}
+.reportTable a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  color: #355d3d;
+}
+.editorialStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 20px 0;
+  font-size: 12px;
+  color: #626962;
+}
+.editorialStats strong {
+  color: #283c2d;
+  font-size: 18px;
+  font-weight: 600;
+}
+@media (max-width: 1000px) {
+  .composerGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+    gap: 18px;
+    padding: 18px;
+  }
+  .preview {
+    padding: 12px;
+  }
+  .reportMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+}
+@media (max-width: 720px) {
+  .composer {
+    width: calc(100vw - 16px);
+    max-height: 96dvh;
+    border-radius: 12px;
+  }
+  .composerGrid {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+  .composerHeader,
+  .composerFooter {
+    padding: 14px 16px;
+  }
+  .composerFooter {
+    position: static;
+  }
+  .composerFooter > .actions {
+    width: 100%;
+  }
+  .preview {
+    position: static;
+  }
+  .formColumns,
+  .imageWorkspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mediaGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .report {
+    padding: 16px;
+  }
+  .reportMetrics dd {
+    font-size: 18px;
+  }
+  .report > .sectionHeading {
+    align-items: flex-start;
+  }
+  .reportAccount > .sectionHeading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .filters {
+    gap: 10px;
+  }
+  .filters label {
+    flex: 1 1 130px;
+  }
+  .filters select {
+    min-width: 0;
+  }
+  .calendarCell {
+    min-height: 150px;
+  }
+  .coverPicker {
+    inset: 5vh 12px;
+  }
+  .scope .uploadButton {
+    min-height: 44px;
+  }
+  .scope .dayNumber {
+    min-height: 32px;
+  }
+  .scope .event {
+    min-height: 24px;
+  }
+  .dateRow {
+    gap: 6px;
+  }
+  .dateRow input {
+    width: 105px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scope * {
+    scroll-behavior: auto !important;
+  }
 }

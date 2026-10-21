@@ -71,6 +71,10 @@ export async function DELETE(req: Request) {
         where: { id: String(body.id) },
         data: { status: "DISCONNECTED", tokenEncrypted: "" },
       });
+      await tx.socialSeries.updateMany({
+        where: { accountId: String(body.id), active: true },
+        data: { active: false },
+      });
     });
     return NextResponse.json({ disconnected: true });
   } catch (error) {

@@ -35,11 +35,13 @@ export async function cleanSocialMedia() {
     SELECT a.id FROM public.social_assets a
     WHERE a.state = 'DELETING' OR
       (a.state = 'UPLOADING' AND a."createdAt" < ${new Date(now - 24 * 3600000)}) OR
-      (a.state = 'AVAILABLE' AND EXISTS (
-        SELECT 1 FROM public.social_posts p WHERE p.media @> jsonb_build_array(jsonb_build_object('id', a.id))
+      (a.state = 'AVAILABLE' AND NOT EXISTS (
+        SELECT 1 FROM public.social_series s WHERE s.active AND a.id=ANY(s."assetIds")
+      ) AND EXISTS (
+        SELECT 1 FROM public.social_posts p WHERE (p.media @> jsonb_build_array(jsonb_build_object('id', a.id)) OR p.options->>'coverAssetId'=a.id) AND p.status='PUBLISHED'
       ) AND NOT EXISTS (
-        SELECT 1 FROM public.social_posts p WHERE p.media @> jsonb_build_array(jsonb_build_object('id', a.id))
-        AND (p.status <> 'PUBLISHED' OR p."publishedAt" IS NULL OR p."publishedAt" > ${cutoff})
+        SELECT 1 FROM public.social_posts p WHERE (p.media @> jsonb_build_array(jsonb_build_object('id', a.id)) OR p.options->>'coverAssetId'=a.id)
+        AND p.status <> 'CANCELLED' AND (p.status <> 'PUBLISHED' OR p."publishedAt" IS NULL OR p."publishedAt" > ${cutoff})
       ))
     ORDER BY a."createdAt" ASC LIMIT 2`;
   let removed = 0;
@@ -51,8 +53,19 @@ export async function cleanSocialMedia() {
       });
       if (!current || current.state === "DELETED") return null;
       if (current.state !== "DELETING") {
+        if (
+          await tx.socialSeries.count({
+            where: { active: true, assetIds: { has: current.id } },
+          })
+        )
+          return null;
         const references = await tx.socialPost.findMany({
-          where: { media: { array_contains: [{ id: current.id }] } },
+          where: {
+            OR: [
+              { media: { array_contains: [{ id: current.id }] } },
+              { options: { path: ["coverAssetId"], equals: current.id } },
+            ],
+          },
           select: { status: true, publishedAt: true },
         });
         const abandoned =
@@ -60,12 +73,13 @@ export async function cleanSocialMedia() {
           current.createdAt.getTime() < now - 24 * 3600000 &&
           !references.length;
         const published =
-          references.length > 0 &&
+          references.some((p) => p.status === "PUBLISHED") &&
           references.every(
             (p) =>
-              p.status === "PUBLISHED" &&
-              p.publishedAt &&
-              p.publishedAt <= cutoff,
+              p.status === "CANCELLED" ||
+              (p.status === "PUBLISHED" &&
+                p.publishedAt &&
+                p.publishedAt <= cutoff),
           );
         if (!abandoned && !published) return null;
         await tx.socialAsset.update({

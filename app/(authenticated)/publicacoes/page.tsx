@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Calendar,
@@ -8,162 +7,136 @@ import {
   Facebook,
   Instagram,
   Plus,
+  Repeat2,
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { canEdit, canView } from "@/lib/permissions";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import styles from "./social.module.css";
-
-type Account = {
-  id: string;
-  provider: "INSTAGRAM" | "FACEBOOK";
-  name: string;
-  status: string;
-  tokenExpiresAt: string | null;
-};
-type Post = {
+import Composer from "@/components/social/Composer";
+import Reports from "@/components/social/Reports";
+import {
+  api,
+  mutation,
+  dayKey,
+  clock,
+  localStamp,
+  formats,
+  states,
+  type Account,
+  type Post,
+  type Detail,
+} from "@/components/social/shared";
+import { weekNames } from "@/components/social/Dates";
+import s from "./social.module.css";
+type Series = {
   id: string;
   caption: string;
   format: string;
-  status: string;
-  scheduledAt: string | null;
-  lastError: string | null;
-  publishStartedAt: string | null;
-  account: Pick<Account, "id" | "provider" | "name">;
+  weekdays: number[];
+  time: string;
+  startDate: string;
+  endDate: string | null;
+  active: boolean;
+  approvedAt: string | null;
+  account: { name: string; provider: string };
 };
-type Asset = {
-  id: string;
-  name: string;
-  mime: string;
-  bytes: number;
-  previewUrl?: string | null;
-};
-const states: Record<string, string> = {
-  DRAFT: "Rascunho",
-  PENDING_APPROVAL: "Aguardando aprovação",
-  SCHEDULED: "Agendado",
-  PROCESSING: "Publicando",
-  PUBLISHED: "Publicado",
-  FAILED: "Falhou",
-  CANCELLED: "Cancelado",
-  UNCERTAIN: "Conferir na rede social",
-};
-const formats: Record<string, string> = {
-  POST: "Post",
-  CAROUSEL: "Carrossel",
-  REEL: "Reel",
-  STORY: "Story",
-};
-const dayKey = (value: string) =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(value));
-const monthNow = () => dayKey(new Date().toISOString()).slice(0, 7);
-const clock = (value: string) =>
-  new Date(value).toLocaleTimeString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-async function api(url: string, init?: RequestInit) {
-  const response = await fetch(url, { cache: "no-store", ...init });
-  const data = await response.json();
-  if (!response.ok) throw Error(data.error || "Não foi possível concluir.");
-  return data;
-}
-const mutation = (body: unknown, method = "POST"): RequestInit => ({
-  method,
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body),
-});
-
 export default function PublicationsPage() {
   const { user } = useAuth(),
     admin = user?.role === "ADMIN",
-    editable = !!user && canEdit(user, "publicacoes");
+    editable = !!user && canEdit(user, "publicacoes"),
+    permitted = !!user && canView(user, "publicacoes");
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]),
-    [clientId, setClientId] = useState("");
-  const [accounts, setAccounts] = useState<Account[]>([]),
+    [clientId, setClientId] = useState(""),
+    [accounts, setAccounts] = useState<Account[]>([]),
     [posts, setPosts] = useState<Post[]>([]),
-    [total, setTotal] = useState(0);
-  const [setup, setSetup] = useState({
-    instagram: false,
-    facebook: false,
-    publishingEnabled: false,
-    videoLimitMB: 50,
-    mediaRetentionHours: null as number | null,
-  });
-  const [uploadProgress, setUploadProgress] = useState("");
-  const [month, setMonth] = useState(monthNow),
+    [events, setEvents] = useState<Post[]>([]),
+    [total, setTotal] = useState(0),
+    [calendarTotal, setCalendarTotal] = useState(0),
+    [truncated, setTruncated] = useState(false);
+  const [month, setMonth] = useState(() => dayKey(new Date()).slice(0, 7)),
+    [day, setDay] = useState(""),
     [status, setStatus] = useState("ALL"),
-    [day, setDay] = useState("");
-  const [loading, setLoading] = useState(false),
+    [provider, setProvider] = useState("ALL"),
+    [format, setFormat] = useState("ALL"),
+    [tab, setTab] = useState("calendar"),
+    [series, setSeries] = useState<Series[]>([]);
+  const [setup, setSetup] = useState({
+      instagram: false,
+      facebook: false,
+      publishingEnabled: false,
+      videoLimitMB: 200,
+      mediaRetentionHours: 48,
+    }),
+    [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [composer, setComposer] = useState(false),
-    [caption, setCaption] = useState(""),
-    [format, setFormat] = useState("POST"),
-    [targets, setTargets] = useState<string[]>([]),
-    [assets, setAssets] = useState<Asset[]>([]),
-    [when, setWhen] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [viewOnly, setViewOnly] = useState(false);
+  const [editor, setEditor] = useState<{
+      clientId: string;
+      accounts: Account[];
+      detail?: Detail;
+      viewOnly?: boolean;
+      copy?: boolean;
+    } | null>(null),
+    [schedule, setSchedule] = useState<Post | null>(null),
+    [scheduleTime, setScheduleTime] = useState("");
   const [selection, setSelection] = useState<{
       session: string;
       pages: { id: string; name: string }[];
     } | null>(null),
     [selectedPages, setSelectedPages] = useState<string[]>([]);
-  const [schedule, setSchedule] = useState<Post | null>(null),
-    [scheduleTime, setScheduleTime] = useState("");
-  const generation = useRef(0),
-    dialog = useRef<HTMLDialogElement>(null),
+  const gen = useRef(0),
     scheduleDialog = useRef<HTMLDialogElement>(null);
-  const permitted = !!user && canView(user, "publicacoes");
-
   const load = useCallback(
     async (append = false) => {
       if (!clientId || !permitted) return;
-      const version = ++generation.current;
+      const version = ++gen.current;
       setLoading(true);
       setError("");
       try {
-        const page = append ? Math.floor(posts.length / 50) : 0;
-        const [list, connected, config] = await Promise.all([
-          api(
-            `/api/social/posts?clientId=${encodeURIComponent(clientId)}&month=${month}&page=${page}`,
-          ),
-          api(`/api/social/accounts?clientId=${encodeURIComponent(clientId)}`),
+        const q = new URLSearchParams({
+            clientId,
+            month,
+            status,
+            provider,
+            format,
+          }),
+          page = append ? Math.floor(posts.length / 50) : 0;
+        const [list, calendar, connected, config, repeats] = await Promise.all([
+          api(`/api/social/posts?${q}&page=${page}${day ? `&day=${day}` : ""}`),
+          api(`/api/social/calendar?${q}`),
+          clientId === "all"
+            ? Promise.resolve([])
+            : api(`/api/social/accounts?clientId=${clientId}`),
           api("/api/social/setup"),
+          clientId === "all"
+            ? Promise.resolve([])
+            : api(`/api/social/series?clientId=${clientId}`),
         ]);
-        if (version !== generation.current) return;
-        setPosts((previous) =>
-          append ? [...previous, ...list.posts] : list.posts,
-        );
+        if (version !== gen.current) return;
+        setPosts((old) => (append ? [...old, ...list.posts] : list.posts));
         setTotal(list.total);
+        setEvents(calendar.posts);
+        setCalendarTotal(calendar.total);
+        setTruncated(calendar.truncated);
         setAccounts(connected);
         setSetup(config);
+        setSeries(repeats);
       } catch (e) {
-        if (version === generation.current) setError((e as Error).message);
+        if (version === gen.current) setError((e as Error).message);
       } finally {
-        if (version === generation.current) setLoading(false);
+        if (version === gen.current) setLoading(false);
       }
     },
-    [clientId, month, permitted, posts.length],
+    [clientId, month, status, provider, format, day, permitted, posts.length],
   );
-  // Scope changes reset the list; refresh/load-more explicitly uses the current page.
   useEffect(() => {
     setPosts([]);
-    setDay("");
     void load();
     return () => {
-      generation.current++;
+      gen.current++;
     };
-  }, [clientId, month, permitted]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clientId, month, status, provider, format, day, permitted]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!permitted) return;
     api("/api/clients")
@@ -174,237 +147,119 @@ export default function PublicationsPage() {
             name: c.name,
           })),
         );
-        const query = new URLSearchParams(window.location.search),
-          chosen = query.get("clientId");
-        if (chosen && rows.some((c: { id: string }) => c.id === chosen))
-          setClientId(chosen);
-        else if (rows.length) setClientId(rows[0].id);
-        const result = query.get("social");
+        const q = new URLSearchParams(window.location.search),
+          chosen = q.get("clientId");
+        setClientId(
+          chosen && rows.some((c: { id: string }) => c.id === chosen)
+            ? chosen
+            : "all",
+        );
+        const result = q.get("social");
         if (result === "connected")
-          setNotice("Conta conectada. Você já pode preparar uma publicação.");
-        else if (result === "select_pages" && query.get("session")) {
-          api(
-            `/api/social/selection?session=${encodeURIComponent(query.get("session")!)}`,
+          setNotice("Conta conectada. Você pode preparar uma publicação.");
+        else if (result === "select_pages" && q.get("session")) {
+          const session = q.get("session")!;
+          void api(
+            `/api/social/selection?session=${encodeURIComponent(session)}`,
           )
-            .then((data) =>
-              setSelection({
-                session: query.get("session")!,
-                pages: data.pages,
-              }),
-            )
+            .then((data) => setSelection({ session, pages: data.pages }))
             .catch((e) => setError(e.message));
         } else if (result)
           setError(
             (
               {
                 cancelled:
-                  "Autorização cancelada. Nenhuma conta foi conectada.",
+                  "Autorização cancelada. A conexão anterior foi preservada.",
                 no_pages:
-                  "Nenhuma página com permissão para publicar foi autorizada.",
+                  "Nenhuma página com permissão de publicação foi autorizada.",
                 invalid_state:
                   "A conexão venceu. Clique em conectar novamente.",
                 account_in_use: "Esta conta já está vinculada a outro cliente.",
               } as Record<string, string>
             )[result] ||
-              "A conexão não foi concluída. Confira a configuração da Meta e tente novamente.",
+              "A conexão não foi concluída. Confira a configuração e as permissões na Meta.",
           );
         if (result)
           window.history.replaceState(
             null,
             "",
-            `/publicacoes${chosen ? `?clientId=${encodeURIComponent(chosen)}` : ""}`,
+            `/publicacoes${chosen ? `?clientId=${chosen}` : ""}`,
           );
       })
       .catch((e) => setError(e.message));
   }, [permitted]);
   useEffect(() => {
-    if (composer) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [composer]);
-  useEffect(() => {
     if (schedule) scheduleDialog.current?.showModal();
     else scheduleDialog.current?.close();
   }, [schedule]);
-
-  async function act(task: () => Promise<void>) {
+  async function act(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      await task();
+      await fn();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  async function connect(provider: Account["provider"]) {
-    // Open synchronously so browsers don't block the official OAuth tab.
-    const tab = window.open("about:blank", "_blank");
-    if (!tab) {
-      setError("Permita abrir uma nova aba para conectar a conta.");
+  async function connect(p: Account["provider"], extended = false) {
+    const target = window.open("about:blank", "_blank");
+    if (!target) {
+      setError("Permita abrir a aba de autorização da rede social.");
       return;
     }
-    tab.opener = null;
+    target.opener = null;
     await act(async () => {
       try {
         const result = await api(
           "/api/social/connect",
-          mutation({ clientId, provider }),
+          mutation({ clientId, provider: p, extended }),
         );
-        tab.location.href = result.url;
+        target.location.href = result.url;
       } catch (e) {
-        tab.close();
+        target.close();
         throw e;
       }
     });
   }
-  async function upload(files: FileList | null) {
-    if (!files) return;
-    const uploadClient = clientId;
+  async function open(post: Post, viewOnly: boolean, copy = false) {
     await act(async () => {
-      if (assets.length + files.length > 10)
-        throw Error("Use até 10 arquivos.");
-      for (const file of Array.from(files)) {
-        if (
-          !["image/jpeg", "video/mp4"].includes(file.type) ||
-          file.size < 1 ||
-          file.size >
-            (file.type === "image/jpeg" ? 8 : setup.videoLimitMB) * 1024 * 1024
-        )
-          throw Error(
-            `Use JPEG de até 8 MB ou MP4 de até ${setup.videoLimitMB} MB.`,
-          );
-        const prepared = await api(
-          "/api/social/media",
-          mutation({
-            clientId: uploadClient,
-            name: file.name,
-            mime: file.type,
-            bytes: file.size,
-          }),
-        );
-        if (prepared.provider === "VPS") {
-          for (
-            let offset = 0;
-            offset < file.size;
-            offset += prepared.upload.chunkBytes
-          ) {
-            const chunk = file.slice(
-              offset,
-              offset + prepared.upload.chunkBytes,
-            );
-            let sent = false;
-            for (let attempt = 0; attempt < 3 && !sent; attempt++) {
-              try {
-                const response = await fetch(
-                  `${prepared.upload.url}?index=${offset / prepared.upload.chunkBytes}`,
-                  {
-                    method: "PUT",
-                    body: chunk,
-                    credentials: "omit",
-                    redirect: "error",
-                    headers: {
-                      Authorization: `Bearer ${prepared.upload.token}`,
-                      "Content-Type": "application/octet-stream",
-                    },
-                    signal: AbortSignal.timeout(60000),
-                  },
-                );
-                sent = response.ok;
-                if (!response.ok && response.status < 500) break;
-              } catch {
-                /* Retry the same immutable part after a lost response. */
-              }
-            }
-            if (!sent)
-              throw Error(
-                `O envio de ${file.name} foi interrompido. Tente novamente.`,
-              );
-            setUploadProgress(
-              `${file.name}: ${Math.round((Math.min(offset + chunk.size, file.size) / file.size) * 100)}%`,
-            );
-          }
-        } else {
-          const { error: uploadError } = await createSupabaseBrowserClient()
-            .storage.from("social-media")
-            .uploadToSignedUrl(prepared.path, prepared.token, file, {
-              contentType: file.type,
-            });
-          if (uploadError)
-            throw Error(`Falha no envio de ${file.name}. Tente novamente.`);
-        }
-        setUploadProgress(`Conferindo ${file.name}…`);
-        const verified = await api(
-          "/api/social/media",
-          mutation({ id: prepared.asset.id, clientId: uploadClient }, "PATCH"),
-        );
-        setAssets((previous) => [
-          ...previous,
-          { ...prepared.asset, previewUrl: verified.previewUrl },
-        ]);
-      }
-    }).finally(() => setUploadProgress(""));
-  }
-  async function save(nextStatus: string) {
-    await act(async () => {
-      const payload = {
-        clientId,
-        accountIds: targets,
-        assetIds: assets.map((a) => a.id),
-        caption,
-        format,
-        status: nextStatus,
-        scheduledAt: when ? new Date(`${when}:00-03:00`).toISOString() : null,
-      };
-      await api(
-        editingId ? `/api/social/posts/${editingId}` : "/api/social/posts",
-        mutation(
-          editingId ? { ...payload, action: "edit" } : payload,
-          editingId ? "PATCH" : "POST",
-        ),
-      );
-      setComposer(false);
-      setAssets([]);
-      setCaption("");
-      setTargets([]);
-      setWhen("");
-      setNotice(
-        nextStatus === "DRAFT"
-          ? "Rascunho salvo."
-          : "Conteúdo enviado para aprovação.",
-      );
-      await load();
+      const [detail, connected] = await Promise.all([
+        api(`/api/social/posts/${post.id}?clientId=${post.clientId}`),
+        api(`/api/social/accounts?clientId=${post.clientId}`),
+      ]);
+      setEditor({
+        clientId: post.clientId,
+        accounts: connected,
+        detail,
+        viewOnly,
+        copy,
+      });
     });
+  }
+  function moveMonth(n: number) {
+    const d = new Date(`${month}-15T12:00:00Z`);
+    d.setUTCMonth(d.getUTCMonth() + n);
+    setMonth(d.toISOString().slice(0, 7));
+    setDay("");
   }
   const current = new Date(`${month}-01T12:00:00Z`),
     count = new Date(
       Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0),
-    ).getUTCDate();
-  const offset = (current.getUTCDay() + 6) % 7;
-  const visible = posts.filter(
-    (p) =>
-      (status === "ALL" || p.status === status) &&
-      (!day || (p.scheduledAt && dayKey(p.scheduledAt) === day)),
-  );
+    ).getUTCDate(),
+    offset = (current.getUTCDay() + 6) % 7,
+    clientName =
+      clients.find((c) => c.id === clientId)?.name || "Todos os clientes";
   const connected = accounts.filter(
     (a) =>
       a.status === "CONNECTED" &&
       (!a.tokenExpiresAt || new Date(a.tokenExpiresAt) > new Date()),
   );
-  const editorAccounts = editingId
-    ? accounts.filter((a) => targets.includes(a.id))
-    : connected;
-  const moveMonth = (n: number) => {
-    const date = new Date(`${month}-15T12:00:00Z`);
-    date.setUTCMonth(date.getUTCMonth() + n);
-    setMonth(
-      `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`,
-    );
-  };
   if (!permitted)
     return (
-      <section className={styles.scope}>
+      <section className={s.scope}>
         <h1>Publicações</h1>
         <p>
           Seu usuário não tem acesso a este módulo. Peça a liberação ao
@@ -413,30 +268,28 @@ export default function PublicationsPage() {
       </section>
     );
   return (
-    <section className={styles.scope} data-ui>
-      <div className={styles.heading}>
+    <section className={s.scope} data-ui>
+      <div className={s.heading}>
         <div>
           <h1>Publicações</h1>
-          <p>Da aprovação ao horário de publicar, por cliente.</p>
+          <p>Conteúdo, perfis e programação dos seus clientes.</p>
         </div>
         <button
-          className={styles.primary}
-          disabled={!clientId || !editable || busy}
-          onClick={() => {
-            setViewOnly(false);
-            setEditingId(null);
-            setCaption("");
-            setFormat("POST");
-            setAssets([]);
-            setTargets([]);
-            setWhen("");
-            setComposer(true);
-          }}
+          className={s.primary}
+          disabled={
+            !clientId || clientId === "all" || !editable || busy || loading
+          }
+          title={
+            clientId === "all"
+              ? "Selecione um cliente para criar uma publicação"
+              : undefined
+          }
+          onClick={() => setEditor({ clientId, accounts })}
         >
           <Plus size={16} /> Nova publicação
         </button>
       </div>
-      <div className={styles.toolbar}>
+      <div className={s.toolbar}>
         <label>
           Cliente
           <select
@@ -444,11 +297,16 @@ export default function PublicationsPage() {
             disabled={busy}
             onChange={(e) => {
               setClientId(e.target.value);
-              setAssets([]);
-              setTargets([]);
+              setDay("");
+              window.history.replaceState(
+                null,
+                "",
+                `/publicacoes?clientId=${e.target.value}`,
+              );
             }}
           >
-            <option value="">Selecione um cliente</option>
+            <option value="">Carregando clientes…</option>
+            <option value="all">Todos os clientes</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -461,363 +319,409 @@ export default function PublicationsPage() {
         </button>
       </div>
       {error && (
-        <div role="alert" className={styles.error}>
+        <div role="alert" className={s.error}>
           {error}
         </div>
       )}
       {notice && (
-        <div role="status" className={styles.notice}>
+        <div role="status" className={s.notice}>
           {notice}
         </div>
       )}
-      {!clients.length && !loading && (
-        <p className={styles.empty}>
-          Cadastre um cliente para conectar suas redes sociais.
+      {clientId === "all" && (
+        <p className={s.help}>
+          Selecione um cliente para criar conteúdo ou conectar suas redes. O
+          calendário reúne os clientes da sua agência.
         </p>
       )}
-      {clientId && (
-        <>
-          <section className={styles.accounts}>
-            <div className={styles.sectionHeading}>
-              <div>
-                <h2>Contas deste cliente</h2>
-                <p>
-                  A autorização acontece diretamente no Instagram ou Facebook.
-                </p>
+      {clientId && clientId !== "all" && (
+        <details className={s.accounts} open={!connected.length}>
+          <summary>Contas e conexões · {connected.length} conectada(s)</summary>
+          <div className={s.sectionHeading}>
+            <p className={s.help}>
+              A autorização acontece diretamente no Instagram ou Facebook.
+            </p>
+            {admin && (
+              <div className={s.actions}>
+                <button
+                  disabled={busy || !setup.instagram}
+                  onClick={() => void connect("INSTAGRAM")}
+                >
+                  <Instagram size={16} />
+                  Conectar Instagram
+                </button>
+                <button
+                  disabled={busy || !setup.facebook}
+                  onClick={() => void connect("FACEBOOK")}
+                >
+                  <Facebook size={16} />
+                  Conectar Facebook
+                </button>
               </div>
-              {admin && (
-                <div className={styles.actions}>
-                  <button
-                    disabled={busy}
-                    onClick={() => void connect("INSTAGRAM")}
-                  >
-                    <Instagram size={16} /> Conectar Instagram
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => void connect("FACEBOOK")}
-                  >
-                    <Facebook size={16} /> Conectar Facebook
-                  </button>
-                </div>
+            )}
+          </div>
+          {accounts.map((a) => (
+            <div className={s.account} key={a.id}>
+              <span>
+                {a.provider === "INSTAGRAM" ? (
+                  <Instagram size={16} />
+                ) : (
+                  <Facebook size={16} />
+                )}{" "}
+                {a.name}
+              </span>
+              <span>
+                {connected.some((c) => c.id === a.id)
+                  ? "Conectada"
+                  : "Reconectar"}
+              </span>
+              {admin && a.status !== "DISCONNECTED" && (
+                <button
+                  disabled={busy}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Desconectar ${a.name}? As repetições serão pausadas e os agendamentos pendentes serão cancelados.`,
+                      )
+                    )
+                      void act(async () => {
+                        await api(
+                          "/api/social/accounts",
+                          mutation({ id: a.id, clientId }, "DELETE"),
+                        );
+                        await load();
+                      });
+                  }}
+                >
+                  Desconectar
+                </button>
               )}
             </div>
-            {!accounts.length ? (
-              <p className={styles.empty}>Nenhuma conta conectada.</p>
-            ) : (
-              accounts.map((a) => (
-                <div className={styles.account} key={a.id}>
-                  <span>
-                    {a.provider === "INSTAGRAM" ? (
-                      <Instagram size={16} />
-                    ) : (
-                      <Facebook size={16} />
-                    )}{" "}
-                    {a.name}
-                  </span>
-                  <span>
-                    {connected.some((c) => c.id === a.id)
-                      ? "Conectada"
-                      : "Reconectar"}
-                  </span>
-                  {admin && a.status !== "DISCONNECTED" && (
-                    <button
-                      disabled={busy}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Desconectar ${a.name}? Os agendamentos pendentes serão cancelados; o histórico será mantido.`,
-                          )
-                        )
-                          void act(async () => {
-                            await api(
-                              "/api/social/accounts",
-                              mutation({ id: a.id, clientId }, "DELETE"),
-                            );
-                            await load();
-                          });
-                      }}
-                    >
-                      Desconectar
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-            {admin && (!setup.instagram || !setup.facebook) && (
-              <p className={styles.help}>
-                A Hadar ainda precisa concluir a configuração da Meta para
-                habilitar{" "}
-                {!setup.instagram && !setup.facebook
-                  ? "as duas conexões"
-                  : !setup.instagram
-                    ? "o Instagram"
-                    : "o Facebook"}
-                .
-              </p>
-            )}
-          </section>
-          {selection && (
-            <section className={styles.accounts}>
-              <h2>Quais páginas pertencem a este cliente?</h2>
-              <p>Selecione somente as páginas que deseja conectar.</p>
-              {selection.pages.map((p) => (
-                <label className={styles.check} key={p.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedPages.includes(p.id)}
-                    onChange={(e) =>
-                      setSelectedPages((old) =>
-                        e.target.checked
-                          ? [...old, p.id]
-                          : old.filter((id) => id !== p.id),
-                      )
-                    }
-                  />
-                  {p.name}
-                </label>
-              ))}
-              <button
-                disabled={busy || !selectedPages.length}
-                onClick={() =>
-                  void act(async () => {
-                    await api(
-                      "/api/social/selection",
-                      mutation({
-                        session: selection.session,
-                        pageIds: selectedPages,
-                      }),
-                    );
-                    setSelection(null);
-                    setSelectedPages([]);
-                    setNotice("Páginas conectadas.");
-                    await load();
-                  })
-                }
-              >
-                Conectar páginas selecionadas
-              </button>
-            </section>
+          ))}
+          {!accounts.length && (
+            <p className={s.empty}>Nenhuma conta conectada.</p>
           )}
-          <div className={styles.workspace}>
-            {/* Fluid calendar + 360px editorial queue; on narrow screens the queue stacks. */}
-            <section className={styles.calendar}>
-              <div className={styles.sectionHeading}>
+        </details>
+      )}
+      {selection && (
+        <section className={s.accounts}>
+          <h2>Selecione as páginas deste cliente</h2>
+          {selection.pages.map((page) => (
+            <label key={page.id} className={s.check}>
+              <input
+                type="checkbox"
+                checked={selectedPages.includes(page.id)}
+                onChange={(e) =>
+                  setSelectedPages((old) =>
+                    e.target.checked
+                      ? [...old, page.id]
+                      : old.filter((id) => id !== page.id),
+                  )
+                }
+              />
+              {page.name}
+            </label>
+          ))}
+          <button
+            className={s.primary}
+            disabled={busy || !selectedPages.length}
+            onClick={() =>
+              void act(async () => {
+                await api(
+                  "/api/social/selection",
+                  mutation({
+                    session: selection.session,
+                    pageIds: selectedPages,
+                  }),
+                );
+                setSelection(null);
+                await load();
+              })
+            }
+          >
+            Conectar páginas selecionadas
+          </button>
+        </section>
+      )}
+      <nav className={s.tabs} aria-label="Visualização de publicações">
+        {[
+          ["calendar", "Calendário"],
+          ["series", "Repetições"],
+          ["reports", "Relatórios"],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            aria-current={tab === id ? "page" : undefined}
+            className={tab === id ? s.activeTab : ""}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {tab === "calendar" && (
+        <>
+          <div className={`${s.toolbar} ${s.filters}`}>
+            <label>
+              Situação
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="ALL">Todas</option>
+                {Object.entries(states).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Rede
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+              >
+                <option value="ALL">Todas</option>
+                <option value="INSTAGRAM">Instagram</option>
+                <option value="FACEBOOK">Facebook</option>
+              </select>
+            </label>
+            <label>
+              Canal
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+              >
+                <option value="ALL">Todos</option>
+                <option value="POST">Post e carrossel</option>
+                <option value="REEL">Reels</option>
+                <option value="STORY">Stories</option>
+              </select>
+            </label>
+          </div>
+          <section className={s.calendar} aria-busy={loading}>
+            <div className={s.sectionHeading}>
+              <div>
                 <h2>
                   {current.toLocaleDateString("pt-BR", {
-                    timeZone: "UTC",
                     month: "long",
                     year: "numeric",
+                    timeZone: "UTC",
                   })}
                 </h2>
-                <div className={styles.actions}>
-                  <button
-                    aria-label="Mês anterior"
-                    onClick={() => moveMonth(-1)}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMonth(monthNow());
-                      setDay("");
-                    }}
-                  >
-                    Hoje
-                  </button>
-                  <button aria-label="Próximo mês" onClick={() => moveMonth(1)}>
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-              <div className={styles.weekdays}>
-                {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => (
-                  <span key={d}>{d}</span>
-                ))}
-              </div>
-              <div className={styles.days}>
-                {Array.from({ length: offset }, (_, i) => (
-                  <div className={styles.outside} key={`off-${i}`} />
-                ))}
-                {Array.from({ length: count }, (_, i) => {
-                  const key = `${month}-${String(i + 1).padStart(2, "0")}`,
-                    daily = posts.filter(
-                      (p) =>
-                        p.scheduledAt &&
-                        dayKey(p.scheduledAt) === key &&
-                        p.status !== "CANCELLED",
-                    );
-                  return (
-                    <button
-                      key={key}
-                      className={`${styles.day} ${key === day ? styles.selected : ""}`}
-                      aria-label={`${i + 1}, ${daily.length} publicações carregadas`}
-                      onClick={() => setDay((old) => (old === key ? "" : key))}
-                    >
-                      <span
-                        className={
-                          key === dayKey(new Date().toISOString())
-                            ? styles.today
-                            : ""
-                        }
-                      >
-                        {i + 1}
-                      </span>
-                      {daily.slice(0, 2).map((p) => (
-                        <span
-                          key={p.id}
-                          title={`${p.account.name} · ${states[p.status]}`}
-                          className={`${styles.calendarPost} ${["DRAFT", "PENDING_APPROVAL"].includes(p.status) ? styles.calendarDraft : ""}`}
-                        >
-                          {clock(p.scheduledAt!)} · {formats[p.format]}
-                        </span>
-                      ))}
-                      {daily.length > 2 && <span>+{daily.length - 2}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className={styles.help}>
-                Horário de Brasília.{" "}
-                {posts.length < total
-                  ? `Calendário parcial: ${posts.length} de ${total} publicações carregadas. Carregue as próximas abaixo.`
-                  : "Rascunhos com horário sugerido ainda precisam de aprovação. Selecione um dia para conferir."}
-              </p>
-            </section>
-            <section className={styles.queue}>
-              <div className={styles.sectionHeading}>
-                <h2>{day ? `Dia ${day.slice(8)}` : "Fila editorial"}</h2>
-                {day && (
-                  <button onClick={() => setDay("")}>Todos os dias</button>
-                )}
-              </div>
-              <label className={styles.filter}>
-                Situação
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  <option value="ALL">Todas</option>
-                  {Object.entries(states).map(([k, v]) => (
-                    <option value={k} key={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {loading && !posts.length ? (
-                <p role="status" className={styles.empty}>
-                  Carregando publicações…
+                <p>
+                  {calendarTotal} publicações no mês · {clientName}
                 </p>
-              ) : !visible.length ? (
-                <div className={styles.empty}>
-                  <Calendar size={20} />
-                  <p>Nenhuma publicação neste período.</p>
-                  <p>Prepare um rascunho ou ajuste os filtros.</p>
+              </div>
+              <div className={s.actions}>
+                <button aria-label="Mês anterior" onClick={() => moveMonth(-1)}>
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => {
+                    setMonth(dayKey(new Date()).slice(0, 7));
+                    setDay(dayKey(new Date()));
+                  }}
+                >
+                  Hoje
+                </button>
+                <button aria-label="Próximo mês" onClick={() => moveMonth(1)}>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            {truncated && (
+              <p role="status" className={s.notice}>
+                O mês tem mais de 2.000 publicações. Refine os filtros para
+                visualizar todos os eventos.
+              </p>
+            )}
+            {loading && (
+              <p role="status" className={s.help}>
+                Atualizando calendário…
+              </p>
+            )}
+            <div className={s.calendarScroll}>
+              <div className={s.fullCalendar}>
+                <div className={s.weekdays}>
+                  {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map(
+                    (name) => (
+                      <span key={name}>{name}</span>
+                    ),
+                  )}
                 </div>
-              ) : (
-                visible.map((p) => (
-                  <article key={p.id} className={styles.post}>
-                    <div className={styles.postHeading}>
-                      <strong>{p.account.name}</strong>
-                      <span
-                        className={`${styles.badge} ${["FAILED", "UNCERTAIN"].includes(p.status) ? styles.bad : ""}`}
+                <div className={s.days}>
+                  {Array.from({ length: offset }, (_, i) => (
+                    <div key={`blank${i}`} className={s.outside} />
+                  ))}
+                  {Array.from({ length: count }, (_, i) => {
+                    const key = month + "-" + String(i + 1).padStart(2, "0"),
+                      items = events.filter(
+                        (p) => dayKey(p.scheduledAt || p.createdAt) === key,
+                      );
+                    return (
+                      <div
+                        key={key}
+                        className={`${s.calendarCell} ${day === key ? s.selected : ""}`}
                       >
-                        {p.publishStartedAt && p.status === "SCHEDULED"
-                          ? "Processando na Meta"
-                          : states[p.status]}
-                      </span>
-                    </div>
-                    <p>{p.caption || `${formats[p.format]} sem legenda`}</p>
-                    <div className={styles.meta}>
-                      {p.account.provider === "INSTAGRAM"
-                        ? "Instagram"
-                        : "Facebook"}{" "}
-                      · {formats[p.format]}
-                      {p.scheduledAt &&
-                        ` · ${dayKey(p.scheduledAt).slice(8)}/${dayKey(p.scheduledAt).slice(5, 7)} às ${clock(p.scheduledAt)}`}
-                    </div>
-                    {p.lastError && (
-                      <p className={styles.errorText}>{p.lastError}</p>
-                    )}
-                    <div className={styles.actions}>
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          void act(async () => {
-                            const detail = await api(
-                              `/api/social/posts/${p.id}?clientId=${encodeURIComponent(clientId)}`,
-                            );
-                            setViewOnly(true);
-                            setEditingId(p.id);
-                            setCaption(detail.caption);
-                            setFormat(detail.format);
-                            setTargets([detail.accountId]);
-                            setAssets(detail.media);
-                            setWhen(
-                              detail.scheduledAt
-                                ? `${dayKey(detail.scheduledAt)}T${clock(detail.scheduledAt)}`
-                                : "",
-                            );
-                            setComposer(true);
-                          })
-                        }
-                      >
-                        Ver conteúdo
-                      </button>
-                      {editable &&
-                        !p.publishStartedAt &&
-                        [
-                          "DRAFT",
-                          "PENDING_APPROVAL",
-                          "FAILED",
-                          "SCHEDULED",
-                        ].includes(p.status) && (
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              void act(async () => {
-                                const detail = await api(
-                                  `/api/social/posts/${p.id}?clientId=${encodeURIComponent(clientId)}`,
-                                );
-                                setViewOnly(false);
-                                setEditingId(p.id);
-                                setCaption(detail.caption);
-                                setFormat(detail.format);
-                                setTargets([detail.accountId]);
-                                setAssets(detail.media);
-                                setWhen(
-                                  detail.scheduledAt
-                                    ? `${dayKey(detail.scheduledAt)}T${clock(detail.scheduledAt)}`
-                                    : "",
-                                );
-                                setComposer(true);
-                              })
+                        <button
+                          className={s.dayNumber}
+                          aria-label={`Ver publicações de ${key.split("-").reverse().join("/")}`}
+                          aria-pressed={day === key}
+                          onClick={() => setDay(day === key ? "" : key)}
+                        >
+                          <span
+                            className={
+                              key === dayKey(new Date()) ? s.today : ""
                             }
                           >
-                            Editar
+                            {i + 1}
+                          </span>
+                          <small>{items.length || ""}</small>
+                        </button>
+                        {items.slice(0, 5).map((post) => (
+                          <button
+                            key={post.id}
+                            className={`${s.event} ${["FAILED", "UNCERTAIN"].includes(post.status) ? s.eventBad : post.status === "PUBLISHED" ? s.eventPublished : s.eventPending}`}
+                            title={`${post.client.name} · ${formats[post.format]} · ${states[post.status]} · ${post.caption || "Sem legenda"}`}
+                            onClick={() => void open(post, true)}
+                            disabled={busy}
+                          >
+                            {post.account.provider === "INSTAGRAM" ? (
+                              <Instagram size={12} />
+                            ) : (
+                              <Facebook size={12} />
+                            )}
+                            <span>
+                              {clientId === "all"
+                                ? post.client.name
+                                : post.account.name}
+                            </span>
+                            <b>
+                              {post.scheduledAt
+                                ? clock(post.scheduledAt)
+                                : "Rasc."}
+                            </b>
+                            <small>
+                              {post.format === "STORY"
+                                ? "S"
+                                : post.format === "REEL"
+                                  ? "R"
+                                  : "P"}
+                            </small>
+                          </button>
+                        ))}
+                        {items.length > 5 && (
+                          <button
+                            className={s.moreEvents}
+                            onClick={() => setDay(key)}
+                          >
+                            +{items.length - 5} publicações
                           </button>
                         )}
-                      {admin &&
-                        !p.publishStartedAt &&
-                        [
-                          "DRAFT",
-                          "PENDING_APPROVAL",
-                          "FAILED",
-                          "SCHEDULED",
-                        ].includes(p.status) && (
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <p className={s.help}>
+              P · Post/carrossel &nbsp; R · Reels &nbsp; S · Stories. Selecione
+              um dia para ver a lista completa abaixo.
+            </p>
+          </section>
+          <section className={s.queue} aria-busy={loading}>
+            <div className={s.sectionHeading}>
+              <h2>
+                {day
+                  ? `Publicações de ${day.split("-").reverse().join("/")}`
+                  : "Publicações do mês"}{" "}
+                <span className={s.help}>({total})</span>
+              </h2>
+              {day && <button onClick={() => setDay("")}>Todos os dias</button>}
+            </div>
+            {!posts.length && !loading && (
+              <div className={s.empty}>
+                <Calendar size={24} />
+                <p>Nenhuma publicação com estes filtros.</p>
+                <p>Selecione um cliente e prepare seu primeiro conteúdo.</p>
+              </div>
+            )}
+            {posts.map((post) => (
+              <article className={s.post} key={post.id}>
+                <div className={s.postHeading}>
+                  <strong>
+                    {clientId === "all" ? post.client.name + " · " : ""}
+                    {post.account.name}
+                  </strong>
+                  <span
+                    className={`${s.badge} ${["FAILED", "UNCERTAIN"].includes(post.status) ? s.bad : ""}`}
+                  >
+                    {states[post.status]}
+                  </span>
+                </div>
+                <p>{post.caption || `${formats[post.format]} sem legenda`}</p>
+                <div className={s.meta}>
+                  {post.account.provider === "INSTAGRAM"
+                    ? "Instagram"
+                    : "Facebook"}{" "}
+                  · {formats[post.format]} ·{" "}
+                  {post.scheduledAt
+                    ? new Date(post.scheduledAt).toLocaleString("pt-BR", {
+                        timeZone: "America/Sao_Paulo",
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })
+                    : "Sem data"}{" "}
+                  {post.seriesId && <span>· Repetição semanal</span>}
+                </div>
+                {post.lastError && (
+                  <p className={s.errorText}>{post.lastError}</p>
+                )}
+                {post.afterPublishError && (
+                  <p className={s.errorText}>{post.afterPublishError}</p>
+                )}
+                <div className={s.actions}>
+                  <button disabled={busy} onClick={() => void open(post, true)}>
+                    Ver conteúdo
+                  </button>
+                  {editable && (
+                    <button
+                      disabled={busy}
+                      onClick={() => void open(post, false, true)}
+                    >
+                      Usar como nova
+                    </button>
+                  )}
+                  {editable &&
+                    ![
+                      "PROCESSING",
+                      "PUBLISHED",
+                      "UNCERTAIN",
+                      "CANCELLED",
+                    ].includes(post.status) &&
+                    !post.publishStartedAt && (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={() => void open(post, false)}
+                        >
+                          Editar
+                        </button>
+                        {admin && (
                           <button
                             disabled={busy || !setup.publishingEnabled}
                             title={
                               !setup.publishingEnabled
                                 ? "O agendador ainda não foi ativado"
-                                : "Aprovar e definir horário"
+                                : undefined
                             }
                             onClick={() => {
-                              setSchedule(p);
+                              setSchedule(post);
                               setScheduleTime(
-                                p.scheduledAt
-                                  ? `${dayKey(p.scheduledAt)}T${clock(p.scheduledAt)}`
+                                post.scheduledAt
+                                  ? localStamp(post.scheduledAt)
                                   : "",
                               );
                             }}
@@ -825,271 +729,230 @@ export default function PublicationsPage() {
                             Aprovar e agendar
                           </button>
                         )}
-                      {editable &&
-                        !p.publishStartedAt &&
-                        [
-                          "DRAFT",
-                          "PENDING_APPROVAL",
-                          "FAILED",
-                          "SCHEDULED",
-                        ].includes(p.status) && (
-                          <button
-                            disabled={busy}
-                            onClick={() => {
-                              if (window.confirm("Cancelar esta publicação?"))
-                                void act(async () => {
-                                  await api(
-                                    `/api/social/posts/${p.id}`,
-                                    mutation(
-                                      { clientId, action: "cancel" },
-                                      "PATCH",
-                                    ),
-                                  );
-                                  await load();
-                                });
-                            }}
-                          >
-                            Cancelar
-                          </button>
-                        )}
-                    </div>
-                  </article>
-                ))
-              )}
-              {posts.length < total && (
-                <button disabled={loading} onClick={() => void load(true)}>
-                  Carregar próximas ({posts.length} de {total})
-                </button>
-              )}
-              {!setup.publishingEnabled && (
-                <p className={styles.help}>
-                  O envio automático aguarda a configuração da Meta e a ativação
-                  do agendador. Você pode preparar rascunhos.
-                </p>
-              )}
-            </section>
-          </div>
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Cancelar somente esta publicação? O histórico será preservado. Uma repetição semanal continua ativa até ser pausada.",
+                              )
+                            )
+                              void act(async () => {
+                                await api(
+                                  `/api/social/posts/${post.id}`,
+                                  mutation(
+                                    {
+                                      clientId: post.clientId,
+                                      action: "cancel",
+                                    },
+                                    "PATCH",
+                                  ),
+                                );
+                                await load();
+                              });
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    )}
+                </div>
+              </article>
+            ))}
+            {posts.length < total && (
+              <button disabled={loading} onClick={() => void load(true)}>
+                Carregar mais publicações
+              </button>
+            )}
+            {!setup.publishingEnabled && (
+              <p className={s.help}>
+                O agendador automático ainda está desativado. Você pode preparar
+                rascunhos e enviar conteúdo para aprovação.
+              </p>
+            )}
+          </section>
         </>
       )}
+      {tab === "series" && (
+        <section className={s.queue}>
+          <div className={s.sectionHeading}>
+            <h2>Repetições semanais</h2>
+            <Repeat2 size={20} />
+          </div>
+          <p className={s.help}>
+            Cada ocorrência pode ser editada separadamente. Pausar cancela as
+            ocorrências pendentes; publicações já em processamento precisam de
+            conferência.
+          </p>
+          {clientId === "all" ? (
+            <p className={s.empty}>
+              Selecione um cliente para gerenciar suas repetições.
+            </p>
+          ) : !series.length ? (
+            <p className={s.empty}>
+              Nenhuma repetição. Em Nova publicação, escolha “Repetir toda
+              semana”.
+            </p>
+          ) : (
+            series.map((item) => (
+              <article className={s.post} key={item.id}>
+                <div className={s.postHeading}>
+                  <strong>
+                    {item.account.name} · {formats[item.format]}
+                  </strong>
+                  <span className={s.badge}>
+                    {!item.active
+                      ? item.endDate && item.endDate < dayKey(new Date())
+                        ? "Encerrada"
+                        : "Pausada"
+                      : item.approvedAt
+                        ? "Aprovada"
+                        : "Aguardando aprovação"}
+                  </span>
+                </div>
+                <p>{item.caption || `${formats[item.format]} sem legenda`}</p>
+                <p className={s.meta}>
+                  {[...item.weekdays]
+                    .sort()
+                    .map((d) => weekNames[d])
+                    .join(", ")}{" "}
+                  às {item.time} · desde{" "}
+                  {item.startDate.split("-").reverse().join("/")} ·{" "}
+                  {item.endDate
+                    ? `até ${item.endDate.split("-").reverse().join("/")}`
+                    : "sem data final"}
+                </p>
+                {admin && item.active && (
+                  <div className={s.actions}>
+                    {!item.approvedAt && (
+                      <button
+                        disabled={busy || !setup.publishingEnabled}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Aprovar esta repetição e suas próximas ocorrências? As publicações continuarão até a data final ou até você pausar.",
+                            )
+                          )
+                            void act(async () => {
+                              await api(
+                                "/api/social/series",
+                                mutation(
+                                  { clientId, id: item.id, action: "approve" },
+                                  "PATCH",
+                                ),
+                              );
+                              await load();
+                            });
+                        }}
+                      >
+                        Aprovar repetição
+                      </button>
+                    )}
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Pausar esta repetição e cancelar suas ocorrências pendentes? Para reiniciar, crie uma nova repetição para revisão.",
+                          )
+                        )
+                          void act(async () => {
+                            await api(
+                              "/api/social/series",
+                              mutation(
+                                { clientId, id: item.id, action: "pause" },
+                                "PATCH",
+                              ),
+                            );
+                            await load();
+                          });
+                      }}
+                    >
+                      Pausar repetição
+                    </button>
+                  </div>
+                )}
+              </article>
+            ))
+          )}
+        </section>
+      )}
+      {tab === "reports" && clientId && (
+        <Reports
+          key={clientId}
+          clientId={clientId}
+          clientName={clientName}
+          admin={admin}
+          onAuthorize={() => void connect("INSTAGRAM", true)}
+        />
+      )}
+      {editor && (
+        <Composer
+          key={
+            (editor.copy ? "copy:" : "") +
+            (editor.detail?.id || editor.clientId)
+          }
+          clientId={editor.clientId}
+          clientName={
+            clients.find((c) => c.id === editor.clientId)?.name || "Cliente"
+          }
+          accounts={editor.accounts}
+          detail={editor.detail}
+          copy={editor.copy}
+          viewOnly={editor.viewOnly}
+          videoLimit={setup.videoLimitMB}
+          enabled={setup.publishingEnabled}
+          admin={admin}
+          onClose={() => setEditor(null)}
+          onSaved={() => {
+            setEditor(null);
+            setNotice(
+              "Conteúdo salvo. Confira os canais, as datas e a situação no calendário.",
+            );
+            void load();
+          }}
+        />
+      )}
       <dialog
-        ref={dialog}
-        className={styles.dialog}
-        onCancel={(e) => {
-          if (busy) e.preventDefault();
-          else setComposer(false);
-        }}
+        ref={scheduleDialog}
+        className={s.dialog}
+        aria-labelledby="schedule-title"
+        onCancel={() => setSchedule(null)}
       >
-        <div className={styles.sectionHeading}>
-          <h2>
-            {viewOnly
-              ? "Conteúdo da publicação"
-              : editingId
-                ? "Editar publicação"
-                : "Nova publicação"}
-          </h2>
+        <div className={s.sectionHeading}>
+          <h2 id="schedule-title">Aprovar publicação</h2>
           <button
-            aria-label="Fechar editor"
+            aria-label="Fechar aprovação"
             disabled={busy}
-            onClick={() => setComposer(false)}
+            onClick={() => setSchedule(null)}
           >
             <X size={18} />
           </button>
         </div>
         <p>
-          {clients.find((c) => c.id === clientId)?.name} · prepare e envie para
-          aprovação.
+          {schedule?.account.name} · {schedule ? formats[schedule.format] : ""}
         </p>
-        <fieldset disabled={busy || viewOnly}>
-          <legend>Publicar nas contas</legend>
-          {editorAccounts.length ? (
-            editorAccounts.map((a) => (
-              <label className={styles.check} key={a.id}>
-                <input
-                  type="checkbox"
-                  disabled={!!editingId}
-                  checked={targets.includes(a.id)}
-                  onChange={(e) =>
-                    setTargets((old) =>
-                      e.target.checked
-                        ? [...old, a.id]
-                        : old.filter((id) => id !== a.id),
-                    )
-                  }
-                />
-                {a.provider === "INSTAGRAM" ? "Instagram" : "Facebook"} ·{" "}
-                {a.name}
-              </label>
-            ))
-          ) : (
-            <p>Conecte uma conta deste cliente primeiro.</p>
-          )}
-        </fieldset>
-        <label>
-          Formato
-          <select
-            value={format}
-            disabled={busy || viewOnly}
-            onChange={(e) => setFormat(e.target.value)}
-          >
-            {Object.entries(formats).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Legenda
-          <textarea
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            maxLength={
-              targets.some(
-                (id) =>
-                  accounts.find((a) => a.id === id)?.provider === "INSTAGRAM",
-              )
-                ? 2200
-                : 5000
-            }
-            rows={5}
-            disabled={busy || viewOnly}
-          />
-        </label>
-        <label>
-          Imagens ou vídeo
-          <input
-            type="file"
-            accept="image/jpeg,video/mp4"
-            multiple={format === "CAROUSEL"}
-            disabled={busy || viewOnly}
-            onChange={(e) => {
-              void upload(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        <p className={styles.help}>
-          JPEG até 8 MB. MP4 até {setup.videoLimitMB} MB; para Reels e Stories,
-          prefira vídeo vertical 9:16. Carrosséis: 2 a 10 imagens. Em Stories,
-          textos e trilha sonora precisam estar no próprio arquivo; a legenda
-          não é adicionada ao Story.
-        </p>
-        {setup.mediaRetentionHours && (
-          <p className={styles.help}>
-            Os arquivos são removidos {setup.mediaRetentionHours} horas após a
-            confirmação de todas as publicações que os utilizam. Rascunhos e
-            envios com falha são preservados.
-          </p>
-        )}
-        {uploadProgress && (
-          <p role="status" className={styles.help}>
-            {uploadProgress}
-          </p>
-        )}
-        <div className={styles.previews}>
-          {assets
-            .filter((a) => a.previewUrl)
-            .map((a) => (
-              <figure key={a.id}>
-                {a.mime === "image/jpeg" ? (
-                  <img src={a.previewUrl!} alt={a.name} />
-                ) : (
-                  <video
-                    src={a.previewUrl!}
-                    controls
-                    preload="metadata"
-                    aria-label={a.name}
-                  />
-                )}
-                <figcaption>{a.name}</figcaption>
-              </figure>
-            ))}
-        </div>
-        {assets.map((a, i) => (
-          <div key={a.id} className={styles.asset}>
-            <span>
-              {i + 1}. {a.name} · {(a.bytes / 1024 / 1024).toFixed(1)} MB
-              {viewOnly &&
-                !a.previewUrl &&
-                " · Arquivo removido; histórico preservado"}
-            </span>
-            {!viewOnly && (
-              <button
-                disabled={busy}
-                onClick={() =>
-                  setAssets((old) => old.filter((x) => x.id !== a.id))
-                }
-                aria-label={`Remover ${a.name} da publicação`}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        ))}
-        <label>
-          Horário sugerido (Brasília)
-          <input
-            type="datetime-local"
-            value={when}
-            onChange={(e) => setWhen(e.target.value)}
-            disabled={busy || viewOnly}
-          />
-        </label>
+        <p>{schedule?.caption || "Sem legenda"}</p>
         {error && (
-          <p role="alert" className={styles.errorText}>
+          <div role="alert" className={s.error}>
             {error}
-          </p>
+          </div>
         )}
-        <div className={styles.dialogActions}>
-          {viewOnly ? (
-            <button onClick={() => setComposer(false)}>Fechar</button>
-          ) : (
-            <>
-              <button
-                disabled={busy || !targets.length || viewOnly}
-                onClick={() => void save("DRAFT")}
-              >
-                Salvar rascunho
-              </button>
-              <button
-                className={styles.primary}
-                disabled={busy || !targets.length || viewOnly}
-                onClick={() => void save("PENDING_APPROVAL")}
-              >
-                {busy ? "Aguarde…" : "Enviar para aprovação"}
-              </button>
-            </>
-          )}
-        </div>
-      </dialog>
-      <dialog
-        ref={scheduleDialog}
-        className={styles.dialog}
-        onCancel={() => setSchedule(null)}
-      >
-        <h2>Aprovar e agendar</h2>
-        <p>
-          {schedule?.account.name} · {schedule && formats[schedule.format]}
-        </p>
         <label>
-          Publicar em (horário de Brasília)
+          Data e horário · Brasília
           <input
             type="datetime-local"
             value={scheduleTime}
+            onInput={(e) => setScheduleTime(e.currentTarget.value)}
             onChange={(e) => setScheduleTime(e.target.value)}
           />
         </label>
-        <p className={styles.help}>
-          Ao confirmar, você autoriza a publicação automática deste conteúdo na
-          conta indicada.
-        </p>
-        {error && <p className={styles.errorText}>{error}</p>}
-        <div className={styles.dialogActions}>
+        <div className={s.dialogActions}>
           <button disabled={busy} onClick={() => setSchedule(null)}>
             Voltar
           </button>
           <button
-            className={styles.primary}
+            className={s.primary}
             disabled={busy || !scheduleTime}
             onClick={() =>
               void act(async () => {
@@ -1097,7 +960,7 @@ export default function PublicationsPage() {
                   `/api/social/posts/${schedule!.id}`,
                   mutation(
                     {
-                      clientId,
+                      clientId: schedule!.clientId,
                       action: "schedule",
                       scheduledAt: new Date(
                         `${scheduleTime}:00-03:00`,
@@ -1112,7 +975,7 @@ export default function PublicationsPage() {
               })
             }
           >
-            Confirmar agendamento
+            Aprovar e agendar
           </button>
         </div>
       </dialog>

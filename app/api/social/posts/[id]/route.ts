@@ -13,6 +13,8 @@ import { verifyAssets, signedMedia } from "@/lib/social/storage";
 import type { SocialMedia } from "@/lib/social/validation";
 import { Prisma } from "@prisma/client";
 import { lockAvailableAssets } from "@/lib/social/media-retention";
+import { validateOptions, type SocialOptions } from "@/lib/social/options";
+import { requireScheduler } from "@/lib/social/editorial";
 export async function GET(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -33,6 +35,8 @@ export async function GET(
         media: true,
         scheduledAt: true,
         status: true,
+        options: true,
+        seriesId: true,
       },
     });
     if (!post) throw new SocialError("Publicação não encontrada.", 404);
@@ -48,7 +52,25 @@ export async function GET(
         }),
       })),
     );
-    return NextResponse.json({ ...post, media });
+    const coverId = (post.options as SocialOptions).coverAssetId;
+    const cover = coverId
+      ? await prisma.socialAsset.findFirst({
+          where: { id: coverId, clientId, state: "AVAILABLE" },
+        })
+      : null;
+    return NextResponse.json({
+      ...post,
+      media,
+      cover: cover
+        ? {
+            id: cover.id,
+            name: cover.name,
+            mime: cover.mime,
+            bytes: cover.bytes,
+            previewUrl: await signedMedia(cover),
+          }
+        : null,
+    });
   } catch (error) {
     return failure(error);
   }
@@ -83,8 +105,9 @@ export async function PATCH(
         409,
       );
     if (body.action === "edit") {
-      if (!["DRAFT", "PENDING_APPROVAL"].includes(body.status))
-        throw new SocialError("Salve como rascunho ou envie para aprovação.");
+      if (!["DRAFT", "PENDING_APPROVAL", "SCHEDULED"].includes(body.status))
+        throw new SocialError("Estado da publicação inválido.");
+      if (body.status === "SCHEDULED") await requireScheduler(access.auth!);
       if (post.publishStartedAt)
         throw new SocialError("Confira a rede social antes de editar.", 409);
       if (
@@ -116,7 +139,28 @@ export async function PATCH(
         }));
       const caption =
           typeof body.caption === "string" ? body.caption.trim() : "",
-        format = String(body.format);
+        format =
+          body.format === "POST" && media.length > 1
+            ? "CAROUSEL"
+            : String(body.format);
+      const options = validateOptions(
+        body.options,
+        post.account.provider as Provider,
+        format,
+      );
+      const covers = options.coverAssetId
+        ? await prisma.socialAsset.findMany({
+            where: {
+              id: options.coverAssetId,
+              clientId,
+              mime: "image/jpeg",
+              state: "AVAILABLE",
+              verifiedAt: { not: null },
+            },
+          })
+        : [];
+      if (options.coverAssetId && covers.length !== 1)
+        throw new SocialError("Capa inválida para este cliente.", 403);
       validateContent(
         post.account.provider as Provider,
         format,
@@ -129,23 +173,41 @@ export async function PATCH(
         post.account.accountType !== "BUSINESS"
       )
         throw new SocialError("Stories precisam de Instagram Business.");
-      await verifyAssets(media);
-      const scheduledAt = body.scheduledAt
-        ? scheduledDate(body.scheduledAt)
-        : null;
+      await verifyAssets([...media, ...covers]);
+      const scheduledAt =
+        body.publishNow === true && body.status === "SCHEDULED"
+          ? new Date()
+          : body.scheduledAt
+            ? scheduledDate(body.scheduledAt)
+            : null;
+      if (body.status === "SCHEDULED" && !scheduledAt)
+        throw new SocialError("Selecione a data ou publique agora.");
       const changed = await prisma.$transaction(async (tx) => {
-        await lockAvailableAssets(tx, body.assetIds, clientId);
+        const account = await tx.socialAccount.updateMany({
+          where: { id: post.accountId, status: "CONNECTED" },
+          data: { status: "CONNECTED" },
+        });
+        if (!account.count)
+          throw new SocialError("Reconecte a conta antes de editar.", 409);
+        await lockAvailableAssets(
+          tx,
+          [
+            ...new Set([...body.assetIds, ...covers.map((c) => c.id)]),
+          ] as string[],
+          clientId,
+        );
         return tx.socialPost.updateMany({
           where: { id, status: post.status, publishStartedAt: null },
           data: {
             caption,
             format,
             media,
+            options: options as Prisma.InputJsonValue,
             status: body.status,
             scheduledAt,
-            nextAttemptAt: null,
-            approvedAt: null,
-            approvedById: null,
+            nextAttemptAt: body.status === "SCHEDULED" ? scheduledAt : null,
+            approvedAt: body.status === "SCHEDULED" ? new Date() : null,
+            approvedById: body.status === "SCHEDULED" ? access.auth!.id : null,
             progress: Prisma.DbNull,
             lastError: null,
           },
@@ -160,7 +222,7 @@ export async function PATCH(
       });
       if (!changed.count)
         throw new SocialError("A publicação mudou. Atualize a página.", 409);
-    } else if (body.action === "schedule") {
+    } else if (body.action === "schedule" || body.action === "publish_now") {
       if (!isAdmin(access.auth!))
         throw new SocialError("Apenas administradores aprovam e agendam.", 403);
       if (process.env.SOCIAL_PUBLISHING_ENABLED !== "true")
@@ -187,7 +249,10 @@ export async function PATCH(
           "Confira a rede social antes de tentar novamente.",
           409,
         );
-      const scheduledAt = scheduledDate(body.scheduledAt);
+      const scheduledAt =
+        body.action === "publish_now"
+          ? new Date()
+          : scheduledDate(body.scheduledAt);
       const result = await prisma.socialPost.updateMany({
         where: { id, status: post.status, publishStartedAt: null },
         data: {

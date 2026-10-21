@@ -52,7 +52,10 @@ export async function POST(req: Request) {
     if (p === "INSTAGRAM") {
       url.searchParams.set(
         "scope",
-        "instagram_business_basic,instagram_business_content_publish",
+        "instagram_business_basic,instagram_business_content_publish" +
+          (body.extended === true
+            ? ",instagram_business_manage_insights,instagram_business_manage_comments"
+            : ""),
       );
       url.searchParams.set("enable_fb_login", "0");
       url.searchParams.set("force_authentication", "1");

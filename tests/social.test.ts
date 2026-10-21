@@ -11,6 +11,13 @@ import { canAccessApi } from "../lib/api-policy";
 import type { AuthUser } from "../types/auth";
 import { NextRequest } from "next/server";
 import { splitSql } from "../scripts/prepare-social";
+import {
+  dayDate,
+  occurrences,
+  validateRecurrence,
+} from "../lib/social/schedule";
+import { validateOptions } from "../lib/social/options";
+import { insightTotals } from "../lib/social/reports";
 
 const native = createRequire(resolve("package.json"));
 function load(file: string, mocks: Record<string, unknown>) {
@@ -63,6 +70,287 @@ test("tokens sociais são autenticados e não aceitam uma chave diferente", () =
     if (before === undefined) delete process.env.SOCIAL_TOKEN_ENCRYPTION_KEY;
     else process.env.SOCIAL_TOKEN_ENCRYPTION_KEY = before;
   }
+});
+
+test("relatórios preservam zero real e não somam alcance único diário como total do período", () => {
+  assert.deepEqual(
+    insightTotals([
+      { name: "views", total_value: { value: 0 } },
+      { name: "reach", values: [{ value: 20 }, { value: 30 }] } as any,
+    ]),
+    { views: 0, reach: null },
+  );
+});
+
+test("um campo de perfil indisponível não apaga métricas e publicações que a Meta permite consultar", async () => {
+  const { accountReport } = load("lib/social/reports.ts", {
+    "@/lib/prisma": {
+      prisma: {
+        socialReportSnapshot: {
+          findUnique: async () => null,
+          upsert: async () => {},
+          deleteMany: async () => {},
+        },
+      },
+    },
+    "./core": { unseal: () => "private-test-token" },
+    "./meta": {
+      meta: async (_p: string, path: string, _token: string, fields: any) => {
+        if (path === "123") throw Error("Unsupported profile field");
+        if (path.endsWith("/media"))
+          return {
+            data: [
+              {
+                id: "456",
+                caption: "Teste",
+                media_type: "IMAGE",
+                timestamp: "2026-10-20T12:00:00Z",
+                like_count: 0,
+                comments_count: 3,
+              },
+            ],
+          };
+        if (fields.metric === "views") throw Error("Unavailable metric");
+        return {
+          data: [
+            {
+              name: fields.metric,
+              total_value: { value: fields.metric === "reach" ? 5 : 2 },
+            },
+          ],
+        };
+      },
+    },
+  });
+  const result = await accountReport(
+    {
+      id: "account",
+      externalId: "123",
+      provider: "INSTAGRAM",
+      name: "Test",
+      tokenEncrypted: "sealed",
+    },
+    new Date("2026-10-01T03:00Z"),
+    new Date("2026-10-21T03:00Z"),
+  );
+  assert.equal(result.followers, null);
+  assert.equal(result.media[0].likes, 0);
+  assert.equal(result.reach, 5);
+  assert.equal(result.views, null);
+  assert.equal(result.interactions, 2);
+  assert(result.warning);
+  assert(result.insightsWarning);
+  assert(!JSON.stringify(result).includes("private-test-token"));
+});
+
+test("publicar agora cria uma única ocorrência direta e continua exigindo administrador e worker ativo", async () => {
+  const prior = process.env.SOCIAL_PUBLISHING_ENABLED;
+  process.env.SOCIAL_PUBLISHING_ENABLED = "true";
+  let rows: any[] = [];
+  const db: any = {
+    socialWorkerState: { findUnique: async () => ({ lastSeenAt: new Date() }) },
+    socialAccount: {
+      findMany: async () => [
+        { id: "account", clientId: "client", provider: "FACEBOOK" },
+      ],
+      updateMany: async () => ({ count: 1 }),
+    },
+    socialAsset: { findMany: async () => [] },
+    socialPost: {
+      createMany: async ({ data }: any) => {
+        rows = data;
+        return { count: data.length };
+      },
+    },
+  };
+  db.$transaction = async (fn: any) => fn(db);
+  try {
+    const { createEditorial } = load("lib/social/editorial.ts", {
+      "@/lib/prisma": { prisma: db },
+      "./media-retention": { lockAvailableAssets: async () => {} },
+      "./storage": { verifyAssets: async () => {} },
+    });
+    const body = {
+      targets: [{ accountId: "account", format: "POST" }],
+      assetIds: [],
+      caption: "Publicação imediata de teste",
+      status: "SCHEDULED",
+      publishNow: true,
+    };
+    const auth = { id: "editor", role: "ADMIN" };
+    await createEditorial(body, "client", auth);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].status, "SCHEDULED");
+    assert.equal(rows[0].approvedById, "editor");
+    assert(Math.abs(rows[0].scheduledAt.getTime() - Date.now()) < 1000);
+    assert.equal(rows[0].seriesId, null);
+    await assert.rejects(
+      createEditorial(body, "client", { ...auth, role: "MEMBER" }),
+      /administradores/,
+    );
+    process.env.SOCIAL_PUBLISHING_ENABLED = "false";
+    await assert.rejects(createEditorial(body, "client", auth), /agendador/);
+  } finally {
+    if (prior === undefined) delete process.env.SOCIAL_PUBLISHING_ENABLED;
+    else process.env.SOCIAL_PUBLISHING_ENABLED = prior;
+  }
+});
+
+test("repetição semanal preserva horário de Brasília, inclui data final e cruza meses sem duplicar", () => {
+  const dates = occurrences(
+    {
+      weekdays: [1, 3, 5],
+      time: "09:15",
+      startDate: "2028-02-25",
+      endDate: "2028-03-03",
+    },
+    new Date("2028-02-25T00:00:00-03:00"),
+  );
+  assert.deepEqual(
+    dates.map((d) => d.toISOString()),
+    [
+      "2028-02-25T12:15:00.000Z",
+      "2028-02-28T12:15:00.000Z",
+      "2028-03-01T12:15:00.000Z",
+      "2028-03-03T12:15:00.000Z",
+    ],
+  );
+  assert.equal(new Set(dates.map((d) => d.toISOString())).size, dates.length);
+  const indefinite = occurrences(
+    {
+      weekdays: [0, 1, 2, 3, 4, 5, 6],
+      time: "12:00",
+      startDate: "2028-01-01",
+      endDate: null,
+    },
+    new Date("2028-01-01T13:00:00-03:00"),
+  );
+  assert(indefinite.length >= 59 && indefinite.length <= 61);
+  assert(
+    indefinite.every(
+      (d) => d.getTime() > new Date("2028-01-01T13:00:00-03:00").getTime(),
+    ),
+  );
+  assert.throws(() => dayDate("2028-02-30"));
+  assert.throws(() => dayDate("9999-99-99"));
+  assert.equal(dayDate("2028-02-29"), "2028-02-29");
+  assert.throws(() =>
+    validateRecurrence({
+      weekdays: [7],
+      time: "09:00",
+      startDate: "2028-01-01",
+    }),
+  );
+});
+
+test("opções avançadas recusam links, opções desconhecidas e capa dentro de Stories", () => {
+  assert.deepEqual(
+    validateOptions(
+      { collaborators: ["@hadarcompany", "hadarcompany"], shareToFeed: false },
+      "INSTAGRAM",
+      "REEL",
+    ),
+    { shareToFeed: false, collaborators: ["hadarcompany"] },
+  );
+  assert.throws(() =>
+    validateOptions(
+      { collaborators: ["https://instagram.com/profile"] },
+      "INSTAGRAM",
+      "REEL",
+    ),
+  );
+  assert.throws(() =>
+    validateOptions({ coverAssetId: "cover" }, "INSTAGRAM", "STORY"),
+  );
+  assert.throws(() =>
+    validateOptions({ coverAssetId: "cover" }, "FACEBOOK", "REEL"),
+  );
+  assert.throws(() =>
+    validateOptions({ firstComment: "a".repeat(2201) }, "INSTAGRAM", "POST"),
+  );
+  assert.throws(() =>
+    validateOptions({ access_token: "injection" }, "INSTAGRAM", "POST"),
+  );
+  assert.throws(() =>
+    validateOptions({ thumbOffset: -1 }, "INSTAGRAM", "REEL"),
+  );
+});
+
+test("a mídia de uma repetição ativa é preservada mesmo se a consulta de candidatos estiver desatualizada", async () => {
+  const before = process.env.SOCIAL_MEDIA_CLEANUP_ENABLED;
+  process.env.SOCIAL_MEDIA_CLEANUP_ENABLED = "true";
+  let removed = false;
+  const db: any = {
+    $queryRaw: async () => [{ id: "recurring" }],
+    $executeRaw: async () => {},
+    socialAsset: {
+      findUnique: async () => ({ id: "recurring", state: "AVAILABLE" }),
+    },
+    socialSeries: { count: async () => 1 },
+  };
+  db.$transaction = async (fn: any) => fn(db);
+  try {
+    const { cleanSocialMedia } = load("lib/social/media-retention.ts", {
+      "@/lib/prisma": { prisma: db },
+      "./storage": {
+        removeMedia: async () => {
+          removed = true;
+        },
+      },
+    });
+    assert.equal((await cleanSocialMedia()).removed, 0);
+    assert.equal(removed, false);
+  } finally {
+    if (before === undefined) delete process.env.SOCIAL_MEDIA_CLEANUP_ENABLED;
+    else process.env.SOCIAL_MEDIA_CLEANUP_ENABLED = before;
+  }
+});
+
+test("falha no primeiro comentário preserva a publicação confirmada e impede repetição automática", async () => {
+  let state = "NONE",
+    calls = 0;
+  const updates: any[] = [];
+  const db = {
+    socialAccount: {
+      findUniqueOrThrow: async () => ({
+        status: "CONNECTED",
+        tokenEncrypted: "sealed",
+      }),
+    },
+    socialPost: {
+      updateMany: async ({ where, data }: any) => {
+        if (where.afterPublishState !== state) return { count: 0 };
+        state = data.afterPublishState;
+        updates.push(data);
+        return { count: 1 };
+      },
+    },
+  };
+  const { afterPublish } = load("lib/social/publisher.ts", {
+    "@/lib/prisma": { prisma: db },
+    "./core": {
+      ...native(resolve("lib/social/core.ts")),
+      unseal: () => "token",
+    },
+    "./meta": {
+      meta: async () => {
+        calls++;
+        throw Error("Lost response");
+      },
+    },
+  });
+  const job = {
+    id: "published",
+    accountId: "account",
+    format: "REEL",
+    options: { firstComment: "Comentário" },
+    account: { provider: "INSTAGRAM" },
+  };
+  await afterPublish(job, "123");
+  await afterPublish(job, "123");
+  assert.equal(calls, 1);
+  assert.equal(state, "WARNING");
+  assert(updates.every((u) => u.status === undefined));
 });
 test("formatos e datas rejeitam combinações que não podem ser publicadas", () => {
   const image = { mime: "image/jpeg" },
@@ -162,6 +450,7 @@ test("limpeza preserva mídia compartilhada com rascunho e só libera quota apó
       },
     },
     socialPost: { findMany: async () => [] },
+    socialSeries: { count: async () => 0 },
   };
   let refs = 0;
   database.socialPost.findMany = async () =>
@@ -560,4 +849,66 @@ test("Story de foto no Facebook usa photo_stories, sem criar um post no feed", a
     if (before === undefined) delete process.env.SOCIAL_TOKEN_ENCRYPTION_KEY;
     else process.env.SOCIAL_TOKEN_ENCRYPTION_KEY = before;
   }
+});
+
+test("Reel envia capa separada, colaboradores e áudio sem transformar a capa em conteúdo", async () => {
+  const calls: any[] = [];
+  const { publishJob } = load("lib/social/publisher.ts", {
+    "@/lib/prisma": {
+      prisma: {
+        socialPost: { updateMany: async () => ({ count: 1 }) },
+        socialAsset: {
+          findFirst: async ({ where }: any) => {
+            assert.equal(where.clientId, "client");
+            return { id: "cover", mime: "image/jpeg" };
+          },
+        },
+      },
+    },
+    "./core": {
+      ...native(resolve("lib/social/core.ts")),
+      unseal: () => "test-token",
+    },
+    "./storage": {
+      signedMedia: async ({ id }: any) => `https://media.example.test/${id}`,
+    },
+    "./meta": {
+      meta: async (_p: string, path: string, _token: string, fields: any) => {
+        calls.push({ path, fields });
+        return path.endsWith("/media")
+          ? { id: "2000" }
+          : path.endsWith("/media_publish")
+            ? { id: "3000" }
+            : { status_code: "FINISHED" };
+      },
+    },
+  });
+  const result = await publishJob({
+    id: "post",
+    clientId: "client",
+    lockToken: "lock",
+    account: {
+      provider: "INSTAGRAM",
+      externalId: "1000",
+      status: "CONNECTED",
+      tokenEncrypted: "sealed",
+    },
+    format: "REEL",
+    caption: "Teste",
+    media: [{ id: "video", mime: "video/mp4" }],
+    options: {
+      coverAssetId: "cover",
+      shareToFeed: false,
+      collaborators: ["@profile"],
+      audioName: "Áudio original",
+    },
+  });
+  assert.equal(result, "3000");
+  const payload = calls.find((c) => c.path.endsWith("/media")).fields;
+  assert.equal(payload.video_url, "https://media.example.test/video");
+  assert.equal(payload.cover_url, "https://media.example.test/cover");
+  assert.equal(payload.image_url, undefined);
+  assert.equal(payload.share_to_feed, "false");
+  assert.equal(payload.collaborators, '["profile"]');
+  assert.equal(payload.audio_name, "Áudio original");
 });
