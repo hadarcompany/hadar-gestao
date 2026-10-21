@@ -10,7 +10,7 @@ const nativeRequire = createRequire(join(root, "package.json"));
 export function loadRouteModule(file: string, mocks: Record<string, unknown> = {}) {
   const module = { exports: {} as Record<string, any> };
   const output = ts.transpileModule(readFileSync(join(root, file), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
-  runInNewContext(output, { module, exports: module.exports, console, Buffer, URL, Request, Response, process, require: (name: string) => {
+  runInNewContext(output, { module, exports: module.exports, console, Buffer, URL, Request, Response, AbortSignal, process, require: (name: string) => {
     if (Object.hasOwn(mocks, name)) return mocks[name];
     return nativeRequire(name.startsWith("@/") ? resolve(root, name.slice(2)) : name);
   } });

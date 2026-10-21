@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { guardApiRequest } from "@/lib/api-guard";
 import { AsaasApiError, ASAAS_KEY_CONTEXT, ASAAS_WEBHOOK_CONTEXT, asaasIntegrationStatus, asaasRuntimeConfig, parseAsaasIntegrationInput } from "@/lib/asaas-integration";
-import { getAsaasConfig } from "@/lib/asaas-integration-server";
+import { getAsaasConfig, getAsaasRuntimeConfig } from "@/lib/asaas-integration-server";
 import { encryptIntegrationSecret } from "@/lib/integrations/crypto";
 import { requestAsaasWithConfig } from "@/lib/asaas";
 import { publicOrigin } from "@/lib/public-url";
@@ -28,7 +28,18 @@ export async function GET(req: NextRequest) {
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const denied = await guardApiRequest(auth, req, "/api/integrations/asaas");
   if (denied) return denied;
-  try { return NextResponse.json({ ...await getAsaasConfig(), webhookUrl: new URL("/api/webhooks/asaas", publicOrigin(req.url)).href }, { headers }); }
+  try {
+    const webhookUrl = new URL("/api/webhooks/asaas", publicOrigin(req.url)).href;
+    const config = await getAsaasConfig();
+    let webhookDelivery;
+    if (req.nextUrl.searchParams.get("verifyWebhook") === "true" && config.configured) {
+      const remote = await requestAsaasWithConfig<{ data: { url: string; enabled: boolean; interrupted: boolean; events: string[] }[] }>(await getAsaasRuntimeConfig(), "/webhooks?limit=100", { signal: AbortSignal.timeout(8000) });
+      // Do not expose credentials, notification emails or unrelated webhook destinations.
+      const matching = remote.data.filter(item => item.url === webhookUrl);
+      webhookDelivery = { registered: matching.length > 0, active: matching.some(item => item.enabled && !item.interrupted), events: Array.from(new Set(matching.filter(item=>item.enabled&&!item.interrupted).flatMap(item => item.events))) };
+    }
+    return NextResponse.json({ ...config, webhookUrl, ...(webhookDelivery ? {webhookDelivery} : {}) }, { headers });
+  }
   catch { return NextResponse.json({ error: "Não foi possível consultar a configuração do Asaas." }, { status: 503, headers }); }
 }
 
