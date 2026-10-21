@@ -4,6 +4,7 @@ import { meta, ProviderError, refreshInstagram } from "./meta";
 import { unseal, seal, SocialError, type Provider } from "./core";
 import { signedMedia } from "./storage";
 import type { SocialMedia } from "./validation";
+import { validateOptions } from "./options";
 
 type Progress = {
   children?: string[];
@@ -79,6 +80,18 @@ async function instagram(
   save: Save,
 ) {
   const account = id(job.account.externalId);
+  const options = validateOptions(job.options, "INSTAGRAM", job.format);
+  const advanced: Record<string, string> = {};
+  if (options.collaborators?.length)
+    advanced.collaborators = JSON.stringify(options.collaborators);
+  if (options.userTags?.length)
+    advanced.user_tags = JSON.stringify(
+      options.userTags.map((username) =>
+        job.format === "REEL" ? { username } : { username, x: 0.5, y: 0.5 },
+      ),
+    );
+  if (options.locationId) advanced.location_id = options.locationId;
+  if (options.isAiGenerated) advanced.is_ai_generated = "true";
   if (!progress.container) {
     if (job.format === "CAROUSEL") {
       progress.children ||= [];
@@ -88,7 +101,16 @@ async function instagram(
           "INSTAGRAM",
           `${account}/media`,
           token,
-          { image_url: await signedMedia(item), is_carousel_item: "true" },
+          {
+            image_url: await signedMedia(item),
+            is_carousel_item: "true",
+            ...(progress.children.length === 0 && advanced.user_tags
+              ? { user_tags: advanced.user_tags }
+              : {}),
+            ...(progress.children.length === 0 && options.altText
+              ? { alt_text: options.altText }
+              : {}),
+          },
           "POST",
         );
         progress.children.push(id(child.id));
@@ -102,6 +124,9 @@ async function instagram(
           media_type: "CAROUSEL",
           children: progress.children.join(","),
           caption: job.caption,
+          ...Object.fromEntries(
+            Object.entries(advanced).filter(([key]) => key !== "user_tags"),
+          ),
         },
         "POST",
       );
@@ -114,9 +139,28 @@ async function instagram(
       if (job.format === "STORY") fields.media_type = "STORIES";
       else if (job.format === "REEL") {
         fields.media_type = "REELS";
-        fields.share_to_feed = "true";
+        fields.share_to_feed = String(options.shareToFeed !== false);
+        if (options.audioName) fields.audio_name = options.audioName;
+        if (options.coverAssetId) {
+          const cover = await prisma.socialAsset.findFirst({
+            where: {
+              id: options.coverAssetId,
+              clientId: job.clientId,
+              mime: "image/jpeg",
+              state: "AVAILABLE",
+            },
+          });
+          if (!cover) throw new SocialError("A capa não está disponível.", 409);
+          fields.cover_url = await signedMedia(cover);
+        } else if (options.thumbOffset !== undefined)
+          fields.thumb_offset = String(options.thumbOffset);
       }
-      if (job.format !== "STORY") fields.caption = job.caption;
+      if (job.format !== "STORY") {
+        fields.caption = job.caption;
+        Object.assign(fields, advanced);
+      }
+      if (job.format === "POST" && options.altText)
+        fields.alt_text = options.altText;
       const result = await meta<{ id: string }>(
         "INSTAGRAM",
         `${account}/media`,
@@ -305,4 +349,53 @@ export async function publishJob(job: Job) {
   return job.account.provider === "INSTAGRAM"
     ? instagram(job, token, job.media as SocialMedia[], progress, save)
     : facebook(job, token, job.media as SocialMedia[], progress, save);
+}
+
+// Auxiliary operations cannot change a confirmed publication into a failed one.
+// Claim once before sending: a lost comment response must not create duplicates.
+export async function afterPublish(job: Job, externalId: string) {
+  if (job.account.provider !== "INSTAGRAM" || job.format === "STORY") return;
+  const options = validateOptions(job.options, "INSTAGRAM", job.format);
+  if (!options.firstComment && !options.disableComments) return;
+  const claim = await prisma.socialPost.updateMany({
+    where: { id: job.id, status: "PUBLISHED", afterPublishState: "NONE" },
+    data: { afterPublishState: "RUNNING" },
+  });
+  if (!claim.count) return;
+  try {
+    const current = await prisma.socialAccount.findUniqueOrThrow({
+      where: { id: job.accountId },
+    });
+    if (current.status !== "CONNECTED") throw new Error("Disconnected");
+    const token = unseal(current.tokenEncrypted);
+    if (options.firstComment)
+      await meta(
+        "INSTAGRAM",
+        `${id(externalId)}/comments`,
+        token,
+        { message: options.firstComment },
+        "POST",
+      );
+    if (options.disableComments)
+      await meta(
+        "INSTAGRAM",
+        id(externalId),
+        token,
+        { comment_enabled: "false" },
+        "POST",
+      );
+    await prisma.socialPost.updateMany({
+      where: { id: job.id, afterPublishState: "RUNNING" },
+      data: { afterPublishState: "DONE" },
+    });
+  } catch {
+    await prisma.socialPost.updateMany({
+      where: { id: job.id, afterPublishState: "RUNNING" },
+      data: {
+        afterPublishState: "WARNING",
+        afterPublishError:
+          "O conteúdo foi publicado. Confira o primeiro comentário e os comentários na rede social; a autorização adicional pode estar pendente. Não repetiremos automaticamente para evitar duplicação.",
+      },
+    });
+  }
 }

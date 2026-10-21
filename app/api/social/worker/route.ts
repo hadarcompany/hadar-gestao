@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { runSocialWorker } from "@/lib/social/worker";
 import { prisma } from "@/lib/prisma";
 import { cleanSocialMedia } from "@/lib/social/media-retention";
+import { expandSocialSeries } from "@/lib/social/series";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 export async function POST(req: Request) {
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
       create: { id: "primary", lastSeenAt: new Date(), status: "OK" },
       update: { lastSeenAt: new Date(), status: "OK" },
     });
+    await expandSocialSeries();
     const cleanup = await cleanSocialMedia();
     return NextResponse.json(
       { ...(await runSocialWorker()), mediaRemoved: cleanup.removed },

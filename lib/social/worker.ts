@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { publishJob, StillProcessing, PublicationUncertain } from "./publisher";
+import {
+  publishJob,
+  afterPublish,
+  StillProcessing,
+  PublicationUncertain,
+} from "./publisher";
 import { ProviderError } from "./meta";
 import { SocialError } from "./core";
 import { trialExpired } from "@/lib/instance-trial";
@@ -8,7 +13,35 @@ import { trialExpired } from "@/lib/instance-trial";
 export async function runSocialWorker() {
   if (process.env.SOCIAL_PUBLISHING_ENABLED !== "true" || trialExpired())
     return { paused: true };
+  await prisma.socialPost.updateMany({
+    where: {
+      status: "PUBLISHED",
+      afterPublishState: "NONE",
+      publishedAt: { lt: new Date(Date.now() - 15 * 60000) },
+      OR: [
+        { options: { path: ["firstComment"], string_contains: "" } },
+        { options: { path: ["disableComments"], equals: true } },
+      ],
+    },
+    data: {
+      afterPublishState: "WARNING",
+      afterPublishError:
+        "O conteúdo foi publicado, mas a etapa adicional não confirmou sua execução. Confira os comentários na rede social.",
+    },
+  });
   // A crashed request may have reached Meta. Never reclaim it for another publish.
+  await prisma.socialPost.updateMany({
+    where: {
+      status: "PUBLISHED",
+      afterPublishState: "RUNNING",
+      publishedAt: { lt: new Date(Date.now() - 15 * 60000) },
+    },
+    data: {
+      afterPublishState: "WARNING",
+      afterPublishError:
+        "A etapa de comentários foi interrompida. Confira na rede social antes de repetir manualmente.",
+    },
+  });
   await prisma.socialPost.updateMany({
     where: {
       status: "PROCESSING",
@@ -66,7 +99,7 @@ export async function runSocialWorker() {
   const where = { id: job.id, lockToken, status: "PROCESSING" };
   try {
     const externalPostId = await publishJob(job);
-    await prisma.socialPost.updateMany({
+    const confirmed = await prisma.socialPost.updateMany({
       where,
       data: {
         status: "PUBLISHED",
@@ -77,6 +110,8 @@ export async function runSocialWorker() {
         lockedAt: null,
       },
     });
+    if (confirmed.count)
+      await afterPublish(job, externalPostId).catch(() => {});
     return { published: 1 };
   } catch (error) {
     if (error instanceof StillProcessing) {

@@ -88,6 +88,7 @@ async function main() {
         apply: process.argv.includes("--apply"),
         existingTables: existing.length,
         newTables: 5,
+        editorialTables: 2,
       }),
     );
     if (!process.argv.includes("--apply")) return;
@@ -129,6 +130,40 @@ async function main() {
       );
     }
     // Confirm the current schema, rather than treating any five tables as ready.
+    const studioTables = await database.$queryRaw<
+      { tablename: string }[]
+    >`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename IN ('social_series','social_report_snapshots')`;
+    const studioColumns = await database.$queryRaw<
+      { column_name: string }[]
+    >`SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='social_posts' AND column_name IN ('options','seriesId','occurrenceKey','afterPublishState','afterPublishError')`;
+    if (
+      !(
+        (studioTables.length === 0 && studioColumns.length === 0) ||
+        (studioTables.length === 2 && studioColumns.length === 5)
+      )
+    )
+      throw Error("Migração editorial parcial: conferir antes de continuar.");
+    if (!studioTables.length) {
+      const sql = await readFile(
+        "prisma/migrations/20261021160000_social_studio/migration.sql",
+        "utf8",
+      );
+      await database.$transaction(
+        async (tx) => {
+          for (const statement of splitSql(sql))
+            await tx.$executeRawUnsafe(statement);
+        },
+        { timeout: 60000 },
+      );
+    }
+    const studioUnprotected = await database.$queryRaw<
+      { tablename: string }[]
+    >`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename IN ('social_series','social_report_snapshots') AND NOT rowsecurity`;
+    if (studioUnprotected.length)
+      throw Error("As tabelas editoriais precisam de RLS.");
+    await database.socialSeries.findFirst({
+      select: { id: true, assetIds: true, options: true },
+    });
     await database.socialAsset.findFirst({
       select: {
         reservedBytes: true,
