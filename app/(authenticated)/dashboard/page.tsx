@@ -10,7 +10,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { CommercialPanel } from "@/components/dashboard/commercial-panel";
 import { getCurrentWeekRange, formatDateBR, formatDayMonthBR } from "@/lib/dates";
 import { type TaskData } from "@/lib/types";
-import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowUpRight, CircleDollarSign, Wallet, TrendingUp } from "lucide-react";
+import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowUpRight, CircleDollarSign, Wallet, TrendingUp, RefreshCw } from "lucide-react";
 
 interface DashboardData {
   range: { from: string; to: string };
@@ -18,6 +18,7 @@ interface DashboardData {
   nextDeliveries: TaskData[];
   upcomingRenewals: Array<{ id: string; name: string; logoUrl?: string | null; renewalDate: string }>;
   financialSummary: null | {
+    synchronization?: {configured:boolean;checked:number;updated:number;failed:number;remaining:number;finishedAt:string};
     month: number;
     year: number;
     received: number;
@@ -49,25 +50,48 @@ export default function DashboardPage() {
   const [clients, setClients] = useState<{ id: string; name: string; image?: string | null }[]>([]);
   const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
   const defaultRangeRef = useRef(range);
+  const [refreshError,setRefreshError]=useState('');
+  const [financeSyncing,setFinanceSyncing]=useState(false);
+  const [syncNotice,setSyncNotice]=useState('');
+  const fetchSequence=useRef(0),fetching=useRef(false);
 
-  const fetchData = useCallback(async (from: string, to: string) => {
-    setLoading(true);
+  const fetchData = useCallback(async (from: string, to: string,background=false) => {
+    if(background && fetching.current)return;
+    const sequence=++fetchSequence.current;fetching.current=true;
+    if(!background)setLoading(true);
     try {
       const res = await fetch(`/api/dashboard?from=${from}&to=${to}`, { cache: "no-store" });
-      setData(await res.json());
+      if(!res.ok)throw Error('A atualização do dashboard falhou. Os últimos dados carregados foram preservados.');
+      const next=await res.json();if(sequence===fetchSequence.current){setData(next);setRefreshError('');}
+    }catch(e){if(sequence===fetchSequence.current)setRefreshError((e as Error).message);
     } finally {
-      setLoading(false);
+      if(sequence===fetchSequence.current){fetching.current=false;setLoading(false);}
     }
   }, []);
 
   useEffect(() => {
-    fetchData(range.from, range.to);
     fetch("/api/users").then((r) => r.json()).then(setUsers);
     fetch("/api/clients").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { fetchData(range.from, range.to); }, [range, fetchData]);
+  useEffect(()=>{
+    const refresh=()=>{if(document.visibilityState==='visible')void fetchData(range.from,range.to,true);};
+    const timer=setInterval(refresh,60000);
+    document.addEventListener('visibilitychange',refresh);
+    window.addEventListener('focus',refresh);
+    return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh);};
+  },[range.from,range.to,fetchData]);
+  async function syncFinance(){
+    setFinanceSyncing(true);setSyncNotice('');
+    try{
+      const response=await fetch('/api/asaas/reconcile',{method:'POST'}),result=await response.json();
+      if(!response.ok||!result.configured)throw Error(result.error||'Configure a integração do Asaas antes de sincronizar.');
+      setSyncNotice(result.failed?`${result.failed} cobranças não puderam ser conferidas agora. O histórico foi preservado.`:result.remaining?`${result.checked} cobranças conferidas. Ainda há ${result.remaining} para os próximos ciclos.`:'Cobranças conferidas com o Asaas.');
+      await fetchData(range.from,range.to);
+    }catch(e){setSyncNotice((e as Error).message);}finally{setFinanceSyncing(false);}
+  }
 
   // Mantém a semana padrão sempre atualizada enquanto a tela fica aberta (ex: virada de segunda-feira),
   // mas só quando o usuário não estiver com um intervalo personalizado selecionado.
@@ -112,16 +136,22 @@ export default function DashboardPage() {
       <h1 className="text-xl font-bold text-gray-900 tracking-tight mb-5">
         Dashboard <span className="text-gray-400 font-normal text-sm">· {user?.name?.split(" ")[0] ?? ""}</span>
       </h1>
+      {refreshError&&<p role="alert" className="mb-4 text-sm text-red-700">{refreshError}</p>}
 
       {data?.financialSummary && (
         <section className="mb-5 rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-gray-800">Resumo financeiro</h2>
-              <p className="text-[11px] text-gray-400">Mês atual · dados do Asaas e competência ajustada</p>
+              <p className="text-[11px] text-gray-500">Mês atual · Asaas e competência ajustada · atualização automática a cada minuto</p>
             </div>
-            <Link href="/financeiro" className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-dark">Ver financeiro <ArrowUpRight size={13} /></Link>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {(user?.role==='ADMIN'||user?.permissions?.financeiro==='edit')&&<button type="button" onClick={()=>void syncFinance()} disabled={financeSyncing} className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"><RefreshCw size={13} className={financeSyncing?'animate-spin':''}/>{financeSyncing?'Sincronizando…':'Sincronizar Asaas'}</button>}
+              <Link href="/financeiro" className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-dark">Ver financeiro <ArrowUpRight size={13} /></Link>
+            </div>
           </div>
+          {syncNotice&&<p role="status" className="mb-3 text-xs text-gray-600">{syncNotice}</p>}
+          {!!data.financialSummary.synchronization?.failed&&<p role="status" className="mb-3 text-xs text-amber-800">Algumas cobranças não puderam ser confirmadas no Asaas. Os valores podem estar desatualizados; tente sincronizar novamente.</p>}
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
             {[
               { label: "Recebido", value: data.financialSummary.received, icon: CircleDollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },

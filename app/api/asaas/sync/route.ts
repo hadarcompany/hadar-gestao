@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/supabase/get-server-auth";
 import { prisma } from "@/lib/prisma";
 import { AsaasApiError, getAsaasCustomer, listAsaasPayments, paymentUpdateData } from "@/lib/asaas";
-import { dateKeyToUTCDate } from "@/lib/dates";
 import { canEdit } from "@/lib/permissions";
 
 function monthRange(month: number, year: number) {
@@ -67,6 +66,7 @@ export async function POST(req: NextRequest) {
       let receivable = await prisma.receivable.findUnique({ where: { asaasPaymentId: payment.id } });
       if (!receivable && payment.externalReference) {
         receivable = await prisma.receivable.findUnique({ where: { id: payment.externalReference } });
+        if (receivable?.asaasPaymentId && receivable.asaasPaymentId !== payment.id) receivable = null;
       }
 
       let clientId = receivable?.clientId;
@@ -128,12 +128,8 @@ export async function POST(req: NextRequest) {
         await prisma.receivable.update({
           where: { id: receivable.id },
           data: {
-            amount: payment.value,
-            dueDate: dateKeyToUTCDate(payment.dueDate),
-            month: Number(payment.dueDate.slice(5, 7)),
-            year: Number(payment.dueDate.slice(0, 4)),
             description: payment.description || receivable.description,
-            ...paymentUpdateData(payment),
+            ...paymentUpdateData(payment, receivable.paidDate),
           },
         });
         updated++;
@@ -141,10 +137,6 @@ export async function POST(req: NextRequest) {
         await prisma.receivable.create({
           data: {
             clientId,
-            amount: payment.value,
-            dueDate: dateKeyToUTCDate(payment.dueDate),
-            month: Number(payment.dueDate.slice(5, 7)),
-            year: Number(payment.dueDate.slice(0, 4)),
             description: payment.description || null,
             ...paymentUpdateData(payment),
           },

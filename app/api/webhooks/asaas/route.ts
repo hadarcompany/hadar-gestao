@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AsaasPayment } from "@/lib/asaas";
-import { paymentUpdateData } from "@/lib/asaas";
-import { dateKeyToUTCDate } from "@/lib/dates";
+import { paymentUpdateData, getAsaasPayment, AsaasApiError } from "@/lib/asaas";
 import { getAsaasWebhookToken } from "@/lib/asaas-integration-server";
 import { validAsaasWebhookToken } from "@/lib/asaas-integration";
 
@@ -13,10 +12,18 @@ type AsaasWebhookPayload = {
   payment?: AsaasPayment;
 };
 
-function canReceiveFinanceAlerts(user: { role: string; permissions: Prisma.JsonValue | null }) {
+function canReceiveFinanceAlerts(user: {
+  role: string;
+  permissions: Prisma.JsonValue | null;
+}) {
   if (user.role === "ADMIN") return true;
   const permissions = user.permissions;
-  if (!permissions || typeof permissions !== "object" || Array.isArray(permissions)) return false;
+  if (
+    !permissions ||
+    typeof permissions !== "object" ||
+    Array.isArray(permissions)
+  )
+    return false;
   const level = (permissions as Prisma.JsonObject).financeiro;
   return level === "view" || level === "edit";
 }
@@ -33,10 +40,14 @@ async function createPaymentNotifications(
 ) {
   const kind = ["PAYMENT_RECEIVED", "PAYMENT_CONFIRMED"].includes(event)
     ? "PAYMENT_RECEIVED"
-    : event === "PAYMENT_OVERDUE" ? "PAYMENT_OVERDUE" : null;
+    : event === "PAYMENT_OVERDUE"
+      ? "PAYMENT_OVERDUE"
+      : null;
   if (!kind) return;
 
-  const users = await tx.user.findMany({ select: { id: true, role: true, permissions: true } });
+  const users = await tx.user.findMany({
+    select: { id: true, role: true, permissions: true },
+  });
   const recipients = users.filter(canReceiveFinanceAlerts);
   if (recipients.length === 0) return;
 
@@ -45,7 +56,9 @@ async function createPaymentNotifications(
     data: recipients.map((user) => ({
       userId: user.id,
       type: kind,
-      title: received ? `Pagamento recebido: ${receivable.client.name}` : `Cobrança vencida: ${receivable.client.name}`,
+      title: received
+        ? `Pagamento recebido: ${receivable.client.name}`
+        : `Cobrança vencida: ${receivable.client.name}`,
       body: received
         ? `${brl(payment.value)} entrou pelo Asaas.`
         : `${brl(payment.value)} venceu em ${payment.dueDate}.`,
@@ -60,15 +73,62 @@ export async function POST(req: NextRequest) {
   const expectedToken = await getAsaasWebhookToken();
   const receivedToken = req.headers.get("asaas-access-token");
   if (!validAsaasWebhookToken(expectedToken, receivedToken)) {
-    return NextResponse.json({ error: "Webhook não autorizado." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Webhook não autorizado." },
+      { status: 401 },
+    );
   }
 
-  const payload = await req.json() as AsaasWebhookPayload;
-  if (!payload.id || !payload.event || !payload.payment?.id) {
+  const payload = (await req
+    .json()
+    .catch(() => null)) as AsaasWebhookPayload | null;
+  if (!payload?.id || !payload.event || !payload.payment?.id) {
     return NextResponse.json({ error: "Evento inválido." }, { status: 400 });
   }
 
   try {
+    if (
+      await prisma.asaasWebhookEvent.findUnique({
+        where: { id: payload.id },
+        select: { id: true },
+      })
+    )
+      return NextResponse.json({ ok: true, duplicate: true });
+    const externalReference = payload.payment.externalReference;
+    const snapshot = await prisma.receivable.findFirst({
+      where: {
+        OR: [
+          { asaasPaymentId: payload.payment.id },
+          ...(externalReference
+            ? [
+                {
+                  id: externalReference,
+                  OR: [
+                    { asaasPaymentId: null },
+                    { asaasPaymentId: payload.payment.id },
+                  ],
+                },
+              ]
+            : []),
+        ],
+      },
+      select: { id: true, asaasSyncedAt: true, paidDate: true },
+    });
+    let current: AsaasPayment;
+    try {
+      current = await getAsaasPayment(payload.payment.id, 8000);
+    } catch (error) {
+      if (
+        payload.event === "PAYMENT_DELETED" &&
+        error instanceof AsaasApiError &&
+        error.status === 404
+      )
+        current = { ...payload.payment, deleted: true };
+      else throw error;
+    }
+    if (current.id !== payload.payment.id)
+      throw Error("Invalid provider payment");
+    const latestData = paymentUpdateData(current);
     await prisma.$transaction(async (tx) => {
       await tx.asaasWebhookEvent.create({
         data: {
@@ -79,51 +139,100 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const externalReference = payload.payment!.externalReference;
+      const externalReference = current.externalReference;
       const match = await tx.receivable.findFirst({
         where: {
           OR: [
-            { asaasPaymentId: payload.payment!.id },
-            ...(externalReference ? [{ id: externalReference }] : []),
+            { asaasPaymentId: current.id },
+            ...(externalReference
+              ? [
+                  {
+                    id: externalReference,
+                    OR: [
+                      { asaasPaymentId: null },
+                      { asaasPaymentId: current.id },
+                    ],
+                  },
+                ]
+              : []),
           ],
         },
-        select: { id: true },
+        select: { id: true, paidDate: true, asaasSyncedAt: true },
       });
-      let receivable: { id: string; clientId: string; client: { name: string } } | null = null;
+      let receivable: {
+        id: string;
+        clientId: string;
+        client: { name: string };
+      } | null = null;
       if (match) {
-        receivable = await tx.receivable.update({
+        // Do not overwrite a fresher reconciliation/webhook completed during the provider GET.
+        if (!snapshot || snapshot.id !== match.id) return;
+        const changed = await tx.receivable.updateMany({
+          where: { id: match.id, asaasSyncedAt: snapshot.asaasSyncedAt },
+          data: paymentUpdateData(current, match.paidDate),
+        });
+        if (!changed.count) return;
+        receivable = await tx.receivable.findUnique({
           where: { id: match.id },
-          data: paymentUpdateData(payload.payment!),
-          select: { id: true, clientId: true, client: { select: { name: true } } },
+          select: {
+            id: true,
+            clientId: true,
+            client: { select: { name: true } },
+          },
         });
       } else {
         const client = await tx.client.findUnique({
-          where: { asaasCustomerId: payload.payment!.customer },
+          where: { asaasCustomerId: current.customer },
           select: { id: true },
         });
         if (client) {
           receivable = await tx.receivable.create({
             data: {
               clientId: client.id,
-              amount: payload.payment!.value,
-              dueDate: dateKeyToUTCDate(payload.payment!.dueDate),
-              month: Number(payload.payment!.dueDate.slice(5, 7)),
-              year: Number(payload.payment!.dueDate.slice(0, 4)),
-              description: payload.payment!.description || null,
-              ...paymentUpdateData(payload.payment!),
+              description: current.description || null,
+              ...latestData,
             },
-            select: { id: true, clientId: true, client: { select: { name: true } } },
+            select: {
+              id: true,
+              clientId: true,
+              client: { select: { name: true } },
+            },
           });
         }
       }
-      if (receivable) await createPaymentNotifications(tx, payload.event!, payload.payment!, receivable);
+      const effectiveEvent =
+        latestData.status === "PAID"
+          ? "PAYMENT_RECEIVED"
+          : latestData.status === "OVERDUE" && !current.deleted
+            ? "PAYMENT_OVERDUE"
+            : "";
+      if (receivable && effectiveEvent)
+        await createPaymentNotifications(
+          tx,
+          effectiveEvent,
+          current,
+          receivable,
+        );
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002" &&
+      (await prisma.asaasWebhookEvent.findUnique({
+        where: { id: payload.id },
+        select: { id: true },
+      }))
+    ) {
       return NextResponse.json({ ok: true, duplicate: true });
     }
-    console.error("Erro ao processar webhook do Asaas:", error);
-    return NextResponse.json({ error: "Falha ao processar evento." }, { status: 500 });
+    console.error(
+      "Erro ao processar webhook do Asaas:",
+      error instanceof Error ? error.name : "UnknownError",
+    );
+    return NextResponse.json(
+      { error: "Falha ao processar evento." },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ ok: true });

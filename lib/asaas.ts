@@ -37,6 +37,7 @@ export type AsaasPayment = {
   externalReference?: string;
   invoiceUrl?: string;
   bankSlipUrl?: string;
+  deleted?: boolean;
 };
 
 export async function asaasRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -103,8 +104,8 @@ export async function findAsaasPaymentByExternalReference(externalReference: str
   return result.data[0] ?? null;
 }
 
-export async function getAsaasPayment(id: string) {
-  return asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(id)}`);
+export async function getAsaasPayment(id: string, timeoutMs = 30000) {
+  return asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(id)}`,{signal:AbortSignal.timeout(timeoutMs)});
 }
 
 export async function createAsaasPayment(input: {
@@ -155,14 +156,27 @@ export function mapAsaasStatus(status?: string): ReceivableStatus {
 
 export function paymentDateFromAsaas(payment: AsaasPayment): Date | null {
   const value = payment.paymentDate || payment.clientPaymentDate || payment.confirmedDate;
-  return value ? new Date(`${value}T00:00:00.000Z`) : null;
+  return value ? asaasDate(value) : null;
 }
 
-export function paymentUpdateData(payment: AsaasPayment) {
+function asaasDate(value: string): Date {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new AsaasApiError("O Asaas retornou uma data inválida.", 502);
+  }
+  return date;
+}
+
+export function paymentUpdateData(payment: AsaasPayment, previousPaidDate?: Date|null) {
+  if(!payment.id || !Number.isFinite(payment.value) || payment.value<0)throw new AsaasApiError('O Asaas retornou uma cobrança inválida.',502);
   const status = mapAsaasStatus(payment.status);
   return {
+    amount:payment.value,
+    dueDate:asaasDate(payment.dueDate),
+    month:Number(payment.dueDate.slice(5,7)),
+    year:Number(payment.dueDate.slice(0,4)),
     asaasPaymentId: payment.id,
-    asaasStatus: payment.status,
+    asaasStatus: payment.deleted ? 'DELETED' : payment.status,
     billingType: payment.billingType,
     asaasInvoiceUrl: payment.invoiceUrl || null,
     asaasBankSlipUrl: payment.bankSlipUrl || null,
@@ -170,6 +184,6 @@ export function paymentUpdateData(payment: AsaasPayment) {
     asaasSyncedAt: new Date(),
     asaasSyncError: null,
     status,
-    paidDate: status === "PAID" ? paymentDateFromAsaas(payment) || new Date() : null,
+    paidDate: status === "PAID" ? paymentDateFromAsaas(payment) || previousPaidDate || new Date() : null,
   };
 }
