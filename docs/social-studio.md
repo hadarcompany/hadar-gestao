@@ -52,11 +52,12 @@ Calendário consulta até 2.000 eventos por mês, independentemente da paginaç�
 fila (50 itens). Filtros por cliente/todos, rede, canal e situação. Ao exceder a
 janela, informa truncamento e pede filtros. Selecionar dia filtra a fila no servidor.
 
+Os relatórios completos e a rotina de coleta são descritos em [social-analytics.md](social-analytics.md).
 Relatórios por cliente, períodos de até 30 dias e cache de 30 minutos. Seguidores
 são o total atual; alcance, visualizações e interações são totais do período
 retornados pela Meta. Não soma alcance único diário. Valores ausentes são nulos e
-aparecem como indisponíveis. Lista até 500 publicações recentes e informa resultado
-parcial; Stories expirados não entram nessa lista. CSV trata valores como dados,
+aparecem como indisponíveis. Consulta até 1.000 mídias do histórico coletado e informa
+resultado parcial. Stories expirados aparecem quando foram coletados a tempo. CSV trata valores como dados,
 neutralizando fórmulas de planilha.
 
 Instagram precisa de `instagram_business_manage_insights`; a autorização estendida

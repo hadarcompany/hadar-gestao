@@ -17,6 +17,7 @@
     "test:security": "tsx --test tests/security.test.ts",
     "test:social": "tsx --test tests/social.test.ts",
     "test:social:db": "tsx scripts/test-social-studio.cjs",
+    "test:social:analytics:db": "tsx scripts/test-social-analytics.cjs",
     "social:prepare": "tsx scripts/prepare-social.ts"
   },
   "dependencies": {

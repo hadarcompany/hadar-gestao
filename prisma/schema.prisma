@@ -601,6 +601,9 @@ model SocialAccount {
   posts                SocialPost[]
   series               SocialSeries[]
   reports              SocialReportSnapshot[]
+  metricDays           SocialMetricDay[]
+  mediaMetrics         SocialMediaMetric[]
+  analyticsState       SocialAnalyticsState?
   @@unique([provider, externalId])
   @@index([clientId])
   @@map("social_accounts")
@@ -712,6 +715,49 @@ model SocialReportSnapshot {
   fetchedAt DateTime @default(now())
   @@unique([accountId, rangeKey])
   @@map("social_report_snapshots")
+}
+
+model SocialMetricDay {
+  id String @id @default(cuid())
+  accountId String
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  day String
+  followers Int?
+  follows Int?
+  unfollows Int?
+  capturedAt DateTime @default(now())
+  @@unique([accountId, day])
+  @@map("social_metric_days")
+}
+
+model SocialMediaMetric {
+  id String @id @default(cuid())
+  accountId String
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId String
+  channel String
+  publishedAt DateTime
+  data Json
+  firstSeenAt DateTime @default(now())
+  fetchedAt DateTime?
+  attemptedAt DateTime?
+  @@unique([accountId, externalId])
+  @@index([accountId, publishedAt])
+  @@index([accountId, attemptedAt])
+  @@map("social_media_metrics")
+}
+
+model SocialAnalyticsState {
+  accountId String @id
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  startedAt DateTime @default(now())
+  lastCollectedAt DateTime?
+  nextAttemptAt DateTime @default(now())
+  lockToken String?
+  lockedAt DateTime?
+  warning String?
+  @@index([nextAttemptAt])
+  @@map("social_analytics_state")
 }
 
 model SocialWorkerState {

@@ -18,6 +18,16 @@ import {
 } from "../lib/social/schedule";
 import { validateOptions } from "../lib/social/options";
 import { insightTotals } from "../lib/social/reports";
+import {
+  emptyMedia,
+  breakdownRows,
+  parseMediaMetrics,
+  ratio,
+  mediaSummary,
+  timePerformance,
+  safeSocialUrl,
+  csvCell,
+} from "../lib/social/analytics-data";
 
 const native = createRequire(resolve("package.json"));
 function load(file: string, mocks: Record<string, unknown>) {
@@ -86,6 +96,18 @@ test("um campo de perfil indisponível não apaga métricas e publicações que 
   const { accountReport } = load("lib/social/reports.ts", {
     "@/lib/prisma": {
       prisma: {
+        socialAnalyticsState: { findUnique: async () => null },
+        socialMetricDay: { findMany: async () => [] },
+        socialMediaMetric: {
+          findMany: async () => [
+            {
+              externalId: "456",
+              channel: "POST",
+              data: { ...emptyMedia("456", "POST"), likes: 0, comments: 3 },
+              fetchedAt: null,
+            },
+          ],
+        },
         socialReportSnapshot: {
           findUnique: async () => null,
           upsert: async () => {},
@@ -94,6 +116,13 @@ test("um campo de perfil indisponível não apaga métricas e publicações que 
       },
     },
     "./core": { unseal: () => "private-test-token" },
+    "./analytics-collector": {
+      readMetrics: async () => [
+        { name: "reach", total_value: { value: 5 } },
+        { name: "total_interactions", total_value: { value: 2 } },
+      ],
+      analyticsCall: async () => ({ data: [] }),
+    },
     "./meta": {
       meta: async (_p: string, path: string, _token: string, fields: any) => {
         if (path === "123") throw Error("Unsupported profile field");
@@ -141,6 +170,134 @@ test("um campo de perfil indisponível não apaga métricas e publicações que 
   assert(result.warning);
   assert(result.insightsWarning);
   assert(!JSON.stringify(result).includes("private-test-token"));
+});
+
+test("relatórios interpretam dimensões por nome, preservam nulos e navegação em minúsculas", () => {
+  const data: any = {
+    name: "navigation",
+    values: [{ value: 25 }],
+    total_value: {
+      breakdowns: [
+        {
+          dimension_keys: ["story_navigation_action_type"],
+          results: [
+            { dimension_values: ["tap_forward"], value: 19 },
+            { dimension_values: ["tap_back"], value: 4 },
+            { dimension_values: ["tap_exit"], value: 1 },
+            { dimension_values: ["swipe_forward"], value: 1 },
+          ],
+        },
+      ],
+    },
+  };
+  assert.deepEqual(parseMediaMetrics([data], "STORY"), {
+    navigation: 25,
+    exits: 1,
+    back: 4,
+    forward: 19,
+    next: 1,
+  });
+  assert.deepEqual(
+    breakdownRows(
+      {
+        name: "demo",
+        total_value: {
+          breakdowns: [
+            {
+              dimension_keys: ["timeframe", "gender", "age"],
+              results: [
+                { dimension_values: ["THIS_MONTH", "F", "25-34"], value: 0 },
+              ],
+            },
+          ],
+        },
+      },
+      "age",
+    ),
+    [{ label: "25-34", value: 0, gender: "F" }],
+  );
+  assert.equal(ratio(2, 0), null);
+  assert.equal(ratio(null, 10), null);
+  assert.equal(ratio(0, 10), 0);
+});
+test("médias usam somente valores conhecidos e separam Reels de posts e Stories", () => {
+  const a = {
+    ...emptyMedia("1", "REEL"),
+    views: 100,
+    interactions: 10,
+    reach: 50,
+    timestamp: "2026-10-19T03:15:00Z",
+  };
+  const b = {
+    ...emptyMedia("2", "POST"),
+    views: null,
+    interactions: 0,
+    reach: 10,
+    timestamp: "2026-10-19T12:00:00Z",
+  };
+  const summary = mediaSummary([a, b]);
+  assert.equal(summary.views.value, 100);
+  assert.equal(summary.views.known, 1);
+  assert.equal(summary.averageViews, 100);
+  assert.equal(summary.averageInteractions, 5);
+  assert.equal(summary.averageEngagement, 10);
+  assert.equal(timePerformance([a])[0].day, 1);
+  assert.equal(timePerformance([a])[0].hour, 0);
+});
+test("links de mídia e CSV não transmitem tokens nem executam fórmulas", () => {
+  assert.equal(
+    safeSocialUrl("https://cdninstagram.com.evil.test/x", true),
+    null,
+  );
+  assert.equal(
+    safeSocialUrl("https://www.instagram.com/p/1?access_token=private"),
+    null,
+  );
+  assert.equal(
+    safeSocialUrl("https://scontent.cdninstagram.com/x", true),
+    "https://scontent.cdninstagram.com/x",
+  );
+  assert.equal(
+    csvCell('  =WEBSERVICE("secret")'),
+    '"\'  =WEBSERVICE(""secret"")"',
+  );
+});
+test("coletor de relatórios recusa chamadas sem segredo e não usa sessão de navegador", async () => {
+  const { POST } = load("app/api/social/analytics/worker/route.ts", {
+    "@/lib/social/analytics-collector": {
+      runAnalyticsCollector: async () => {
+        throw Error("Must not run");
+      },
+    },
+  });
+  const before = process.env.SOCIAL_WORKER_SECRET;
+  process.env.SOCIAL_WORKER_SECRET = "a".repeat(40);
+  try {
+    assert.equal(
+      (
+        await POST(
+          new Request("https://app.test/api/social/analytics/worker", {
+            method: "POST",
+          }),
+        )
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await POST(
+          new Request("https://app.test/api/social/analytics/worker", {
+            method: "POST",
+            headers: { authorization: "Bearer " + "x".repeat(40) },
+          }),
+        )
+      ).status,
+      401,
+    );
+  } finally {
+    if (before === undefined) delete process.env.SOCIAL_WORKER_SECRET;
+    else process.env.SOCIAL_WORKER_SECRET = before;
+  }
 });
 
 test("publicar agora cria uma única ocorrência direta e continua exigindo administrador e worker ativo", async () => {

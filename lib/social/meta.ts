@@ -20,6 +20,7 @@ export async function meta<T>(
   token: string,
   fields: Record<string, string> = {},
   method = "GET",
+  timeoutMs = 45000,
 ): Promise<T> {
   const url = new URL(
     `https://${p === "INSTAGRAM" ? "graph.instagram.com" : "graph.facebook.com"}/${graphVersion()}/${path}`,
@@ -31,7 +32,7 @@ export async function meta<T>(
     method,
     redirect: "error",
     cache: "no-store",
-    signal: AbortSignal.timeout(45000),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: {
       Authorization: `Bearer ${token}`,
       ...(method === "POST"

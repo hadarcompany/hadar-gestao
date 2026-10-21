@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect Hadar social analytics every minute for %i
+
+[Timer]
+OnBootSec=90
+OnUnitInactiveSec=60
+AccuracySec=10
+Unit=hadar-analytics@%i.service
+
+[Install]
+WantedBy=timers.target

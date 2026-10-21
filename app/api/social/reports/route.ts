@@ -32,7 +32,11 @@ export async function GET(req: Request) {
       orderBy: { name: "asc" },
     });
     const reports = [];
-    for (const a of accounts) reports.push(await accountReport(a, start, end));
+    const deadline = Date.now() + 210000;
+    for (const a of accounts)
+      reports.push(
+        await accountReport(a, start, end, Date.now() < deadline - 125000),
+      );
     const editorial = await prisma.socialPost.groupBy({
       by: ["status"],
       where: {
@@ -44,13 +48,16 @@ export async function GET(req: Request) {
       },
       _count: { _all: true },
     });
-    return NextResponse.json({
-      reports,
-      editorial,
-      start,
-      end,
-      generatedAt: new Date(),
-    });
+    return NextResponse.json(
+      {
+        reports,
+        editorial,
+        start,
+        end,
+        generatedAt: new Date(),
+      },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (e) {
     return failure(e);
   }

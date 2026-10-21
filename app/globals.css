@@ -84,3 +84,15 @@ body {
     font-weight: 600;
   }
 }
+@media print {
+  body:has([data-social-report]) .social-shell > :not(main),
+  body:has([data-social-report]) .social-shell > main > header,
+  body:has([data-social-report]) [data-ui]:has([data-social-report]) > :not([data-social-report]) {
+    display: none !important;
+  }
+  body:has([data-social-report]) .social-shell > main {
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+}

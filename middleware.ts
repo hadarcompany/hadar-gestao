@@ -37,7 +37,7 @@ export async function middleware(request: NextRequest) {
   const isLoginPage = pathname === "/login";
   const isApiAuth = pathname.startsWith("/api/auth");
   // Worker authenticates its own bearer secret, never a browser session.
-  const isSocialWorker = pathname === "/api/social/worker";
+  const isSocialWorker = pathname === "/api/social/worker" || pathname === "/api/social/analytics/worker";
   const isPublicWebhook =
     pathname === "/api/webhooks/asaas" ||
     pathname === "/api/webhooks/whatsapp" ||
