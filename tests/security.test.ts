@@ -13,6 +13,7 @@ import { createLoginLimiter, parseLogin } from "../lib/login-security";
 import { CLIENT_FIELDS, TASK_FIELDS, pickWritableFields } from "../lib/security-input";
 import { publicOrigin } from "../lib/public-url";
 import { trialExpired, trialDenial } from "../lib/instance-trial";
+import { isPublicLegalPage } from "../lib/public-legal";
 
 const root = process.cwd();
 const nativeRequire = createRequire(join(root, "package.json"));
@@ -50,6 +51,32 @@ test("teste vence no instante definido e configuração ausente não limita a Ha
   assert.equal(trialDenial(request("/dashboard"), expiry, end)!.status, 402);
   assert.equal(trialDenial(request("/api/auth/logout", "POST"), expiry, end), null);
   assert.equal(trialDenial(request("/api/webhooks/asaas", "POST"), expiry, end), null);
+});
+
+test("avisos públicos não exigem sessão ou teste ativo e não liberam APIs ou subcaminhos", async () => {
+  let authCalls = 0;
+  const middleware = loadModule("middleware.ts", {
+    "@supabase/ssr": { createServerClient: () => { authCalls++; return { auth: { getUser: async () => ({ data: { user: null } }) } }; } },
+    "./lib/public-legal": { isPublicLegalPage },
+    "./lib/instance-trial": { trialDenial },
+    "./lib/public-url": { publicOrigin },
+  }).middleware;
+  const expiry = "2026-01-01T00:00:00Z";
+  for (const path of ["/privacidade", "/exclusao-de-dados"]) {
+    for (const method of ["GET", "HEAD"]) {
+      assert.equal(trialDenial(request(path, method), expiry), null);
+      assert.equal((await middleware(request(path, method))).headers.get("x-middleware-next"), "1");
+    }
+    assert.equal(isPublicLegalPage(path, "POST"), false);
+    assert.equal(trialDenial(request(path, "POST"), expiry)!.status, 402);
+  }
+  assert.equal(authCalls, 0);
+  for (const path of ["/api/social/accounts", "/privacidade/api", "/exclusao-de-dados/export", "/dashboard"]) {
+    assert.equal(isPublicLegalPage(path, "GET"), false);
+    assert.equal(trialDenial(request(path), expiry)!.status, 402);
+    assert.equal((await middleware(request(path))).status, 307);
+  }
+  assert.equal(authCalls, 4);
 });
 
 test("visualização não permite edição/exclusão; desconhecidos e Acessos negados mesmo para admin", () => {

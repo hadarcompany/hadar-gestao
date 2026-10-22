@@ -2,8 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { publicOrigin } from "./lib/public-url";
 import { trialDenial } from "./lib/instance-trial";
+import { isPublicLegalPage } from "./lib/public-legal";
 
 export async function middleware(request: NextRequest) {
+  // Static notices must remain readable without an account or an active trial.
+  if (isPublicLegalPage(request.nextUrl.pathname, request.method)) return NextResponse.next();
   const expired = trialDenial(request);
   if (expired) return expired;
   let supabaseResponse = NextResponse.next({ request });
