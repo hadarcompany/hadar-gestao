@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Logo } from "@/components/logo";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -79,6 +80,10 @@ export default function LoginPage() {
             {loading ? "Entrando..." : "Entrar"}
           </button>
         </form>
+        <nav aria-label="Informações sobre dados pessoais" className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-gray-600">
+          <Link href="/privacidade" className="underline underline-offset-4 hover:text-gray-900">Privacidade</Link>
+          <Link href="/exclusao-de-dados" className="underline underline-offset-4 hover:text-gray-900">Exclusão de dados</Link>
+        </nav>
       </div>
     </div>
   );
