@@ -7,6 +7,7 @@ import { EXPENSE_PAYMENT_OPTIONS } from "@/lib/expense-payments";
 
 export type CreditCardInfo = {
   id: string; name: string; bank: string | null; brand: string | null; color: string; isActive: boolean;
+  closingDay?: number | null; dueDay?: number | null;
 };
 
 export type ExpensePaymentInfo = {

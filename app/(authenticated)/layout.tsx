@@ -53,11 +53,11 @@ export default function AuthenticatedLayout({
   return (
     <LabelsProvider>
       <AreasProvider>
-      <div className={`flex min-h-screen${pathname.startsWith("/publicacoes") ? " social-shell" : ""}`}>
+      <div className={`flex min-h-screen${pathname.startsWith("/publicacoes") ? " social-shell" : pathname.startsWith("/financeiro") ? " finance-shell" : ""}`}>
         <Sidebar />
         <main className="flex-1 ml-60 px-8 pb-8">
           <header className="sticky top-0 z-40 -mx-8 mb-6 px-8 py-3 flex items-center justify-end bg-[#f5f5f4]/85 backdrop-blur border-b border-gray-200/70">
-            {pathname.startsWith("/publicacoes") && <span className="social-mobile-brand">Hadar Gestão</span>}
+            {(pathname.startsWith("/publicacoes") || pathname.startsWith("/financeiro")) && <span className="social-mobile-brand">Hadar Gestão</span>}
             <NotificationBell />
           </header>
           <div key={dataVersion}>{children}</div>
