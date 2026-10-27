@@ -30,6 +30,8 @@ test("short months clamp and successive installments never collide", () => {
   assert.equal(addCalendarMonths("2024-01-31", 1), "2024-02-29");
   assert.equal(addCalendarMonths("2026-01-31", 2), "2026-03-31");
   assert.throws(() => calendarDate("2026-02-30"));
+  assert.throws(() => calendarDate("2026-02-30T00:00:00.000Z"));
+  assert.deepEqual(invoiceForPurchase("2026-12-31", { closingDay: 31, dueDay: 31 }), { month: 1, year: 2027 });
   const first = invoiceForPurchase("2026-01-30", { closingDay: 29, dueDay: 5 });
   assert.deepEqual([0, 1, 2].map(i => shiftPeriod(first, i)), [{ month: 3, year: 2026 }, { month: 4, year: 2026 }, { month: 5, year: 2026 }]);
   assert.equal(invoiceDates({ month: 3, year: 2024 }, { closingDay: 31, dueDay: 5 }).closesAt, "2024-02-29");
