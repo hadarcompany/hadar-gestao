@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CreditCard, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -9,8 +9,11 @@ import { useAuth } from "@/contexts/auth-context";
 import { canEdit } from "@/lib/permissions";
 import { useFetch } from "@/lib/hooks";
 import type { CreditCardInfo } from "./expense-payment-fields";
+import { CardInvoicePanel } from "./card-invoice-panel";
+import { getTodayKey } from "@/lib/dates";
+import { shiftPeriod } from "@/lib/card-invoices";
 
-const EMPTY_CARD = { name: "", bank: "", brand: "", color: "#FF5A00", isActive: true };
+const EMPTY_CARD = { name: "", bank: "", brand: "", color: "#FF5A00", isActive: true, closingDay: "", dueDay: "" };
 const COLORS = ["#FF5A00", "#7C3AED", "#2563EB", "#059669", "#DB2777", "#1F2937"];
 
 export function CreditCardsTab() {
@@ -23,10 +26,13 @@ export function CreditCardsTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [period, setPeriod] = useState(() => getTodayKey().slice(0, 7));
+  const [year, month] = period.split("-").map(Number);
+  function movePeriod(offset: number) { const next = shiftPeriod({ month, year }, offset); if (next.year >= 1900 && next.year <= 9998) setPeriod(`${next.year}-${String(next.month).padStart(2, "0")}`); }
 
   function openCard(card?: CreditCardInfo) {
     setEditId(card?.id ?? null);
-    setForm(card ? { name: card.name, bank: card.bank ?? "", brand: card.brand ?? "", color: card.color, isActive: card.isActive } : EMPTY_CARD);
+    setForm(card ? { name: card.name, bank: card.bank ?? "", brand: card.brand ?? "", color: card.color, isActive: card.isActive, closingDay: card.closingDay ? String(card.closingDay) : "", dueDay: card.dueDay ? String(card.dueDay) : "" } : EMPTY_CARD);
     setError("");
     setShowModal(true);
   }
@@ -60,11 +66,12 @@ export function CreditCardsTab() {
   return (
     <div className="animate-in fade-in space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-sm text-gray-500">Identifique os cartões usados nas despesas apenas com nome, banco, bandeira e cor.</p>
+        <p className="text-sm text-gray-500">Confira as faturas por cartão e mês de vencimento.</p>
         {editable && <button onClick={() => openCard()} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-colors">
           <Plus size={16} /> Novo Cartão
         </button>}
       </div>
+      <div className="flex items-center gap-3 flex-wrap"><button type="button" aria-label="Fatura do mês anterior" onClick={() => movePeriod(-1)} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"><ChevronLeft size={18} /></button><Input aria-label="Mês e ano da fatura" type="month" min="1900-01" max="9998-12" value={period} onChange={event => { if (/^\d{4}-\d{2}$/.test(event.target.value)) setPeriod(event.target.value); }} /><button type="button" aria-label="Fatura do próximo mês" onClick={() => movePeriod(1)} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"><ChevronRight size={18} /></button><p className="text-xs text-gray-500">Compras no dia do fechamento entram na fatura que fecha naquele dia.</p></div>
       {(loadError || (error && !showModal)) && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">
         {loadError ? "Não foi possível carregar os cartões." : error}
         {loadError && <button onClick={refetch} className="ml-2 underline">Tentar novamente</button>}
@@ -84,6 +91,7 @@ export function CreditCardsTab() {
                 <p className="text-xs text-white/90 mt-1 break-words">{[card.bank, card.brand].filter(Boolean).join(" · ") || "Cartão de crédito"}</p>
               </div>
             </div>
+            <CardInvoicePanel key={`${card.id}:${period}:${card.closingDay}:${card.dueDay}`} card={card} month={month} year={year} editable={editable} />
             {editable && <div className="flex justify-end gap-4 p-4">
               <button onClick={() => openCard(card)} className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-accent"><Pencil size={13} /> Editar</button>
               <button onClick={() => setDeleteId(card.id)} className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-red-600"><Trash2 size={13} /> Excluir</button>
@@ -97,6 +105,11 @@ export function CreditCardsTab() {
             <Input label="Banco (opcional)" placeholder="Ex: Nubank" maxLength={100} value={form.bank} onChange={(e) => setForm({ ...form, bank: e.target.value })} />
             <Input label="Bandeira (opcional)" placeholder="Ex: Mastercard" maxLength={50} value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Dia de fechamento da fatura" aria-label="Dia de fechamento da fatura" type="number" min="1" max="31" required value={form.closingDay} onChange={e => setForm({ ...form, closingDay: e.target.value })} />
+            <Input label="Dia de vencimento da fatura" aria-label="Dia de vencimento da fatura" type="number" min="1" max="31" required value={form.dueDay} onChange={e => setForm({ ...form, dueDay: e.target.value })} />
+          </div>
+          <p className="text-xs text-gray-500">Em meses mais curtos, usamos o último dia do mês. Alterar estas datas recalcula a distribuição das compras; valores pagos permanecem no cartão e mês informados.</p>
           <fieldset className="space-y-2">
             <legend className="text-xs text-gray-500 uppercase tracking-wider font-medium">Cor do cartão</legend>
             <div className="flex flex-wrap gap-2 items-center">

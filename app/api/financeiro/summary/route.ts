@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
   });
 
   const investments = await prisma.investment.findMany({
-    where: { date: { gte: startDate, lte: endDate } },
+    where: { date: { gte: startDate, lte: endDate }, expenses: { none: {} } },
   });
   const totalInvestments = investments.reduce((sum, e) => sum + e.amount, 0);
   if (totalInvestments > 0) {

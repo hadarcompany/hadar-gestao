@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { canEdit, canView } from "@/lib/permissions";
 import { ExpensePaymentError } from "@/lib/expense-payments";
 import { resolveExpensePayment } from "@/lib/expense-payments-server";
+import { syncExpenseCash } from "@/lib/expense-cash";
+import { financeTransaction } from "@/lib/finance-transactions";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
   const { name, category, amount, paidWithCash, month, year } = body;
 
   try {
-    const expense = await prisma.$transaction(async (db) => {
+    const expense = await financeTransaction(async (db) => {
       const payment = await resolveExpensePayment(db, body);
       const expense = await db.fixedExpense.create({
         data: {
@@ -47,15 +49,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      if (paidWithCash) {
-        await db.cashEntry.create({
-          data: {
-            type: "RETIRADA_DESPESA",
-            amount: parseFloat(amount),
-            description: `Despesa Fixa: ${name}`,
-          },
-        });
-      }
+      await syncExpenseCash(db, { fixedExpenseId: expense.id }, expense, `Despesa Fixa: ${expense.name}`);
       return expense;
     });
     return NextResponse.json(expense, { status: 201 });
@@ -76,11 +70,11 @@ export async function PATCH(req: NextRequest) {
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
   try {
-    const expense = await prisma.$transaction(async (db) => {
+    const expense = await financeTransaction(async (db) => {
       const existing = await db.fixedExpense.findUnique({ where: { id } });
       if (!existing) return null;
       const payment = await resolveExpensePayment(db, body, existing);
-      return db.fixedExpense.update({
+      const updated = await db.fixedExpense.update({
         where: { id },
         data: {
           ...payment,
@@ -92,6 +86,8 @@ export async function PATCH(req: NextRequest) {
           ...(body.paidWithCash !== undefined ? { paidWithCash: Boolean(body.paidWithCash) } : {}),
         },
       });
+      await syncExpenseCash(db, { fixedExpenseId: updated.id }, updated, `Despesa Fixa: ${updated.name}`);
+      return updated;
     });
     if (!expense) return NextResponse.json({ error: "Despesa não encontrada." }, { status: 404 });
     return NextResponse.json(expense);

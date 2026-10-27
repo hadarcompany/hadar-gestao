@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { canEdit, canView } from "@/lib/permissions";
 import { ExpensePaymentError } from "@/lib/expense-payments";
 import { resolveExpensePayment } from "@/lib/expense-payments-server";
+import { syncExpenseCash } from "@/lib/expense-cash";
+import { financeTransaction } from "@/lib/finance-transactions";
 
 export async function GET(req: NextRequest) {
   const auth = await getServerAuth();
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
   const { name, category, amount, date, paidWithCash } = body;
 
   try {
-    const expense = await prisma.$transaction(async (db) => {
+    const expense = await financeTransaction(async (db) => {
       const payment = await resolveExpensePayment(db, body);
       const expense = await db.variableExpense.create({
         data: {
@@ -57,15 +59,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      if (paidWithCash) {
-        await db.cashEntry.create({
-          data: {
-            type: "RETIRADA_DESPESA",
-            amount: parseFloat(amount),
-            description: `Despesa Avulsa: ${name}`,
-          },
-        });
-      }
+      await syncExpenseCash(db, { variableExpenseId: expense.id }, expense, `Despesa Avulsa: ${expense.name}`);
       return expense;
     });
     return NextResponse.json(expense, { status: 201 });
@@ -86,6 +80,9 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
+  const existing = await prisma.variableExpense.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "Despesa não encontrada." }, { status: 404 });
+  if (existing.investmentId) return NextResponse.json({ error: "Esta parcela pertence a um investimento. Edite o investimento para manter os valores e cartões sincronizados." }, { status: 409 });
   await prisma.variableExpense.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }
@@ -101,14 +98,16 @@ export async function PATCH(req: NextRequest) {
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
   try {
-    const expense = await prisma.$transaction(async (db) => {
+    const expense = await financeTransaction(async (db) => {
       const existing = await db.variableExpense.findUnique({ where: { id } });
       if (!existing) return null;
+      if (existing.investmentId) throw new ExpensePaymentError("Esta parcela pertence a um investimento. Edite o investimento para manter os valores e cartões sincronizados.");
       const payment = await resolveExpensePayment(db, body, existing);
-      return db.variableExpense.update({
+      const updated = await db.variableExpense.update({
         where: { id },
         data: {
           ...payment,
+          ...(body.date !== undefined || body.creditCardId !== undefined || body.paymentMethod !== undefined ? { cardInvoiceMonth: null, cardInvoiceYear: null } : {}),
           ...(body.name !== undefined ? { name: String(body.name) } : {}),
           ...(body.category !== undefined ? { category: body.category } : {}),
           ...(body.amount !== undefined ? { amount: parseFloat(body.amount) } : {}),
@@ -116,6 +115,8 @@ export async function PATCH(req: NextRequest) {
           ...(body.paidWithCash !== undefined ? { paidWithCash: Boolean(body.paidWithCash) } : {}),
         },
       });
+      await syncExpenseCash(db, { variableExpenseId: updated.id }, updated, `Despesa Avulsa: ${updated.name}`);
+      return updated;
     });
     if (!expense) return NextResponse.json({ error: "Despesa não encontrada." }, { status: 404 });
     return NextResponse.json(expense);

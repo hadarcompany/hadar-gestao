@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.fixedExpense.findMany({ select: { amount: true } }),
       prisma.variableExpense.findMany({ where: { date: { gte: monthStart, lt: monthEnd } }, select: { amount: true } }),
-      prisma.investment.findMany({ where: { date: { gte: monthStart, lt: monthEnd } }, select: { amount: true } }),
+      prisma.investment.findMany({ where: { date: { gte: monthStart, lt: monthEnd }, expenses: { none: {} } }, select: { amount: true } }),
     ]);
 
     const received = paid.reduce((sum, item) => sum + item.amount, 0);

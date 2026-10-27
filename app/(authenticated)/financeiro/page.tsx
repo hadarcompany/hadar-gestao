@@ -18,6 +18,9 @@ import {
 import { formatDateBR } from "@/lib/dates";
 import { AsaasChargesTab } from "@/components/financeiro/asaas-charges-tab";
 import { CreditCardsTab } from "@/components/financeiro/credit-cards-tab";
+import { InvestmentsTab } from "@/components/financeiro/investments-tab";
+import { useAuth } from "@/contexts/auth-context";
+import { canEdit } from "@/lib/permissions";
 import { ExpensePaymentFields, type ExpensePaymentInfo } from "@/components/financeiro/expense-payment-fields";
 import { expensePaymentLabel } from "@/lib/expense-payments";
 
@@ -77,15 +80,16 @@ const PERIOD_PRESETS = [
 // ── main component ──────────────────────────────────────────────
 export default function FinanceiroPage() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [investmentToEdit, setInvestmentToEdit] = useState<string | null>(null);
   const [month, setMonth] = useState(CURRENT_MONTH);
   const [year, setYear] = useState(CURRENT_YEAR);
 
   return (
-    <div className="min-h-screen bg-transparent w-full pb-10">
+    <div className="min-h-screen bg-transparent w-full min-w-0 max-w-full pb-10">
 
       {/* HEADER DA PÁGINA */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
-        <div>
+      <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between mb-8 gap-4 min-w-0">
+        <div className="shrink-0">
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             Gestão Financeira
           </h1>
@@ -93,7 +97,7 @@ export default function FinanceiroPage() {
         </div>
 
         {/* TABS (Estilo Hadar) */}
-        <div className="flex bg-white/80 backdrop-blur-md rounded-xl border border-gray-200 p-1 overflow-x-auto custom-scrollbar">
+        <div className="flex min-w-0 max-w-full bg-white/80 backdrop-blur-md rounded-xl border border-gray-200 p-1 overflow-x-auto custom-scrollbar">
           {TABS.map((tab) => (
             <button
               key={tab.key}
@@ -114,9 +118,9 @@ export default function FinanceiroPage() {
       {activeTab === "dashboard" && <DashboardTab />}
       {activeTab === "charges" && <AsaasChargesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
       {activeTab === "fixed" && <FixedExpensesTab />}
-      {activeTab === "variable" && <VariableExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} />}
+      {activeTab === "variable" && <VariableExpensesTab month={month} year={year} setMonth={setMonth} setYear={setYear} onEditInvestment={id => { setInvestmentToEdit(id); setActiveTab("investments"); }} />}
       {activeTab === "cards" && <CreditCardsTab />}
-      {activeTab === "investments" && <InvestmentsTab />}
+      {activeTab === "investments" && <InvestmentsTab initialEditId={investmentToEdit} onEditOpened={() => setInvestmentToEdit(null)} />}
       {activeTab === "prolabore" && <ProLaboreTab year={year} setYear={setYear} />}
       {activeTab === "cash" && <CashTab />}
     </div>
@@ -660,11 +664,11 @@ function FixedExpensesTab() {
 // 4. DESPESAS AVULSAS
 // ══════════════════════════════════════════════════════════════════
 interface VariableExpense extends ExpensePaymentInfo {
-  id: string; name: string; category: string; amount: number; date: string; paidWithCash: boolean;
+  investmentId?: string | null; id: string; name: string; category: string; amount: number; date: string; paidWithCash: boolean;
 }
 
-function VariableExpensesTab({ month, year, setMonth, setYear }: {
-  month: number; year: number; setMonth: (m: number) => void; setYear: (y: number) => void;
+function VariableExpensesTab({ month, year, setMonth, setYear, onEditInvestment }: {
+  month: number; year: number; setMonth: (m: number) => void; setYear: (y: number) => void; onEditInvestment: (id: string) => void;
 }) {
   const [items, setItems] = useState<VariableExpense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -705,8 +709,13 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/financeiro/variable-expenses?id=${id}`, { method: "DELETE" });
-    fetch_();
+    setError("");
+    try {
+      const response = await fetch(`/api/financeiro/variable-expenses?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Não foi possível excluir a despesa.");
+      fetch_();
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível excluir a despesa."); }
   }
 
   function openEdit(item: VariableExpense) {
@@ -753,7 +762,7 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
                       : <span className="text-xs text-gray-400">Operacional</span>}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-3"><button onClick={() => openEdit(e)} className="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-accent transition-colors"><Pencil size={13} /> Editar</button><button onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button></div>
+                    <div className="flex justify-end gap-3"><button onClick={() => e.investmentId ? onEditInvestment(e.investmentId) : openEdit(e)} className="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-accent transition-colors"><Pencil size={13} /> {e.investmentId ? "Editar investimento" : "Editar"}</button><button hidden={!!e.investmentId} onClick={() => setDeleteId(e.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button></div>
                   </td>
                 </tr>
               ))}
@@ -817,209 +826,6 @@ function VariableExpensesTab({ month, year, setMonth, setYear }: {
 
 // ══════════════════════════════════════════════════════════════════
 // 5. INVESTIMENTOS
-// ══════════════════════════════════════════════════════════════════
-interface Investment {
-  id: string; description: string; amount: number; paymentMethod: string; installments: number | null;
-  date: string; paidWithCash: boolean;
-}
-
-function InvestmentsTab() {
-  const [items, setItems] = useState<Investment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ description: "", amount: "", paymentMethod: "A_VISTA", installments: "", firstPaymentDate: "", paidWithCash: false });
-  const [saving, setSaving] = useState(false);
-
-  const fetch_ = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Busca todos os investimentos (sem filtro de mês)
-      const res = await fetch("/api/financeiro/investments");
-      if (res.ok) setItems(await res.json());
-    } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetch_(); }, [fetch_]);
-
-  async function handleCreate() {
-    setSaving(true);
-    try {
-      await fetch("/api/financeiro/investments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: form.description,
-          amount: form.amount,
-          paymentMethod: form.paymentMethod,
-          installments: form.paymentMethod === "PARCELADO" ? form.installments : undefined,
-          date: form.firstPaymentDate,
-          paidWithCash: form.paidWithCash,
-          autoCreateExpenses: true,
-        }),
-      });
-      setShowModal(false);
-      setForm({ description: "", amount: "", paymentMethod: "A_VISTA", installments: "", firstPaymentDate: "", paidWithCash: false });
-      fetch_();
-    } finally { setSaving(false); }
-  }
-
-  async function handleDelete(id: string) {
-    await fetch(`/api/financeiro/investments?id=${id}`, { method: "DELETE" });
-    fetch_();
-  }
-
-  const total = items.reduce((s, e) => s + e.amount, 0);
-  const progress = (investment: Investment) => {
-    const totalAmount = investment.amount || 0;
-    const start = new Date(investment.date);
-    if (investment.paymentMethod === "A_VISTA" || !investment.installments || investment.installments <= 1) {
-      const paid = start.getTime() <= Date.now() ? totalAmount : 0;
-      return { paid, remaining: Math.max(0, totalAmount - paid), monthly: 0 };
-    }
-    const now = new Date();
-    let elapsed = (now.getUTCFullYear() - start.getUTCFullYear()) * 12 + (now.getUTCMonth() - start.getUTCMonth());
-    if (now.getUTCDate() < start.getUTCDate()) elapsed--;
-    const paidInstallments = Math.max(0, Math.min(investment.installments, elapsed + 1));
-    const monthly = totalAmount / investment.installments;
-    const paid = Math.min(totalAmount, monthly * paidInstallments);
-    return { paid, remaining: Math.max(0, totalAmount - paid), monthly: paidInstallments < investment.installments ? monthly : 0 };
-  };
-  const paidTotal = items.reduce((s, e) => s + progress(e).paid, 0);
-  const remainingTotal = items.reduce((s, e) => s + progress(e).remaining, 0);
-  const monthlyTotal = items.reduce((s, e) => s + progress(e).monthly, 0);
-
-  // Preview de parcelas
-  const installmentCount = parseInt(form.installments) || 0;
-  const installmentValue = form.amount && installmentCount > 0
-    ? parseFloat(form.amount) / installmentCount
-    : 0;
-
-  return (
-    <div className="animate-in fade-in">
-      {/* Header - sem filtro de mês */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[["Total", total, "text-red-600"], ["Já pago", paidTotal, "text-emerald-600"], ["Restante", remainingTotal, "text-amber-600"], ["Parcelas / mês", monthlyTotal, "text-blue-600"]].map(([label, value, color]) => (
-            <div key={String(label)} className="bg-white/80 border border-gray-200/60 rounded-2xl px-5 py-3 min-w-[145px]">
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">{label}</p>
-              <p className={`text-xl font-bold ${color}`}>{R$(Number(value))}</p>
-            </div>
-          ))}
-        </div>
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-accent hover:bg-accent-dark text-white rounded-xl transition-all shadow-lg shadow-[#FF5A00]/20">
-          <Plus size={16} /> Novo Investimento
-        </button>
-      </div>
-
-      {loading ? <Spinner /> : (
-        <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200/60 bg-gray-50/30">
-                <Th>Descrição</Th><Th>Valor Total</Th><Th>Já pago</Th><Th>Restante</Th><Th>Parcela/mês</Th><Th>Forma Pgto</Th><Th>Data Início</Th><Th>Origem</Th><Th align="right">Ações</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr><td colSpan={9} className="px-6 py-12 text-center text-sm text-gray-400">Nenhum investimento registrado.</td></tr>
-              ) : items.map((inv) => (
-                <tr key={inv.id} className="border-b border-gray-200/40 hover:bg-gray-100/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-800">{inv.description}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-red-600">{R$(inv.amount)}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-emerald-600">{R$(progress(inv).paid)}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-amber-600">{R$(progress(inv).remaining)}</td>
-                  <td className="px-6 py-4 text-sm text-blue-600">{progress(inv).monthly > 0 ? R$(progress(inv).monthly) : "—"}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {inv.paymentMethod === "A_VISTA" ? "À vista" : (
-                      <span>
-                        Parcelado ({inv.installments}x de {R$(inv.amount / (inv.installments || 1))})
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{formatDateBR(inv.date)}</td>
-                  <td className="px-6 py-4">
-                    {inv.paidWithCash
-                      ? <span className="text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">Caixa</span>
-                      : <span className="text-xs text-gray-400">Operacional</span>}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => setDeleteId(inv.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 transition-colors">Excluir</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Modal Investimento */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Novo Investimento">
-        <div className="space-y-4">
-          <Input label="Descrição (Equipamento, Curso, Software, etc)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Valor Total (R$)" type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-            <SelectField label="Forma de Pagamento" value={form.paymentMethod}
-              onChange={(v) => setForm({ ...form, paymentMethod: v, installments: "" })}
-              options={[{ value: "A_VISTA", label: "À vista" }, { value: "PARCELADO", label: "Parcelado" }]} />
-          </div>
-
-          {form.paymentMethod === "A_VISTA" ? (
-            <Input label="Data do Pagamento" type="date" value={form.firstPaymentDate}
-              onChange={(e) => setForm({ ...form, firstPaymentDate: e.target.value })} />
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Data da 1ª Parcela" type="date" value={form.firstPaymentDate}
-                onChange={(e) => setForm({ ...form, firstPaymentDate: e.target.value })} />
-              <Input label="Número de Parcelas" type="number" min="2" value={form.installments}
-                onChange={(e) => setForm({ ...form, installments: e.target.value })} />
-            </div>
-          )}
-
-          {/* Preview de parcelas */}
-          {form.paymentMethod === "PARCELADO" && installmentCount > 0 && form.amount && form.firstPaymentDate && (
-            <div className="bg-gray-50/50 border border-gray-200 rounded-xl p-4">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Preview das parcelas</p>
-              <p className="text-sm text-gray-600">
-                {installmentCount}x de <span className="text-accent font-bold">{R$(installmentValue)}</span> — lançadas automaticamente no financeiro a partir de {new Date(form.firstPaymentDate + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
-              </p>
-            </div>
-          )}
-
-          <div className="pt-2">
-            <label className="flex items-center gap-3 text-sm text-gray-600 font-medium cursor-pointer bg-gray-50 p-4 rounded-xl border border-gray-200 hover:border-accent/50 transition-colors">
-              <input type="checkbox" checked={form.paidWithCash}
-                onChange={(e) => setForm({ ...form, paidWithCash: e.target.checked })}
-                className="w-5 h-5 rounded border-gray-300 text-accent focus:ring-accent focus:ring-offset-white bg-white" />
-              Investimento pago com Saldo do Caixa
-            </label>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <button onClick={() => setShowModal(false)} className="px-5 py-2 text-sm text-gray-500 bg-white hover:bg-gray-100 rounded-xl font-medium transition-colors">Cancelar</button>
-            <button onClick={handleCreate} disabled={saving || !form.description || !form.amount || !form.firstPaymentDate || (form.paymentMethod === "PARCELADO" && !form.installments)}
-              className="px-6 py-2 text-sm bg-accent hover:bg-accent-dark disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-[#FF5A00]/20 transition-all">
-              {saving ? "Registrando..." : "Registrar Investimento"}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <ConfirmDialog
-        open={!!deleteId}
-        title="Excluir Investimento"
-        message="Tem certeza que deseja excluir este investimento? As despesas vinculadas no financeiro não serão removidas automaticamente."
-        confirmLabel="Sim, excluir"
-        cancelLabel="Cancelar"
-        onConfirm={() => { const id = deleteId!; setDeleteId(null); handleDelete(id); }}
-        onCancel={() => setDeleteId(null)}
-      />
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════
-// 6. PRÓ-LABORE
 // ══════════════════════════════════════════════════════════════════
 interface ProLaboreData {
   current: {
@@ -1126,6 +932,10 @@ interface CashEntry {
 }
 
 function CashTab() {
+  const { user } = useAuth();
+  const editable = !!user && canEdit(user, "financeiro");
+  const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
+  const [cashError, setCashError] = useState("");
   const [balance, setBalance] = useState(0);
   const [minBalance, setMinBalance] = useState(1000);
   const [entries, setEntries] = useState<CashEntry[]>([]);
@@ -1152,6 +962,16 @@ function CashTab() {
   }, []);
 
   useEffect(() => { fetch_(); }, [fetch_]);
+
+  async function removeWithdrawal(id: string) {
+    setCashError("");
+    try {
+      const response = await fetch(`/api/financeiro/cash?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Não foi possível remover a retirada.");
+      await fetch_();
+    } catch (err) { setCashError(err instanceof Error ? err.message : "Não foi possível remover a retirada."); }
+  }
 
   async function handleAporte() {
     setSaving(true);
@@ -1193,6 +1013,8 @@ function CashTab() {
 
   return (
     <div className="space-y-6 animate-in fade-in">
+      {cashError && <p role="alert" className="text-sm text-red-600">{cashError}</p>}
+      <ConfirmDialog open={!!deleteEntryId} title="Remover retirada do Caixa" message="Remover esta retirada do saldo do Caixa? A despesa ou investimento, quando existir, será mantido e terá a origem Caixa desmarcada. O registro da retirada será preservado para recuperação." confirmLabel="Remover retirada" cancelLabel="Cancelar" onConfirm={() => { const id = deleteEntryId!; setDeleteEntryId(null); removeWithdrawal(id); }} onCancel={() => setDeleteEntryId(null)} />
       {/* Big Balance card */}
       <div className={`bg-white/80 backdrop-blur-xl border rounded-2xl p-8 relative overflow-hidden transition-colors ${isLow ? "border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.1)]" : "border-gray-200/60"}`}>
 
@@ -1234,12 +1056,12 @@ function CashTab() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200/60 bg-gray-50/30">
-              <Th>Data</Th><Th>Tipo de Operação</Th><Th>Descrição do Lançamento</Th><Th align="right">Valor</Th>
+              <Th>Data</Th><Th>Tipo de Operação</Th><Th>Descrição do Lançamento</Th><Th align="right">Valor</Th><Th align="right">Ações</Th>
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 ? (
-              <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma movimentação registrada.</td></tr>
+              <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-400">Nenhuma movimentação registrada.</td></tr>
             ) : entries.map((e) => {
               const isOut = e.type === "RETIRADA_DESPESA";
               return (
@@ -1254,6 +1076,7 @@ function CashTab() {
                   <td className={`px-6 py-4 text-base font-bold text-right ${isOut ? "text-red-600" : "text-emerald-600"}`}>
                     {isOut ? "- " : "+ "}{R$(e.amount)}
                   </td>
+                  <td className="px-6 py-4 text-right">{editable && isOut && <button type="button" onClick={() => setDeleteEntryId(e.id)} aria-label={`Remover retirada ${e.description ?? "do Caixa"}`} className="text-xs font-bold text-gray-500 hover:text-red-600">Remover retirada</button>}</td>
                 </tr>
               );
             })}

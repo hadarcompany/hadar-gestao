@@ -944,12 +944,30 @@ model CreditCard {
   brand            String?
   color            String            @default("#FF5A00")
   isActive         Boolean           @default(true)
+  closingDay       Int?
+  dueDay           Int?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   fixedExpenses    FixedExpense[]
   variableExpenses VariableExpense[]
+  investments      Investment[]
+  invoices         CreditCardInvoice[]
 
   @@map("credit_cards")
+}
+
+model CreditCardInvoice {
+  id           String     @id @default(cuid())
+  creditCardId String
+  creditCard   CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
+  month        Int
+  year         Int
+  paidAmount   Decimal    @default(0) @db.Decimal(14, 2)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([creditCardId, year, month])
+  @@map("credit_card_invoices")
 }
 
 model FixedExpense {
@@ -965,6 +983,7 @@ model FixedExpense {
   year          Int
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
+  cashEntry     CashEntry?
 
   @@index([creditCardId])
   @@map("fixed_expenses")
@@ -982,8 +1001,15 @@ model VariableExpense {
   creditCard    CreditCard?             @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
+  investmentId  String?
+  investment    Investment?             @relation(fields: [investmentId], references: [id], onDelete: SetNull)
+  installmentNumber Int?
+  cardInvoiceMonth Int?
+  cardInvoiceYear Int?
+  cashEntry     CashEntry?
 
   @@index([creditCardId])
+  @@unique([investmentId, installmentNumber])
   @@map("variable_expenses")
 }
 
@@ -995,9 +1021,16 @@ model Investment {
   installments  Int?
   date          DateTime
   paidWithCash  Boolean       @default(false)
+  creditCardId  String?
+  creditCard    CreditCard?    @relation(fields: [creditCardId], references: [id], onDelete: Restrict)
+  autoCreateExpenses Boolean  @default(false)
+  requestId     String?        @unique
+  expenses      VariableExpense[]
+  cashEntry     CashEntry?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  @@index([creditCardId])
   @@map("investments")
 }
 
@@ -1008,6 +1041,13 @@ model CashEntry {
   description String?
   date        DateTime      @default(now())
   createdAt   DateTime      @default(now())
+  voidedAt    DateTime?
+  fixedExpenseId String?   @unique
+  fixedExpense FixedExpense? @relation(fields: [fixedExpenseId], references: [id], onDelete: Cascade)
+  variableExpenseId String? @unique
+  variableExpense VariableExpense? @relation(fields: [variableExpenseId], references: [id], onDelete: Cascade)
+  investmentId String?     @unique
+  investment  Investment?  @relation(fields: [investmentId], references: [id], onDelete: Cascade)
 
   @@map("cash_entries")
 }
