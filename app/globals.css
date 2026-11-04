@@ -12,6 +12,32 @@ body {
   background: var(--background);
 }
 
+/* Team settings: keep the existing desktop shell and fold it on phones. */
+.team-mobile-menu { display: none; }
+.team-settings-shell > main { min-width: 0; }
+@media (max-width: 767px) {
+  .team-settings-shell > aside { display: none; }
+  .team-settings-shell[data-team-menu-open="true"] > aside {
+    display: flex;
+    width: min(300px, 85vw);
+    padding-top: 48px;
+  }
+  .team-settings-shell > main { margin-left: 0; width: 100%; padding-left: 16px; padding-right: 16px; }
+  .team-settings-shell > main > header { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; min-height: 64px; }
+  .team-settings-shell .team-mobile-menu {
+    display: block;
+    position: fixed;
+    left: 16px;
+    top: 10px;
+    z-index: 60;
+    min-height: 44px;
+    padding: 8px 14px;
+    background: white;
+    border: 1px solid #cdd2cd;
+    border-radius: 8px;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
