@@ -15,6 +15,7 @@
     "security:check": "tsx scripts/security-maintenance.ts",
     "security:apply": "tsx scripts/security-maintenance.ts --apply",
     "test:security": "tsx --test tests/security.test.ts",
+    "test:team": "tsx --test tests/team-members.test.ts",
     "test:finance": "tsx --test tests/finance-invoices.test.ts tests/expense-payments.test.ts tests/fixed-expenses.test.ts",
     "test:finance:db": "tsx scripts/test-finance-db.ts",
     "test:social": "tsx --test tests/social.test.ts",

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export function createSupabaseAdminClient() {
   return createClient(
@@ -8,8 +8,7 @@ export function createSupabaseAdminClient() {
   );
 }
 
-export async function findSupabaseAuthUserByEmail(email: string) {
-  const admin = createSupabaseAdminClient();
+export async function findSupabaseAuthUserByEmail(email: string, admin: SupabaseClient = createSupabaseAdminClient()) {
   for (let page = 1; ; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
     if (error) throw new Error("AUTH_USER_LOOKUP_FAILED");

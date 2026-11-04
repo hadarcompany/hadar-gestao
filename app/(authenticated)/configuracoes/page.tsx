@@ -16,7 +16,8 @@ export default function ConfiguracoesPage() {
   const [tab, setTab] = useState<Tab>("perfil");
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "integracoes") setTab("integracoes");
+    const selected = new URLSearchParams(window.location.search).get("tab");
+    if (selected === "integracoes" || selected === "equipe" || selected === "perfil") setTab(selected);
   }, []);
 
   const tabs: { key: Tab; label: string; icon: typeof UserCircle; adminOnly?: boolean }[] = [
@@ -26,17 +27,17 @@ export default function ConfiguracoesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-transparent w-full pb-10">
+    <div className="min-h-screen bg-transparent w-full min-w-0 pb-10">
       <h1 className="text-xl font-bold text-gray-900 tracking-tight mb-5">Configurações</h1>
 
-      <div className="flex gap-6">
-        <nav className="w-52 shrink-0 space-y-1">
+      <div className="flex flex-col md:flex-row gap-6">
+        <nav className="flex md:block w-full md:w-52 shrink-0 gap-1 md:space-y-1 overflow-x-auto" aria-label="Configurações">
           {tabs.filter((t) => !t.adminOnly || isAdmin).map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left",
+                "w-auto md:w-full shrink-0 flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left",
                 tab === t.key ? "bg-accent/10 text-accent-dark" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
               )}
             >
