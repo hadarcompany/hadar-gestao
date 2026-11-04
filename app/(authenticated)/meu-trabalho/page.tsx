@@ -96,7 +96,7 @@ export default function MeuTrabalhoPage() {
   useEffect(() => {
     fetchTasks();
     fetchNotifications();
-    fetch("/api/clients").then((r) => r.json()).then((d) =>
+    fetch("/api/clients?view=lookup").then((r) => r.json()).then((d) =>
       setClients(d.map((c: ClientInfo) => ({ id: c.id, name: c.name, status: c.status })))
     );
     fetch("/api/users").then((r) => r.json()).then(setUsers);

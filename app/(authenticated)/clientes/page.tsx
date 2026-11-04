@@ -131,7 +131,7 @@ export default function ClientesPage() {
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/clients");
+      const res = await fetch("/api/clients?view=list");
       setClients(await res.json());
     } finally { setLoading(false); }
   }, []);

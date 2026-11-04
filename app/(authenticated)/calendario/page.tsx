@@ -68,7 +68,7 @@ export default function CalendarioPage() {
   }, [anchor, clientFilter]);
 
   useEffect(() => {
-    fetch("/api/clients").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
+    fetch("/api/clients?view=lookup").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
     fetch("/api/users").then((r) => r.json()).then(setUsers);
   }, []);
 

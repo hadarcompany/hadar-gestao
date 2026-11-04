@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch("/api/users").then((r) => r.json()).then(setUsers);
-    fetch("/api/clients").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
+    fetch("/api/clients?view=lookup").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

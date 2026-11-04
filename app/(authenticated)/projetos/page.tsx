@@ -61,7 +61,7 @@ export default function ProjetosPage() {
 
   useEffect(() => {
     fetch("/api/users").then((r) => r.json()).then(setUsers);
-    fetch("/api/clients").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
+    fetch("/api/clients?view=lookup").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
   }, []);
 
   // Em aberto primeiro, depois pelo prazo mais próximo.
