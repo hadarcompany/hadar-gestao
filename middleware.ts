@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
 
     if (user && isLoginPage) {
       const url = new URL(request.nextUrl.pathname + request.nextUrl.search, publicOrigin(request.url));
-      url.pathname = "/dashboard";
+      url.pathname = "/";
       return NextResponse.redirect(url);
     }
   }

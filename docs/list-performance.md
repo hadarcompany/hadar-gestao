@@ -11,3 +11,9 @@ Prisma is shared through one process singleton in production as well as developm
 For the single persistent Insider container, the measured configuration uses the Supabase shared session pooler on port 5432, a four-connection application limit and TLS. The `pgbouncer=true` transaction compatibility option is removed only for that instance's session-mode URL. Vercel/serverless connection settings remain unchanged. Keep backups, credentials, schema and trial settings intact; save the old environment and release for rollback. No database migration is required.
 
 Validate with `npx tsx --test tests/list-performance.test.ts tests/security.test.ts tests/team-members.test.ts`, TypeScript and build. After deployment compare real sequential and simultaneous HTTP requests, verify active vs historical counts and full client details, and confirm the imported data/account fingerprints remain unchanged.
+
+## Permission-aware entry
+
+Successful sign-in goes to `/`, which chooses an accessible destination using the current account read from the database. Administrators keep the Dashboard; members without that permission open Meu Trabalho or another permitted page. Accounts with no modules can still open their personal settings. The authenticated layout redirects bookmarks to inaccessible pages before rendering their children. This is a navigation safeguard; API authorization remains unchanged.
+
+Dashboard responses are checked before entering render state. HTTP errors and incomplete payloads display an error while preserving the last valid state. Authenticated pages also provide a retry/home fallback for rendering failures. Regression tests are in `tests/page-access.test.ts`.
