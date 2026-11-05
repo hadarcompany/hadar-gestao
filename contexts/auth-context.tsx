@@ -26,9 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = supabaseRef.current;
 
   useEffect(() => {
+    let profileLoading = false;
     // A foto não vem no token (ver get-server-auth): é carregada à parte e
     // preenchida depois, para o cookie de sessão não crescer com base64.
     async function loadProfile() {
+      if (profileLoading) return;
+      profileLoading = true;
       try {
         const res = await fetch("/api/users/me");
         if (!res.ok) return;
@@ -44,6 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } : prev));
       } catch {
         // avatar cai para as iniciais do nome
+      } finally {
+        profileLoading = false;
       }
     }
 

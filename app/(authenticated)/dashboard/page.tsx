@@ -10,6 +10,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { CommercialPanel } from "@/components/dashboard/commercial-panel";
 import { getCurrentWeekRange, formatDateBR, formatDayMonthBR } from "@/lib/dates";
 import { type TaskData } from "@/lib/types";
+import { readDashboardResponse } from "@/lib/dashboard-response";
 import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowUpRight, CircleDollarSign, Wallet, TrendingUp, RefreshCw } from "lucide-react";
 
 interface DashboardData {
@@ -61,8 +62,7 @@ export default function DashboardPage() {
     if(!background)setLoading(true);
     try {
       const res = await fetch(`/api/dashboard?from=${from}&to=${to}`, { cache: "no-store" });
-      if(!res.ok)throw Error('A atualização do dashboard falhou. Os últimos dados carregados foram preservados.');
-      const next=await res.json();if(sequence===fetchSequence.current){setData(next);setRefreshError('');}
+      const next=await readDashboardResponse<DashboardData>(res);if(sequence===fetchSequence.current){setData(next);setRefreshError('');}
     }catch(e){if(sequence===fetchSequence.current)setRefreshError((e as Error).message);
     } finally {
       if(sequence===fetchSequence.current){fetching.current=false;setLoading(false);}
@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch("/api/users").then((r) => r.json()).then(setUsers);
-    fetch("/api/clients").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
+    fetch("/api/clients?view=lookup").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

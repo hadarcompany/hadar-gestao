@@ -11,9 +11,31 @@ export async function GET(req: NextRequest) {
   const denied = await guardApiRequest(auth, req, "/api/clients");
   if (denied) return denied;
 
+  const mode = req.nextUrl.searchParams.get("view");
+  // Dropdowns need identifiers, not briefings and the recent history of every client.
+  if (mode === "lookup") {
+    return NextResponse.json(await prisma.client.findMany({
+      select: { id: true, name: true, status: true },
+      orderBy: { name: "asc" },
+    }));
+  }
+
   // Selects de tarefas/calendário recebem somente identificação, sem dados privados.
   if (!canView(auth, "clientes")) {
     const clients = await prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
+    return NextResponse.json(await withMedia(clients, "client"));
+  }
+
+  // The detail endpoint still returns the complete briefing, services and history.
+  if (mode === "list") {
+    const clients = await prisma.client.findMany({
+      select: {
+        id: true, name: true, email: true, status: true, classification: true,
+        contractStartDate: true, renewalDate: true,
+        _count: { select: { tasks: true } },
+      },
+      orderBy: { name: "asc" },
+    });
     return NextResponse.json(await withMedia(clients, "client"));
   }
 

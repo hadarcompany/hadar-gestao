@@ -9,6 +9,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { LabelsProvider } from "@/contexts/labels-context";
 import { AreasProvider } from "@/contexts/areas-context";
 import { AssistantPanel } from "@/components/assistant/assistant-panel";
+import { canVisitPage, homeForUser } from "@/lib/page-access";
 
 export default function AuthenticatedLayout({
   children,
@@ -22,7 +23,7 @@ export default function AuthenticatedLayout({
   const teamSettings = pathname.startsWith("/configuracoes") || pathname === "/equipe";
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   useEffect(() => { setTeamMenuOpen(false); }, [pathname]);
-  const financeAllowed = user?.role === "ADMIN" || user?.permissions?.financeiro === "view" || user?.permissions?.financeiro === "edit";
+  const pageAllowed = !!user && canVisitPage(user, pathname);
 
   useEffect(() => {
     const refreshPage = () => setDataVersion((version) => version + 1);
@@ -37,10 +38,10 @@ export default function AuthenticatedLayout({
   }, [isLoading, user, router]);
 
   useEffect(() => {
-    if (!isLoading && user && pathname.startsWith("/financeiro") && !financeAllowed) {
-      router.replace("/dashboard");
+    if (!isLoading && user && !pageAllowed) {
+      router.replace(homeForUser(user));
     }
-  }, [financeAllowed, isLoading, pathname, router, user]);
+  }, [pageAllowed, isLoading, router, user]);
 
   if (isLoading) {
     return (
@@ -51,7 +52,7 @@ export default function AuthenticatedLayout({
   }
 
   if (!user) return null;
-  if (pathname.startsWith("/financeiro") && !financeAllowed) return null;
+  if (!pageAllowed) return null;
 
   return (
     <LabelsProvider>
