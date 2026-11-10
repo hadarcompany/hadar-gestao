@@ -28,7 +28,7 @@ export default function LoginPage() {
       setError(data.error ?? "Email ou senha incorretos");
     } else {
       // Login sets cookies on the server; remount the browser AuthProvider with that session.
-      window.location.assign("/dashboard");
+      window.location.assign("/");
     }
   }
 

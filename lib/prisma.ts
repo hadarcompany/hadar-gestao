@@ -6,4 +6,6 @@ const globalForPrisma = globalThis as unknown as {
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Next route bundles can load this module separately in the same process.
+// Reuse one pool in production too, so the configured limit applies to the app.
+globalForPrisma.prisma = prisma;

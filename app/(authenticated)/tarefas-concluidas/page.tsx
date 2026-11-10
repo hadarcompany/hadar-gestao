@@ -58,7 +58,7 @@ export default function TarefasConcluidasPage() {
   useEffect(() => {
     fetchTasks();
     fetch("/api/users").then((r) => r.json()).then(setUsers);
-    fetch("/api/clients").then((r) => r.json()).then((d) =>
+    fetch("/api/clients?view=lookup").then((r) => r.json()).then((d) =>
       setClients(d.map((c: ClientInfo) => ({ id: c.id, name: c.name, status: c.status })))
     );
   }, [fetchTasks]);

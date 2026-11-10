@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = {};
   if (status) where.status = status;
+  if (searchParams.get("scope") === "active") {
+    where.AND = [{ status: { notIn: ["COMPLETED", "CANCELLED"] } }];
+  }
   if (clientId) where.clientId = clientId;
   if (priority) where.priority = priority;
   if (assigneeId) where.assignees = { some: { userId: assigneeId } };

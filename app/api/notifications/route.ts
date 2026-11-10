@@ -67,8 +67,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const unreadOnly = searchParams.get("unreadOnly") === "true";
 
-  await ensureOverdueTaskNotifications(auth.id);
-  await ensureOverduePaymentNotifications(auth);
+  await Promise.all([
+    ensureOverdueTaskNotifications(auth.id),
+    ensureOverduePaymentNotifications(auth),
+  ]);
 
   const hiddenTypes: NotificationType[] = canView(auth, "financeiro") ? [] : ["PAYMENT_RECEIVED", "PAYMENT_OVERDUE"];
   const visibleWhere = {
@@ -77,13 +79,11 @@ export async function GET(req: NextRequest) {
     ...(hiddenTypes.length ? { type: { notIn: hiddenTypes } } : {}),
   };
 
-  const notifications = await prisma.notification.findMany({
+  const [notifications, unreadCount] = await Promise.all([prisma.notification.findMany({
     where: visibleWhere,
     orderBy: { createdAt: "desc" },
     take: 50,
-  });
-
-  const unreadCount = await prisma.notification.count({ where: { ...visibleWhere, read: false } });
+  }), prisma.notification.count({ where: { ...visibleWhere, read: false } })]);
 
   return NextResponse.json({ notifications, unreadCount });
 }

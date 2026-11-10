@@ -69,6 +69,7 @@ export default function TarefasPage() {
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
+    params.set("scope", "active");
     if (filterStatus) params.set("status", filterStatus);
     if (filterClient) params.set("clientId", filterClient);
     if (filterPriority) params.set("priority", filterPriority);
@@ -85,9 +86,12 @@ export default function TarefasPage() {
 
   useEffect(() => {
     fetchTasks();
-    fetch("/api/users").then((r) => r.json()).then(setUsers);
-    fetch("/api/clients").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
   }, [fetchTasks]);
+
+  useEffect(() => {
+    fetch("/api/users").then((r) => r.json()).then(setUsers);
+    fetch("/api/clients?view=lookup").then((r) => r.json()).then((d) => setClients(d.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))));
+  }, []);
 
   useEffect(() => { if (editingArea) { areaInputRef.current?.focus(); areaInputRef.current?.select(); } }, [editingArea]);
 
