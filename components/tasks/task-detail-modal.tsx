@@ -455,7 +455,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                     <ArrowLeftRight size={12} /> Transferir
                   </button>
                   <button
-                    onClick={() => setEditMode(true)}
+                    onClick={() => { setEditCategory(explicitTaskCategory(task)); setEditMode(true); }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent bg-accent-dark/10 hover:bg-accent-dark/20 rounded-lg transition-colors"
                   >
                     <Pencil size={12} /> Editar
