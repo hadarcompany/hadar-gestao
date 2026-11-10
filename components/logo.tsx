@@ -1,3 +1,5 @@
+"use client";
+import { useBrand } from "@/contexts/brand-context";
 interface LogoProps {
   className?: string;
   width?: number;
@@ -5,6 +7,12 @@ interface LogoProps {
 }
 
 export function Logo({ className = "text-accent-dark", width = 140, height = 42 }: LogoProps) {
+  const brand = useBrand();
+  if (brand === "insider") return (
+    <svg viewBox="143 141 1633 409" width={width} height={height} className={className} role="img" aria-label="Insider">
+      <image href="/brand/insider-logo.png" width="1920" height="706" />
+    </svg>
+  );
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

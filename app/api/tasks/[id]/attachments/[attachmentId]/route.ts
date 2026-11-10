@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/permissions";
 import { isHeicImage, isPreviewableImage } from "@/lib/image-files";
 import { heicToJpeg } from "@/lib/heic";
+import { materialRead, parseMaterialReference } from "@/lib/materials/storage";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,16 @@ export async function GET(req: NextRequest, { params: routeParams }: { params: P
     return NextResponse.json({ error: "Anexo não encontrado" }, { status: 404 });
   }
 
+  const stored = parseMaterialReference(attachment.data);
+  if (stored) {
+    const upstream=await fetch(materialRead(stored),{cache:"no-store",redirect:"error",headers:req.headers.has("range")?{Range:req.headers.get("range")!}:{},signal:AbortSignal.timeout(45000)});
+    if(!upstream.ok) return NextResponse.json({error:"Arquivo temporariamente indisponível."},{status:503});
+    const inline=req.nextUrl.searchParams.get("inline")==="1" && ["image/jpeg","image/png","image/webp"].includes(attachment.mimeType);
+    const name=encodeURIComponent(attachment.fileName);
+    const headers:Record<string,string>={"Content-Type":inline?attachment.mimeType:"application/octet-stream","Content-Disposition":`${inline?"inline":"attachment"}; filename="${name}"; filename*=UTF-8''${name}`,"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"};
+    for(const key of ["content-length","content-range","accept-ranges"]) if(upstream.headers.has(key)) headers[key]=upstream.headers.get(key)!;
+    return new NextResponse(upstream.body,{status:upstream.status,headers});
+  }
   const base64 = attachment.data.split(",")[1] ?? "";
   let buffer: Buffer = Buffer.from(base64, "base64");
   const inline = new URL(req.url).searchParams.get("inline") === "1" && isPreviewableImage(attachment);

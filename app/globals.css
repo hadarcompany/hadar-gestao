@@ -3,8 +3,17 @@
 @tailwind utilities;
 
 :root {
+  --brand-accent: 248 80 33;
+  --brand-accent-dark: 212 65 26;
+  --brand-active: #fdece5;
   --background: #f5f5f4;
   --foreground: #1c1c1e;
+}
+
+html[data-brand="insider"] {
+  --brand-accent: 0 116 177;
+  --brand-accent-dark: 0 93 142;
+  --brand-active: #e7f3fa;
 }
 
 body {
@@ -122,3 +131,7 @@ body {
     min-width: 0;
   }
 }
+
+/* Brand-specific chrome; semantic warning and status colors stay unchanged. */
+html[data-brand="insider"] [class*="shadow-[#FF5A00]"] { --tw-shadow-color: rgb(0 116 177 / 0.2); }
+html[data-brand="insider"] [fill="#F85021"] { fill: rgb(var(--brand-accent)); }

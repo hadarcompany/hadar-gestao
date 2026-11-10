@@ -193,6 +193,7 @@ model User {
   taskUpdates          TaskUpdate[]
   descriptionEdits     Task[]               @relation("TaskDescriptionEditor")
   assistantRuns        AssistantRun[]
+  materialLinks        ClientMaterialLink[]
 
   @@map("users")
 }
@@ -219,6 +220,7 @@ model Client {
   updatedAt          DateTime              @updatedAt
 
   tasks                 Task[]
+  materialLink          ClientMaterialLink?
   interactions          Interaction[]
   accesses              Access[]
   services              Service[]
@@ -298,6 +300,7 @@ model Task {
   board          TaskBoard?
   project        Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
   updates        TaskUpdate[]
+  materialSubmission ClientMaterialSubmission?
 
   @@index([projectId])
   @@index([descriptionUpdatedById])
@@ -306,6 +309,31 @@ model Task {
 
 /// Quadro livre vinculado a uma tarefa. Imagens continuam armazenadas como
 /// anexos e os elementos guardam apenas posição, tamanho, texto e attachmentId.
+model ClientMaterialLink {
+  id String @id
+  clientId String @unique
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy User @relation(fields: [createdById], references: [id])
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  submissions ClientMaterialSubmission[]
+  @@map("client_material_links")
+}
+
+model ClientMaterialSubmission {
+  id String @id
+  linkId String
+  link ClientMaterialLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  assets Json
+  taskId String? @unique
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  submitted Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@index([linkId, createdAt])
+  @@map("client_material_submissions")
+}
+
 model TaskBoard {
   taskId    String   @id
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)

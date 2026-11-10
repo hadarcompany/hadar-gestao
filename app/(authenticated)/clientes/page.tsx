@@ -17,6 +17,7 @@ import { formatDateBR } from "@/lib/dates";
 import { WeeklyDemandPanel } from "@/components/clients/weekly-demand-panel";
 import { ClientChatPanel } from "@/components/clients/client-chat-panel";
 import { IMAGE_FILE_ACCEPT } from "@/lib/image-files";
+import { ClientMaterialLink } from "@/components/materials/client-material-link";
 
 interface ServiceData {
   id: string;
@@ -519,6 +520,7 @@ export default function ClientesPage() {
                 <div className="space-y-6 animate-in fade-in">
                   {!editMode ? (
                     <>
+                      <ClientMaterialLink key={selectedClient.id} clientId={selectedClient.id} />
                       <div className="flex justify-end">
                         <button onClick={startEditClient}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors">
