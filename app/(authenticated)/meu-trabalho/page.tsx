@@ -9,7 +9,8 @@ import { TaskListHeader } from "@/components/tasks/task-list-header";
 import { useTaskColumns } from "@/components/tasks/use-task-columns";
 import { Avatar } from "@/components/ui/avatar";
 import { type TaskData } from "@/lib/types";
-import { getTaskBucket } from "@/lib/dates";
+import { getTaskBucket, getTodayKey } from "@/lib/dates";
+import { groupWorkTasks, type WorkPeriod } from "@/lib/my-work";
 import { sortTasks, type SortKey, type SortState } from "@/lib/task-sort";
 import {
   Loader2, Plus, Bell, CheckSquare, AtSign, ArrowLeftRight, ExternalLink, Check, CheckCheck,
@@ -65,6 +66,14 @@ export default function MeuTrabalhoPage() {
   const [sort, setSort] = useState<SortState>({ key: "dueDate", dir: "asc" });
   // Clientes nascem fechados na aba Concluídas: as tarefas aparecem ao clicar no cliente.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [periodOpen, setPeriodOpen] = useState<Partial<Record<WorkPeriod, boolean>>>({ TODAY: true, THIS_WEEK: true });
+  const [todayKey, setTodayKey] = useState(getTodayKey);
+  useEffect(() => {
+    const refreshDay = () => setTodayKey(getTodayKey());
+    const timer = window.setInterval(refreshDay, 60000);
+    window.addEventListener("focus", refreshDay);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshDay); };
+  }, []);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -119,13 +128,15 @@ export default function MeuTrabalhoPage() {
       else groups.UPCOMING.push(task);
     });
     return groups;
-  }, [scopedTasks]);
+  }, [scopedTasks, todayKey]);
 
   const totalActive = buckets.ALL.length;
   const totalDone = buckets.COMPLETED.filter((t) => t.status === "COMPLETED").length;
   const completionRate = totalActive + totalDone > 0 ? Math.round((totalDone / (totalActive + totalDone)) * 100) : 0;
 
   const displayedTasks = useMemo(() => sortTasks(buckets[tab], sort), [buckets, tab, sort]);
+  const periodGroups = useMemo(() => groupWorkTasks(displayedTasks, todayKey).filter(group => group.tasks.length > 0), [displayedTasks, todayKey]);
+  const periodsExpanded = periodGroups.length > 0 && periodGroups.every(group => periodOpen[group.key]);
 
   function handleSort(key: SortKey) {
     setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
@@ -344,18 +355,19 @@ export default function MeuTrabalhoPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {tab === "COMPLETED" && (
+              {(
                 <button
-                  onClick={toggleAll}
-                  disabled={allGroups.length === 0}
-                  title={allExpanded ? "Recolher todos" : "Expandir todos"}
+                  onClick={() => tab === "COMPLETED" ? toggleAll() : setPeriodOpen(periodsExpanded ? {} : Object.fromEntries(periodGroups.map(group => [group.key, true])))}
+                  disabled={tab === "COMPLETED" ? allGroups.length === 0 : periodGroups.length === 0}
+                  title={(tab === "COMPLETED" ? allExpanded : periodsExpanded) ? "Recolher todos" : "Expandir todos"}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all disabled:opacity-50"
                 >
-                  {allExpanded ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
-                  {allExpanded ? "Recolher" : "Expandir"}
+                  {(tab === "COMPLETED" ? allExpanded : periodsExpanded) ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+                  {(tab === "COMPLETED" ? allExpanded : periodsExpanded) ? "Recolher" : "Expandir"}
                 </button>
               )}
               <select
+                aria-label="Filtrar por cliente"
                 value={clientFilter}
                 onChange={(e) => setClientFilter(e.target.value)}
                 className="text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600 focus:outline-none focus:border-accent/50"
@@ -377,10 +389,16 @@ export default function MeuTrabalhoPage() {
           ) : displayedTasks.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-14 bg-white border border-gray-200 rounded-xl">Nenhuma tarefa nesta aba.</p>
           ) : tab !== "COMPLETED" ? (
-            // Abas do dia a dia: lista direta. Só as concluídas, que acumulam, ficam por cliente.
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <TaskListHeader sort={sort} onSort={handleSort} visibleColumns={visibleColumns} onVisibleColumnsChange={setVisibleColumns} />
-              {displayedTasks.map((task) => (
+            <div className="space-y-4">
+              {periodGroups.map(group => <section key={group.key} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <h2><button type="button" aria-expanded={!!periodOpen[group.key]} aria-controls={`work-period-${group.key}`} onClick={() => setPeriodOpen(previous => ({ ...previous, [group.key]: !previous[group.key] }))} className="flex min-h-11 w-full items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent">
+                  {periodOpen[group.key] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  <span className={cn("text-sm font-semibold", group.key === "OVERDUE" ? "text-red-700" : "text-accent-dark")}>{group.label}</span>
+                  <span className="text-xs text-gray-500">{group.tasks.length} {group.tasks.length === 1 ? "tarefa" : "tarefas"}</span>
+                </button></h2>
+                {periodOpen[group.key] && <div id={`work-period-${group.key}`} className="border-t border-gray-100">
+                  <TaskListHeader sort={sort} onSort={handleSort} visibleColumns={visibleColumns} onVisibleColumnsChange={setVisibleColumns} />
+                  {group.tasks.map((task) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -390,7 +408,9 @@ export default function MeuTrabalhoPage() {
                   onCloned={handleRowCloned}
                   onOpenDetail={setSelectedTask}
                 />
-              ))}
+                  ))}
+                </div>}
+              </section>)}
             </div>
           ) : (
             <div className="space-y-6">

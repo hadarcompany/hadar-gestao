@@ -20,6 +20,7 @@ import { useAreas } from "@/contexts/areas-context";
 import { IMAGE_FILE_ACCEPT, isImageFile } from "@/lib/image-files";
 import { addTaskImages, transferredFiles } from "@/lib/task-images";
 import { Plus, Trash2, GripVertical, ImagePlus, X } from "lucide-react";
+import { TaskCategoryField } from "@/components/tasks/task-category-field";
 
 interface User { id: string; name: string; email?: string | null; }
 interface Client { id: string; name: string; }
@@ -40,6 +41,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
   const { areas } = useAreas();
   const [loading, setLoading] = useState(false);
   const [taskType, setTaskType] = useState<string>("");
+  const [category, setCategory] = useState("");
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -88,7 +90,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
   // Reset on open
   useEffect(() => {
     if (open) {
-      setTaskType(""); setTitle(""); setClientId(initialClientId || ""); setAssigneeIds([]);
+      setTaskType(""); setCategory(""); setTitle(""); setClientId(initialClientId || ""); setAssigneeIds([]);
       setAssigneesTouched(false); setArea(""); setProjectId(initialProjectId || "");
       setStatus("PENDING"); setPriority("MEDIUM"); setStartDate(""); setDueDate("");
       setPublishDate(initialPublishDate || ""); setIsExtra(false);
@@ -165,7 +167,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
             startDate: startDate || null, dueDate: dueDate || null,
             publishDate: publishDate || null, isExtra,
             estimatedTime: estimatedTime || null,
-            checklist, extraFields: Object.keys(extraFields).length > 0 ? extraFields : null,
+            checklist, extraFields: category ? { ...extraFields, taskCategory: category } : Object.keys(extraFields).length > 0 ? extraFields : null,
             tags, clientId: clientId || null, assigneeIds,
             area: area || null, projectId: projectId || null,
           }),
@@ -251,6 +253,7 @@ export function CreateTaskModal({ open, onClose, onCreated, users, clients, init
         />
 
         {/* Universal Fields - 2 columns */}
+        <TaskCategoryField value={category} onChange={setCategory} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="Título" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título da tarefa" />
           <SelectField
