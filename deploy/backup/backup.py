@@ -229,7 +229,7 @@ def local_media_files(config, temporary, output, key):
             raise ValueError("Media object missing during backup")
         expected = manifest["sha256"]
         if (not re.fullmatch(r"[a-f0-9]{64}", expected) or
-                not re.fullmatch(r"[a-f0-9]{16}/[a-f0-9-]{36}\.(jpg|mp4)", manifest["p"])):
+                not re.fullmatch(r"[a-f0-9]{16}/[a-f0-9-]{36}\.(jpg|png|webp|mp4)", manifest["p"])):
             raise ValueError("Invalid media manifest")
         blob = output / ("media-" + expected + ".hgm")
         if not blob.exists():

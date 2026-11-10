@@ -9,6 +9,15 @@ export async function middleware(request: NextRequest) {
   if (isPublicLegalPage(request.nextUrl.pathname, request.method)) return NextResponse.next();
   const expired = trialDenial(request);
   if (expired) return expired;
+  // Capability links validate their own tokens. Keep trial validation above.
+  if (process.env.INSTANCE_BRAND === "insider" && process.env.MATERIALS_ENABLED === "true" &&
+    (/^\/enviar-material\/[A-Za-z0-9_.-]+$/.test(request.nextUrl.pathname) || /^\/api\/public\/materials\/[A-Za-z0-9_.-]+$/.test(request.nextUrl.pathname))) {
+    const response=NextResponse.next();
+    response.headers.set("Cache-Control","no-store");
+    response.headers.set("Referrer-Policy","no-referrer");
+    response.headers.set("X-Robots-Tag","noindex, nofollow");
+    return response;
+  }
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

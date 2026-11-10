@@ -36,6 +36,9 @@ def b64(value):
 
 
 class Store:
+    def valid_header(self, data, header):
+        return header.startswith(b"\xff\xd8\xff") if data["m"] == "image/jpeg" else header[4:8] == b"ftyp"
+
     def __init__(self, config):
         self.root = Path(config["directory"]).resolve()
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -173,7 +176,7 @@ class Store:
                     os.fsync(output.fileno())
                 with temporary.open("rb") as file:
                     header = file.read(16)
-                if not (header.startswith(b"\xff\xd8\xff") if data["m"] == "image/jpeg" else header[4:8] == b"ftyp"):
+                if not self.valid_header(data, header):
                     raise Reject(415)
                 temporary.replace(folder / "object")
                 self.save(data, manifest | {"ready": True, "sha256": digest.hexdigest()})
