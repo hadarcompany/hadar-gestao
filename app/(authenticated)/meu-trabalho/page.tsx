@@ -356,7 +356,7 @@ export default function MeuTrabalhoPage() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 max-w-full">
               {(
                 <button
                   onClick={() => tab === "COMPLETED" ? toggleAll() : setPeriodOpen(periodsExpanded ? {} : Object.fromEntries(periodGroups.map(group => [group.key, true])))}
@@ -372,7 +372,7 @@ export default function MeuTrabalhoPage() {
                 aria-label="Filtrar por cliente"
                 value={clientFilter}
                 onChange={(e) => setClientFilter(e.target.value)}
-                className="text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600 focus:outline-none focus:border-accent/50"
+                className="w-44 sm:w-auto max-w-full min-w-0 text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600 focus:outline-none focus:border-accent/50"
               >
                 <option value="">Todos os clientes</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
