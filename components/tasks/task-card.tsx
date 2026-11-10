@@ -7,6 +7,7 @@ import { Calendar, CheckSquare } from "lucide-react";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from "@/lib/task-templates";
 import { formatDayMonthBR, isOverdue as isTaskOverdue } from "@/lib/dates";
 import { type TaskData } from "@/lib/types";
+import { taskCategoryLabel } from "@/lib/task-category";
 
 interface TaskCardProps {
   task: TaskData;
@@ -46,9 +47,9 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
 
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <Badge variant={statusVariant}>{statusOpt?.label ?? ""}</Badge>
-        {task.type && (
+        {(
           <span className="text-[10px] text-gray-400 px-2 py-0.5 rounded bg-gray-100">
-            {task.type.replace(/_/g, " ")}
+            {taskCategoryLabel(task)}
           </span>
         )}
       </div>

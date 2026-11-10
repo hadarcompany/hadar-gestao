@@ -16,6 +16,8 @@ import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { TaskLabels } from "@/components/tasks/label-picker";
 import { TaskUpdates } from "@/components/tasks/task-updates";
 import { TaskBoard } from "@/components/tasks/task-board";
+import { TaskCategoryField } from "@/components/tasks/task-category-field";
+import { explicitTaskCategory, taskCategoryLabel, taskTypeLabel } from "@/lib/task-category";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, type ChecklistItem } from "@/lib/task-templates";
 import { useAreas } from "@/contexts/areas-context";
 import { formatDateBR } from "@/lib/dates";
@@ -66,6 +68,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
 
   // Edit mode fields
   const [editTitle, setEditTitle] = useState("");
+  const [editCategory, setEditCategory] = useState("");
   const [editClientId, setEditClientId] = useState("");
   const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
   const [editStartDate, setEditStartDate] = useState("");
@@ -107,6 +110,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
       setShowBoard(false);
       setPreviewIndex(null);
       setEditTitle(task.title);
+      setEditCategory(explicitTaskCategory(task));
       setEditClientId(task.clientId || "");
       setEditAssigneeIds(task.assignees.map((a) => a.user.id));
       setEditStartDate(task.startDate ? task.startDate.slice(0, 10) : "");
@@ -309,6 +313,12 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
       };
 
       if (editMode) {
+        if (editCategory !== explicitTaskCategory(task)) {
+          const extra = { ...task.extraFields };
+          if (editCategory) extra.taskCategory = editCategory;
+          else delete extra.taskCategory;
+          payload.extraFields = extra;
+        }
         payload.title = editTitle;
         payload.clientId = editClientId || null;
         payload.assigneeIds = editAssigneeIds;
@@ -319,12 +329,15 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
         payload.estimatedTime = editEstimatedTime || null;
       }
 
-      await fetch(`/api/tasks/${task.id}`, {
+      const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (!response.ok) throw new Error("Não foi possível salvar as alterações.");
       onUpdated();
+    } catch {
+      setInlineError("Não foi possível salvar as alterações. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -404,7 +417,8 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={statusVariant}>{statusOpt?.label ?? ""}</Badge>
                 <PriorityBadge priority={priority} onChange={changePriority} />
-                {task.type && <Badge>{task.type.replace(/_/g, " ")}</Badge>}
+                <Badge>{taskCategoryLabel(task)}</Badge>
+                {taskTypeLabel(task) && taskTypeLabel(task) !== taskCategoryLabel(task) && <Badge>{taskTypeLabel(task)}</Badge>}
                 {taskArea && (
                   <span
                     className="text-xs font-medium px-2 py-0.5 rounded-full"
@@ -441,7 +455,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                     <ArrowLeftRight size={12} /> Transferir
                   </button>
                   <button
-                    onClick={() => setEditMode(true)}
+                    onClick={() => { setEditCategory(explicitTaskCategory(task)); setEditMode(true); }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent bg-accent-dark/10 hover:bg-accent-dark/20 rounded-lg transition-colors"
                   >
                     <Pencil size={12} /> Editar
@@ -507,6 +521,7 @@ export function TaskDetailModal({ open, onClose, task, onUpdated, onTaskChanged,
                 />
               </div>
 
+              <TaskCategoryField value={editCategory} onChange={setEditCategory} />
               <MultiSelect
                 label="Responsável(is)"
                 options={users.map((u) => ({ value: u.id, label: u.name }))}
