@@ -19,7 +19,7 @@ export default function AuthenticatedLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [dataVersion, setDataVersion] = useState(0);
-  const teamSettings = pathname.startsWith("/configuracoes") || pathname === "/equipe";
+  const teamSettings = pathname.startsWith("/configuracoes") || pathname === "/equipe" || pathname === "/meu-trabalho";
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   useEffect(() => { setTeamMenuOpen(false); }, [pathname]);
   const financeAllowed = user?.role === "ADMIN" || user?.permissions?.financeiro === "view" || user?.permissions?.financeiro === "edit";

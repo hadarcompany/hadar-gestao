@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DEFAULT_TASK_COLUMNS, type TaskColumnKey } from "@/lib/task-columns";
+import { taskContextLabel } from "@/lib/task-category";
 
 interface TaskRowProps {
   task: TaskData;
@@ -165,7 +166,9 @@ export function TaskRow({
       />}
 
       {/* título: clique renomeia; o resto da linha abre a tarefa */}
-      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+      <div className="flex-1 min-w-0">
+        <p className="mb-0.5 truncate text-[11px] leading-4 text-gray-500" title={taskContextLabel(task)}>{taskContextLabel(task)}</p>
+        <div className="flex items-center gap-1.5">
         {editingTitle ? (
           <input
             ref={titleInputRef}
@@ -232,6 +235,7 @@ export function TaskRow({
           </span>
         )}
         {error && <span role="alert" className="shrink-0 text-[11px] text-red-600 bg-red-50 rounded px-1.5 py-0.5">{error}</span>}
+        </div>
       </div>
 
       {/* etiquetas */}
