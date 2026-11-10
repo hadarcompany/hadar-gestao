@@ -249,7 +249,8 @@ export default function MeuTrabalhoPage() {
                 </span>
               </button>
               {open && (
-                <div className="border-t border-gray-100">
+                <div className="border-t border-gray-100 overflow-x-auto">
+                  <div className="min-w-[840px]">
                   <TaskListHeader
                     sort={sort}
                     onSort={handleSort}
@@ -269,6 +270,7 @@ export default function MeuTrabalhoPage() {
                       onOpenDetail={setSelectedTask}
                     />
                   ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -396,7 +398,8 @@ export default function MeuTrabalhoPage() {
                   <span className={cn("text-sm font-semibold", group.key === "OVERDUE" ? "text-red-700" : "text-accent-dark")}>{group.label}</span>
                   <span className="text-xs text-gray-500">{group.tasks.length} {group.tasks.length === 1 ? "tarefa" : "tarefas"}</span>
                 </button></h2>
-                {periodOpen[group.key] && <div id={`work-period-${group.key}`} className="border-t border-gray-100">
+                <div id={`work-period-${group.key}`} hidden={!periodOpen[group.key]} className="border-t border-gray-100 overflow-x-auto">
+                  {periodOpen[group.key] && <div className="min-w-[840px]">
                   <TaskListHeader sort={sort} onSort={handleSort} visibleColumns={visibleColumns} onVisibleColumnsChange={setVisibleColumns} />
                   {group.tasks.map((task) => (
                 <TaskRow
@@ -409,7 +412,8 @@ export default function MeuTrabalhoPage() {
                   onOpenDetail={setSelectedTask}
                 />
                   ))}
-                </div>}
+                  </div>}
+                </div>
               </section>)}
             </div>
           ) : (
