@@ -250,7 +250,7 @@ export default function MeuTrabalhoPage() {
               </button>
               {open && (
                 <div className="border-t border-gray-100 overflow-x-auto">
-                  <div className="min-w-[840px]">
+                  <div className="min-w-[840px] sm:min-w-[1120px]">
                   <TaskListHeader
                     sort={sort}
                     onSort={handleSort}
@@ -399,7 +399,7 @@ export default function MeuTrabalhoPage() {
                   <span className="text-xs text-gray-500">{group.tasks.length} {group.tasks.length === 1 ? "tarefa" : "tarefas"}</span>
                 </button></h2>
                 <div id={`work-period-${group.key}`} hidden={!periodOpen[group.key]} className="border-t border-gray-100 overflow-x-auto">
-                  {periodOpen[group.key] && <div className="min-w-[840px]">
+                  {periodOpen[group.key] && <div className="min-w-[840px] sm:min-w-[1120px]">
                   <TaskListHeader sort={sort} onSort={handleSort} visibleColumns={visibleColumns} onVisibleColumnsChange={setVisibleColumns} />
                   {group.tasks.map((task) => (
                 <TaskRow
